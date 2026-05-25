@@ -1,4 +1,4 @@
-# AI 操作日志
+# 操作日志
 
 > 记录每次 PR / AI 辅助操作的摘要
 
@@ -19,3 +19,5 @@
 | 09:41 | 技能配置 | 注册两个自定义 Skill：requirements-clarity（需求澄清）和 lyra（提示词优化） | XCY | ✅ |
 | 09:43 | 补充文档 | CLAUDE.md 新增「自定义技能」章节，记录两个 Skill 说明 | XCY | ✅ |
 | 09:45 | 技能配置 | 将 Skill 文件移至 .claude/skills/ 目录，更新配置路径 | XCY | ✅ |
+| 10:09 | 技能重命名 | requirements-clarity → product-manager，lyra → prompt-polish，改用目录+SKILL.md自动发现 | XCY | ✅ |
+| 10:10 | 项目里程碑 | 项目初始化完成，dev 合并至 main 分支 | XCY | ✅ |

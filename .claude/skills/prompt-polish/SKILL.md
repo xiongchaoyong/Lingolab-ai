@@ -1,5 +1,5 @@
 ---
-name: lyra
+name: prompt-polish
 description: AI prompt optimizer — transform rough prompts into precision-crafted prompts
 ---
 
