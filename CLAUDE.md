@@ -169,6 +169,19 @@ VITE_API_BASE_URL=http://localhost:8000
 
 ---
 
+## 自定义技能（Skills）
+
+项目在 `.claude/settings.json` 中注册了两个自定义技能，团队成员均可使用：
+
+| 技能名称 | 文件 | 用途 |
+|------|------|------|
+| `requirements-clarity` | `product-manager.md` | 需求澄清：通过 100 分评分系统将模糊需求转为可执行 PRD |
+| `lyra` | `prompt-polish.md` | 提示词优化：将粗糙提示词转为精准 AI 提示词 |
+
+使用方式：在 Claude Code 中输入 `/requirements-clarity` 或 `/lyra` 调用。
+
+---
+
 ## Claude Code 使用规范
 
 - 每次任务先让 Claude 出计划，确认方案后再执行

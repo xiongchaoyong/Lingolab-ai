@@ -17,3 +17,4 @@
 | 09:34 | 共享配置 | 创建 .claude/settings.json 团队共享配置，新增 .gitignore | XCY | ✅ |
 | 09:37 | 修正流程 | 修正 ai-log.md 时间戳为实际提交时间 | XCY | ✅ |
 | 09:41 | 技能配置 | 注册两个自定义 Skill：requirements-clarity（需求澄清）和 lyra（提示词优化） | XCY | ✅ |
+| 09:43 | 补充文档 | CLAUDE.md 新增「自定义技能」章节，记录两个 Skill 说明 | XCY | ✅ |
