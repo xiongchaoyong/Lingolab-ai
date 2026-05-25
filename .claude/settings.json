@@ -10,7 +10,7 @@
     ]
   },
   "skills": {
-    "requirements-clarity": "product-manager.md",
-    "lyra": "prompt-polish.md"
+    "requirements-clarity": ".claude/skills/product-manager.md",
+    "lyra": ".claude/skills/prompt-polish.md"
   }
 }
