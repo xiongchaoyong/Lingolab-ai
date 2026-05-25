@@ -8,5 +8,9 @@
       "Bash(git pull:*)",
       "Bash(git branch:*)"
     ]
+  },
+  "skills": {
+    "requirements-clarity": "product-manager.md",
+    "lyra": "prompt-polish.md"
   }
 }

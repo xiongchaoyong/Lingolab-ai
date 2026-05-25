@@ -16,3 +16,4 @@
 | 09:27 | 修正流程 | 规范分支策略：每次开发前自动拉取最新 dev 并创建 feat 分支 | XCY | ✅ |
 | 09:34 | 共享配置 | 创建 .claude/settings.json 团队共享配置，新增 .gitignore | XCY | ✅ |
 | 09:37 | 修正流程 | 修正 ai-log.md 时间戳为实际提交时间 | XCY | ✅ |
+| 09:41 | 技能配置 | 注册两个自定义 Skill：requirements-clarity（需求澄清）和 lyra（提示词优化） | XCY | ✅ |
