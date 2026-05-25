@@ -165,7 +165,7 @@ VITE_API_BASE_URL=http://localhost:8000
 - 重构：`refactor/模块名`
 - 文档：`docs/内容描述`
 
-**仓库地址：**
+**仓库地址：**git@github.com:xiongchaoyong/Lingolab-ai.git   或  https://github.com/xiongchaoyong/Lingolab-ai.git
 
 ---
 

@@ -12,3 +12,4 @@
 | 初始化 | 补充文档 | 新增 ai-log.md，更新经验教训 | XCY | ✅ |
 | 初始化 | 补充文档 | ai-log.md 新增成员列，明确操作归属 | XCY | ✅ |
 | 初始化 | 修正流程 | 规范分支策略：每次开发前自动拉取最新 dev 并创建 feat 分支 | XCY | ✅ |
+| 初始化 | 共享配置 | 创建 .claude/settings.json 团队共享配置，新增 .gitignore | XCY | ✅ |
