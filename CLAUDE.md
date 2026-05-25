@@ -172,4 +172,4 @@ VITE_API_BASE_URL=http://localhost:8000
 > 在此追加 Claude 犯错后的纠正记录，格式如下：
 > `- [日期] 问题描述 → 正确做法`
 
-（暂无记录，项目启动后持续更新）
+- [2026-05-25] 项目初始化 push 后未同步更新 ai-log.md → 每次 git 操作（push、PR 等）必须同步更新 ai-log.md 记录操作摘要
