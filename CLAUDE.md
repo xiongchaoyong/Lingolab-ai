@@ -149,8 +149,9 @@ VITE_API_BASE_URL=http://localhost:8000
 
 **每次开发前（Claude 自动执行，无需人工提醒）：**
 1. 切换到 `dev` 分支：`git checkout dev`
-2. 拉取最新代码：`git pull origin dev`
-3. 基于最新 `dev` 创建功能分支：`git checkout -b feat/功能名`
+2. 拉取 `dev` 最新代码：`git pull origin dev`
+3. 拉取 `main` 最新代码（同步上游）：`git pull origin main`
+4. 基于最新 `dev` 创建功能分支：`git checkout -b feat/功能名`
 
 **开发与提交：**
 4. 小粒度提交，每次只做一件事
@@ -186,7 +187,7 @@ VITE_API_BASE_URL=http://localhost:8000
 ## Claude Code 使用规范
 
 - 每次任务先让 Claude 出计划，确认方案后再执行
-- **开始任何新需求前，Claude 自动执行：checkout dev → pull → 创建 feat 分支，无需人工提醒**
+- **开始任何新需求前，Claude 自动执行：checkout dev → pull dev → pull main → 创建 feat 分支，无需人工提醒**
 - 任务粒度要小，一次只完成一个功能点
 - 涉及数据库、鉴权、支付等高危模块，必须人工主导
 - Claude 犯错被纠正后，立即将教训写入下方「经验教训」章节
