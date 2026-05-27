@@ -1,6 +1,7 @@
-# 🎙️ Lingolab-ai — 英语口语训练系统
+# Lingolab-ai — 英语口语训练系统
 
 > 基于 NLP 与大语言模型的英语口语训练系统，支持实时发音评测、个性化学习路径与沉浸式 AI 对话练习。
+> Speak smarter, not harder.
 
 ---
 
