@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="draw.io" version="26.0.0">
+  <diagram name="Lingolab-ai Architecture">
+    <mxGraphModel>
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- ===== Tier 1: Client ===== -->
+        <mxCell id="client-tier" value="客户端层" style="swimlane;startSize=30;fillColor=#f5f5f5;strokeColor=#666666;fontStyle=1;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="40" y="20" width="840" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="browser" value="浏览器&#xa;Vue 3 SPA" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=12;fontStyle=1;" vertex="1" parent="client-tier">
+          <mxGeometry x="310" y="30" width="220" height="52" as="geometry" />
+        </mxCell>
+
+        <!-- ===== Tier 2: Frontend ===== -->
+        <mxCell id="frontend-tier" value="前端应用层 (Vue 3 + Vite)" style="swimlane;startSize=30;fillColor=#f5f5f5;strokeColor=#666666;fontStyle=1;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="40" y="140" width="840" height="160" as="geometry" />
+        </mxCell>
+        <mxCell id="vue-core" value="Vue 3 + Vite" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" vertex="1" parent="frontend-tier">
+          <mxGeometry x="40" y="35" width="200" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="pinia" value="Pinia Store&#xa;状态管理" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" vertex="1" parent="frontend-tier">
+          <mxGeometry x="280" y="35" width="160" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="router" value="Vue Router&#xa;路由管理" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" vertex="1" parent="frontend-tier">
+          <mxGeometry x="480" y="35" width="160" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="api-client" value="API 请求封装 (Axios)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" vertex="1" parent="frontend-tier">
+          <mxGeometry x="160" y="105" width="520" height="40" as="geometry" />
+        </mxCell>
+
+        <!-- ===== Tier 3: Backend ===== -->
+        <mxCell id="backend-tier" value="后端服务层 (FastAPI)" style="swimlane;startSize=30;fillColor=#f5f5f5;strokeColor=#666666;fontStyle=1;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="40" y="320" width="840" height="160" as="geometry" />
+        </mxCell>
+        <mxCell id="routes" value="API Routes&#xa;路由层" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;" vertex="1" parent="backend-tier">
+          <mxGeometry x="40" y="35" width="200" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="services" value="Services&#xa;业务逻辑层" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;" vertex="1" parent="backend-tier">
+          <mxGeometry x="280" y="35" width="200" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="models" value="Models + Schemas&#xa;SQLAlchemy / Pydantic" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;" vertex="1" parent="backend-tier">
+          <mxGeometry x="520" y="35" width="200" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="core" value="Core: Config / DI / Middleware" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;" vertex="1" parent="backend-tier">
+          <mxGeometry x="160" y="105" width="520" height="40" as="geometry" />
+        </mxCell>
+
+        <!-- ===== Tier 4: AI Services ===== -->
+        <mxCell id="ai-tier" value="AI 能力层" style="swimlane;startSize=30;fillColor=#f5f5f5;strokeColor=#666666;fontStyle=1;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="40" y="500" width="840" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="deepseek" value="Deepseek API&#xa;LLM 对话 / 评分" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;dashed=1;dashPattern=8 8;" vertex="1" parent="ai-tier">
+          <mxGeometry x="120" y="30" width="260" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="whisper" value="Whisper API&#xa;语音转写 / 发音评测" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;dashed=1;dashPattern=8 8;" vertex="1" parent="ai-tier">
+          <mxGeometry x="460" y="30" width="260" height="55" as="geometry" />
+        </mxCell>
+
+        <!-- ===== Tier 5: Data ===== -->
+        <mxCell id="data-tier" value="数据层" style="swimlane;startSize=30;fillColor=#f5f5f5;strokeColor=#666666;fontStyle=1;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="40" y="640" width="840" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="mysql" value="MySQL 8.0&#xa;english_training_dev" style="shape=cylinder3;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;fontStyle=1;size=15;" vertex="1" parent="data-tier">
+          <mxGeometry x="290" y="25" width="260" height="65" as="geometry" />
+        </mxCell>
+
+        <!-- ===== Connections ===== -->
+        <!-- Browser → Vue -->
+        <mxCell id="e1" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=#9673a6;" edge="1" parent="1" source="browser" target="vue-core">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Vue → Router -->
+        <mxCell id="e2" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="vue-core" target="router">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Vue → Pinia -->
+        <mxCell id="e3" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.25;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="vue-core" target="pinia">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Pinia → API Client -->
+        <mxCell id="e4" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="pinia" target="api-client">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Router → API Client -->
+        <mxCell id="e5" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.75;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="router" target="api-client">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- API Client → Routes -->
+        <mxCell id="e6" value="HTTP/REST" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;fontSize=10;fontColor=#666666;" edge="1" parent="1" source="api-client" target="routes">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Routes → Services -->
+        <mxCell id="e7" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="routes" target="services">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Routes → Models -->
+        <mxCell id="e8" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.75;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="routes" target="models">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Services → Core -->
+        <mxCell id="e9" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.25;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="services" target="core">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Models → Core -->
+        <mxCell id="e10" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.75;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="models" target="core">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Services → Deepseek -->
+        <mxCell id="e11" value="LLM 调用" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;fontSize=10;fontColor=#666666;dashed=1;dashPattern=8 8;" edge="1" parent="1" source="services" target="deepseek">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Services → Whisper -->
+        <mxCell id="e12" value="语音转写" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;fontSize=10;fontColor=#666666;dashed=1;dashPattern=8 8;" edge="1" parent="1" source="services" target="whisper">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Models → MySQL -->
+        <mxCell id="e13" value="SQLAlchemy ORM" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;fontSize=10;fontColor=#666666;" edge="1" parent="1" source="models" target="mysql">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
