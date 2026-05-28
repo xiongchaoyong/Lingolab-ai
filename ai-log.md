@@ -39,3 +39,4 @@
 | 08:54 | 需求分析 | 完成全部 16 模块 PRD（P0/P1/P2/P3），含详细流程/边界/验收标准；PRD 汇总总结；创建全流程项目计划文档 project-plan.md | XCY | ✅ |
 | 15:30 | 补充文档 | 新增 Claude Code 团队使用指南（claude-code-团队使用指南.md）和项目文件目录说明（project-directory-guide.md）；更新 .gitignore 忽略 drawio 备份文件 | XCY | ✅ |
 | 15:35 | 推送 | push 至 origin/dev（2 commits：团队使用指南 + 项目目录说明 + .gitignore 修正） | XCY | ✅ |
+| 21:00 | 架构设计 | 绘制项目环境架构图（展现层/应用层/能力层/数据层/基础设施层）+ 系统功能结构图（用户端/管理端/客服子系统），完成技术栈分析与能力层技术标注 | XCY | ✅ |
