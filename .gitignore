@@ -22,3 +22,7 @@ Thumbs.db
 
 # 项目进度记录（本地维护，不提交）
 PROGRESS.md
+
+# draw.io / Office 临时备份文件
+.*.bkp
+~$*.drawio
