@@ -1,5 +1,5 @@
 ---
-name: product-manager
+name: requirements-clarity
 description: 在实施前通过针对性对话澄清模糊需求。当需求不清晰、功能复杂（预计超过2天工作量）、或涉及跨团队协作时使用。提出两个核心问题 - 为什么做？（YAGNI检查）和 能更简单吗？（KISS检查）- 确保编码前需求清晰。
 ---
 
