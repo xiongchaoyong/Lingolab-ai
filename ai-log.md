@@ -49,3 +49,4 @@
 | 09:10 | 流程规范 | 新建功能模块分析文档工作流（三阶段：子功能拆解→用例图→详细规格+流程图），定义输出模板和目录规范 | XCY | ✅ |
 | 09:15 | 技能配置 | 新增 module-analysis 技能（功能模块分析），更新 CLAUDE.md 技能表 | XCY | ✅ |
 | 09:20 | 文档清理 | 删除 docs/project-plan.md（已被 PRD 和工作流文档取代） | XCY | ✅ |
+| 09:50 | 技能重构 | 重命名 product-manager → requirements-clarity，新增需求分析师智能体（deepseek-v4-pro，自动触发），清理根目录重复文件，更新 CLAUDE.md 引用 | XCY | ✅ |
