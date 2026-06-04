@@ -25,8 +25,11 @@
 | 后端 | Python + FastAPI | Python >= 3.11 |
 | 数据库 | MySQL | >= 8.0 |
 | ORM | SQLAlchemy + Alembic | 最新稳定版 |
-| AI/NLP | Deepseek | 按需接入 |
-| 语音处理 | Whisper API（后端转写） | - |
+| AI/NLP | deepseek-v4-flash（深度求索） | 对话生成 / 语法纠错 / 推荐 / 客服 |
+| 语音识别(ASR) | Paraformer（阿里） | 语音转文字，为语法纠错提供文字稿 |
+| 发音评测 | Echoic（开源 MIT） | Docker 本地部署，音素级三维评分（准确度/流利度/完整度） |
+| 语音合成(TTS) | 豆包 TTS（字节跳动） | AI 回复语音合成 + 标准音播放 |
+| 向量数据库 | Milvus（P2 可选） | 长期记忆、个性化推荐语义检索 |
 | 包管理 | 前端 npm，后端 pip + requirements.txt | - |
 
 ---

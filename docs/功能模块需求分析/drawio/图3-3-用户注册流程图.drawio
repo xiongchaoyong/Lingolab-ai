@@ -1,0 +1,182 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="draw.io" version="30.0.4">
+  <diagram name="图 3.2-2 用户注册流程图" id="mod1-reg">
+    <mxGraphModel dx="1200" dy="1400" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="820" pageHeight="650" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <!-- Start -->
+        <mxCell id="s" value="用户提交注册表单" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.5;fontFamily=PingFang SC;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="235" y="8" width="100" height="28" as="geometry"/>
+        </mxCell>
+        <!-- 1. 校验username -->
+        <mxCell id="v1" value="校验 username 唯一性" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.5;fontFamily=PingFang SC;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="200" y="52" width="170" height="22" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_s_v1" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;strokeColor=#000000;strokeWidth=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="s" target="v1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <!-- D1: 唯一? -->
+        <mxCell id="d1" value="唯一?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.5;fontFamily=PingFang SC;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="212" y="90" width="146" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_v1_d1" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;strokeColor=#000000;strokeWidth=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="v1" target="d1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <!-- Err1: 409 -->
+        <mxCell id="e1" value="返回 409「用户名已被注册」" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1;dashed=1;dashPattern=3 3;fontFamily=PingFang SC;fontSize=8;" vertex="1" parent="1">
+          <mxGeometry x="540" y="78" width="170" height="24" as="geometry"/>
+        </mxCell>
+        <mxCell id="end1" value="结束" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1;dashed=1;dashPattern=3 3;fontFamily=PingFang SC;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="590" y="118" width="70" height="24" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_d1_e1" value="否" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;strokeColor=#000000;strokeWidth=1;dashed=1;dashPattern=3 3;fontFamily=PingFang SC;fontSize=8;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="d1" target="e1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="520" y="110"/>
+              <mxPoint x="520" y="90"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_e1_end1" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;strokeColor=#000000;strokeWidth=1;dashed=1;dashPattern=3 3;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="e1" target="end1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <!-- 2. 校验password -->
+        <mxCell id="v2" value="校验 password 复杂度" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.5;fontFamily=PingFang SC;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="200" y="146" width="170" height="22" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_d1_v2" value="是" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;strokeColor=#000000;strokeWidth=1;fontFamily=PingFang SC;fontSize=8;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="d1" target="v2">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <!-- D2: 合规? -->
+        <mxCell id="d2" value="≥8位含字母+数字?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.5;fontFamily=PingFang SC;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="212" y="184" width="146" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_v2_d2" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;strokeColor=#000000;strokeWidth=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="v2" target="d2">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <!-- Err2: 422 -->
+        <mxCell id="e2" value="返回 422「密码需 8-32 位」" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1;dashed=1;dashPattern=3 3;fontFamily=PingFang SC;fontSize=8;" vertex="1" parent="1">
+          <mxGeometry x="540" y="172" width="170" height="24" as="geometry"/>
+        </mxCell>
+        <mxCell id="end2" value="结束" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1;dashed=1;dashPattern=3 3;fontFamily=PingFang SC;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="590" y="212" width="70" height="24" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_d2_e2" value="否" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;strokeColor=#000000;strokeWidth=1;dashed=1;dashPattern=3 3;fontFamily=PingFang SC;fontSize=8;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="d2" target="e2">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="520" y="204"/>
+              <mxPoint x="520" y="184"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_e2_end2" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;strokeColor=#000000;strokeWidth=1;dashed=1;dashPattern=3 3;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="e2" target="end2">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <!-- 3. 校验age -->
+        <mxCell id="v3" value="校验 age 合法性 (1-150)" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.5;fontFamily=PingFang SC;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="200" y="240" width="170" height="22" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_d2_v3" value="是" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;strokeColor=#000000;strokeWidth=1;fontFamily=PingFang SC;fontSize=8;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="d2" target="v3">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <!-- D3: 有效? -->
+        <mxCell id="d3" value="有效年龄?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.5;fontFamily=PingFang SC;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="212" y="278" width="146" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_v3_d3" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;strokeColor=#000000;strokeWidth=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="v3" target="d3">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <!-- Err3: 422 age -->
+        <mxCell id="e3" value="返回 422「请输入有效年龄」" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1;dashed=1;dashPattern=3 3;fontFamily=PingFang SC;fontSize=8;" vertex="1" parent="1">
+          <mxGeometry x="540" y="266" width="170" height="24" as="geometry"/>
+        </mxCell>
+        <mxCell id="end3" value="结束" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1;dashed=1;dashPattern=3 3;fontFamily=PingFang SC;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="590" y="306" width="70" height="24" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_d3_e3" value="否" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;strokeColor=#000000;strokeWidth=1;dashed=1;dashPattern=3 3;fontFamily=PingFang SC;fontSize=8;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="d3" target="e3">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="520" y="298"/>
+              <mxPoint x="520" y="278"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_e3_end3" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;strokeColor=#000000;strokeWidth=1;dashed=1;dashPattern=3 3;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="e3" target="end3">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <!-- 4. bcrypt -->
+        <mxCell id="v4" value="bcrypt 加密密码" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.5;fontFamily=PingFang SC;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="200" y="334" width="170" height="22" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_d3_v4" value="是" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;strokeColor=#000000;strokeWidth=1;fontFamily=PingFang SC;fontSize=8;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="d3" target="v4">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <!-- 5. 年龄归类 -->
+        <mxCell id="v5" value="年龄归类 (儿童/青少年/大学生/职场/中老年)" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.5;fontFamily=PingFang SC;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="160" y="372" width="250" height="22" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_v4_v5" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;strokeColor=#000000;strokeWidth=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="v4" target="v5">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <!-- 6. 写入DB -->
+        <mxCell id="v6" value="写入 user_profiles 表" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.5;fontFamily=PingFang SC;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="200" y="410" width="170" height="22" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_v5_v6" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;strokeColor=#000000;strokeWidth=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="v5" target="v6">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <!-- D4: 写入成功? -->
+        <mxCell id="d4" value="写入成功?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.5;fontFamily=PingFang SC;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="212" y="448" width="146" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_v6_d4" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;strokeColor=#000000;strokeWidth=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="v6" target="d4">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <!-- Err4: 500 -->
+        <mxCell id="e4" value="回滚事务 返回 500 内部错误" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1;dashed=1;dashPattern=3 3;fontFamily=PingFang SC;fontSize=8;" vertex="1" parent="1">
+          <mxGeometry x="540" y="436" width="170" height="24" as="geometry"/>
+        </mxCell>
+        <mxCell id="end4" value="结束" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1;dashed=1;dashPattern=3 3;fontFamily=PingFang SC;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="590" y="476" width="70" height="24" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_d4_e4" value="否" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;strokeColor=#000000;strokeWidth=1;dashed=1;dashPattern=3 3;fontFamily=PingFang SC;fontSize=8;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="d4" target="e4">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="520" y="468"/>
+              <mxPoint x="520" y="448"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e_e4_end4" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;strokeColor=#000000;strokeWidth=1;dashed=1;dashPattern=3 3;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="e4" target="end4">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <!-- 7. 生成JWT -->
+        <mxCell id="v7" value="生成 JWT Token (24h 有效期)" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.5;fontFamily=PingFang SC;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="195" y="504" width="180" height="22" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_d4_v7" value="是" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;strokeColor=#000000;strokeWidth=1;fontFamily=PingFang SC;fontSize=8;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="d4" target="v7">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <!-- 8. 返回结果 -->
+        <mxCell id="v8" value="返回 user_id / username / token&#xa;(assessment_completed=false)" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.5;fontFamily=PingFang SC;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="160" y="542" width="250" height="28" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_v7_v8" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;strokeColor=#000000;strokeWidth=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="v7" target="v8">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <!-- Note -->
+        <mxCell id="note" value="前端收到 token 后强制跳转至水平测评页" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=PingFang SC;fontSize=8;fontColor=#666666;" vertex="1" parent="1">
+          <mxGeometry x="185" y="580" width="200" height="18" as="geometry"/>
+        </mxCell>
+        <!-- End -->
+        <mxCell id="end" value="结束" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.5;fontFamily=PingFang SC;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="250" y="600" width="70" height="28" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_v8_end" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;strokeColor=#000000;strokeWidth=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="v8" target="end">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

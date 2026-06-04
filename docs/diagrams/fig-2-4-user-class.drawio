@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="drawio" version="26.0.0">
+  <diagram name="用户服务模块类图">
+    <mxGraphModel dx="1400" dy="1000" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1000" pageHeight="850">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- API Layer -->
+        <mxCell id="api-group" value="API 路由层 (app/api/)" style="swimlane;startSize=25;fillColor=#FFFFFF;strokeColor=#000000;fontFamily=SimSun;fontSize=10;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="30" width="440" height="130" as="geometry" />
+        </mxCell>
+        <mxCell id="auth-router" value="AuthRouter&#xa;+ POST /register&#xa;+ POST /login&#xa;+ POST /refresh" style="swimlane;startSize=22;fillColor=#FFFFFF;strokeColor=#000000;fontFamily=SimSun;fontSize=9;align=left;spacingLeft=8;" vertex="1" parent="api-group">
+          <mxGeometry x="20" y="35" width="180" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="assess-router" value="AssessmentRouter&#xa;+ GET /questions&#xa;+ POST /answer&#xa;+ GET /result" style="swimlane;startSize=22;fillColor=#FFFFFF;strokeColor=#000000;fontFamily=SimSun;fontSize=9;align=left;spacingLeft=8;" vertex="1" parent="api-group">
+          <mxGeometry x="230" y="35" width="180" height="80" as="geometry" />
+        </mxCell>
+
+        <!-- Service Layer -->
+        <mxCell id="svc-group" value="业务逻辑层 (app/services/)" style="swimlane;startSize=25;fillColor=#FFFFFF;strokeColor=#000000;fontFamily=SimSun;fontSize=10;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="200" width="580" height="130" as="geometry" />
+        </mxCell>
+        <mxCell id="auth-svc" value="AuthService&#xa;+ register(data)&#xa;+ login(user, pw)&#xa;+ verify_token(token)&#xa;+ hash_password(pw)" style="swimlane;startSize=22;fillColor=#FFFFFF;strokeColor=#000000;fontFamily=SimSun;fontSize=9;align=left;spacingLeft=8;" vertex="1" parent="svc-group">
+          <mxGeometry x="20" y="35" width="200" height="85" as="geometry" />
+        </mxCell>
+        <mxCell id="assess-svc" value="AssessmentService&#xa;+ get_question(difficulty)&#xa;+ evaluate_answer(q, a)&#xa;+ calc_final_level(scores)&#xa;+ adaptive_adjust(prev, correct)" style="swimlane;startSize=22;fillColor=#FFFFFF;strokeColor=#000000;fontFamily=SimSun;fontSize=9;align=left;spacingLeft=8;" vertex="1" parent="svc-group">
+          <mxGeometry x="260" y="35" width="240" height="85" as="geometry" />
+        </mxCell>
+        <mxCell id="path-gen" value="PathGenerator&#xa;+ generate_daily_tasks(user)&#xa;+ rule_engine_6steps(profile)&#xa;+ handle_feedback(op)" style="swimlane;startSize=22;fillColor=#FFFFFF;strokeColor=#000000;fontFamily=SimSun;fontSize=9;align=left;spacingLeft=8;" vertex="1" parent="svc-group">
+          <mxGeometry x="20" y="130" width="200" height="70" style="swimlane;startSize=22;fillColor=#FFFFFF;strokeColor=#000000;fontFamily=SimSun;fontSize=9;align=left;spacingLeft=8;" vertex="1" parent="svc-group">
+            <mxGeometry x="20" y="130" width="200" height="70" />
+          </mxCell>
+        </mxCell>
+
+        <!-- Model Layer -->
+        <mxCell id="model-group" value="数据模型层 (app/models/)" style="swimlane;startSize=25;fillColor=#FFFFFF;strokeColor=#000000;fontFamily=SimSun;fontSize=10;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="370" width="580" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="user-profile" value="UserProfile&#xa;+ id, username, password_hash&#xa;+ age_group, learning_goal&#xa;+ level_final, interests&#xa;+ assessment_completed" style="swimlane;startSize=22;fillColor=#FFFFFF;strokeColor=#000000;fontFamily=SimSun;fontSize=9;align=left;spacingLeft=8;" vertex="1" parent="model-group">
+          <mxGeometry x="20" y="35" width="200" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="assess-record" value="AssessmentRecord&#xa;+ id, user_id (FK)&#xa;+ question_id, dimension&#xa;+ user_answer, score&#xa;+ difficulty_level" style="swimlane;startSize=22;fillColor=#FFFFFF;strokeColor=#000000;fontFamily=SimSun;fontSize=9;align=left;spacingLeft=8;" vertex="1" parent="model-group">
+          <mxGeometry x="250" y="35" width="200" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="daily-task" value="DailyTask&#xa;+ id, user_id (FK)&#xa;+ task_date&#xa;+ tasks (JSON)&#xa;+ status" style="swimlane;startSize=22;fillColor=#FFFFFF;strokeColor=#000000;fontFamily=SimSun;fontSize=9;align=left;spacingLeft=8;" vertex="1" parent="model-group">
+          <mxGeometry x="480" y="35" width="180" height="100" />
+        </mxCell>
+
+        <!-- External Utils -->
+        <mxCell id="util-group" value="外部工具层 (app/utils/)" style="swimlane;startSize=25;fillColor=#FFFFFF;strokeColor=#000000;fontFamily=SimSun;fontSize=10;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="520" width="400" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="whisper" value="WhisperClient&#xa;+ transcribe(audio)&#xa;+ align_phonemes(text, audio)" style="swimlane;startSize=22;fillColor=#FFFFFF;strokeColor=#000000;fontFamily=SimSun;fontSize=9;align=left;spacingLeft=8;" vertex="1" parent="util-group">
+          <mxGeometry x="20" y="35" width="170" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="deepseek-c" value="DeepseekClient&#xa;+ chat(messages)&#xa;+ score(prompt, text)" style="swimlane;startSize=22;fillColor=#FFFFFF;strokeColor=#000000;fontFamily=SimSun;fontSize=9;align=left;spacingLeft=8;" vertex="1" parent="util-group">
+          <mxGeometry x="210" y="35" width="170" height="55" as="geometry" />
+        </mxCell>
+
+        <!-- Frontend -->
+        <mxCell id="fe-group" value="前端 (Vue 3)" style="swimlane;startSize=25;fillColor=#FFFFFF;strokeColor=#000000;fontFamily=SimSun;fontSize=10;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="520" y="520" width="350" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="auth-store" value="AuthStore (Pinia)&#xa;+ user, token, isLoggedIn&#xa;+ login() / logout()" style="swimlane;startSize=22;fillColor=#FFFFFF;strokeColor=#000000;fontFamily=SimSun;fontSize=9;align=left;spacingLeft=8;" vertex="1" parent="fe-group">
+          <mxGeometry x="15" y="35" width="155" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="fe-views" value="Views&#xa;Register / Login / Assessment" style="swimlane;startSize=22;fillColor=#FFFFFF;strokeColor=#000000;fontFamily=SimSun;fontSize=9;align=left;spacingLeft=8;" vertex="1" parent="fe-group">
+          <mxGeometry x="185" y="35" width="150" height="55" as="geometry" />
+        </mxCell>
+
+        <!-- Edges: Router → Service -->
+        <mxCell id="e1" value="依赖" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontFamily=SimSun;fontSize=8;endArrow=open;endFill=0;dashed=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="auth-router" target="auth-svc">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" value="依赖" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontFamily=SimSun;fontSize=8;endArrow=open;endFill=0;dashed=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="assess-router" target="assess-svc">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- Edges: Service → Model -->
+        <mxCell id="e3" value="ORM 操作" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontFamily=SimSun;fontSize=8;endArrow=classic;endFill=1;exitX=0.25;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="auth-svc" target="user-profile">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e4" value="ORM 操作" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontFamily=SimSun;fontSize=8;endArrow=classic;endFill=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="assess-svc" target="assess-record">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e5" value="ORM 操作" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontFamily=SimSun;fontSize=8;endArrow=classic;endFill=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="path-gen" target="daily-task">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="175" y="350" />
+              <mxPoint x="530" y="350" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- Service → AI -->
+        <mxCell id="e6" value="调用" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontFamily=SimSun;fontSize=8;endArrow=classic;endFill=1;exitX=0.4;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="assess-svc" target="whisper">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="396" y="360" />
+              <mxPoint x="135" y="360" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e7" value="调用" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontFamily=SimSun;fontSize=8;endArrow=classic;endFill=1;exitX=0.6;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="assess-svc" target="deepseek-c">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="424" y="360" />
+              <mxPoint x="335" y="360" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- Frontend → Router -->
+        <mxCell id="e8" value="HTTP REST" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fontFamily=SimSun;fontSize=8;endArrow=classic;endFill=1;exitX=0.2;exitY=0;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="auth-store" target="auth-router">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="551" y="520" />
+              <mxPoint x="551" y="20" />
+              <mxPoint x="260" y="20" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
