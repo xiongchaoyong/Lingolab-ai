@@ -1,0 +1,16 @@
+# ASR - WhisperX
+whisperx>=3.1.0
+faster-whisper>=1.0.0
+
+# PyTorch (Apple Silicon MPS 加速)
+torch>=2.0.0
+torchaudio>=2.0.0
+
+# 音频处理
+librosa>=0.10.0
+soundfile>=0.12.0
+pydub>=0.25.0
+
+# 工具
+numpy>=1.24.0
+tqdm>=4.65.0

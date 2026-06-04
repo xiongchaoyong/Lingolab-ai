@@ -1,7 +1,7 @@
 # Lingolab-ai 产品需求文档 (PRD)
 
 > **创建时间**：2026-05-27  | **版本**：1.1 | 作者：XCY
-> **最后更新**：2026-06-04 — 更新模型架构（WhisperX + deepseek-v4-flash + wav2vec2(Meta) + 豆包TTS + Milvus）
+> **最后更新**：2026-06-04 — 更新模型架构（WhisperX + deepseek-v4-flash + wav2vec2(Meta) + Edge TTS + Milvus）
 
 ---
 
@@ -24,7 +24,7 @@
 
 ![system-boundary](/Users/x/Desktop/大项目/Lingolab-ai/docs/diagrams/png/system-boundary.png)
 
-> 外部依赖：deepseek-v4-flash API、WhisperX（自部署）、wav2vec2（自部署）、豆包 TTS API、对象存储
+> 外部依赖：deepseek-v4-flash API、WhisperX（自部署）、wav2vec2（自部署）、Edge TTS（免费，无需注册）、对象存储
 > 一期不做：直播课、线下约课、支付系统
 
 ### 1.4 模块依赖关系

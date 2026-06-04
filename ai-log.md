@@ -74,4 +74,6 @@
 
 | 时间  | 操作     | 描述                                                         | 成员 |      |
 | ----- | -------- | :----------------------------------------------------------- | :--: | :--: |
-| 10:00 | PRD 迭代 | PRD v1.1 模型架构重构：Whisper→Paraformer、Deepseek→deepseek-v4-flash、Edge TTS→豆包TTS，发音评测从讯飞/驰声→Echoic开源方案(MIT/Docker)，管线化架构，延迟目标调整为5s，新增成本分析(全栈月费约15元)；同步更新 CLAUDE.md | XCY  |  ✅   |
+| 10:00 | PRD 迭代 | PRD v1.1 模型架构重构：Whisper→Paraformer→WhisperX、Deepseek→deepseek-v4-flash、Edge TTS→豆包TTS，发音评测从讯飞/驰声→Echoic→wav2vec2(Meta)，管线化架构，延迟目标调整为5s，新增成本分析(全栈月费约15元)；同步更新 CLAUDE.md | XCY  |  ✅   |
+| 20:00 | 模型验证 | WhisperX + wav2vec2 + Edge TTS 三模型实测验证：WhisperX small 转录 1.3s + 单词对齐 0.1s (Apple M4 CPU int8)，wav2vec2 GOP 发音评分 MPS 加速通过，Edge TTS 4音色 SSML 句级时间戳通过；TTS 方案回退：豆包 TTS(收费)→Edge TTS(免费) | XCY | ✅ |
+| 20:30 | 文档更新 | 更新 CLAUDE.md + model-architecture-v1.1.md + lingolab-ai-v1.0-prd.md，豆包 TTS→Edge TTS，新增实测验证章节(含耗时/设备/模型存储位置/关键发现)，修正环境变量配置 | XCY | ✅ |
