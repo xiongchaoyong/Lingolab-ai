@@ -1,6 +1,6 @@
 <mxfile host="Electron">
   <diagram name="Lingolab-ai 项目环境图" id="0">
-    <mxGraphModel dx="1097" dy="539" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+    <mxGraphModel dx="2187" dy="1191" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
@@ -89,7 +89,7 @@
           <mxGeometry height="112" width="250" x="890" y="35" as="geometry" />
         </mxCell>
         <mxCell id="capInfraText" parent="layer3" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;fontSize=10;spacingLeft=8;spacingTop=5;" value="日志监控与链路追踪（FastAPI Middleware · 结构化日志）&#xa;限流熔断与服务保护（Nginx rate limiting · 慢查询拦截）&#xa;消息推送与系统通知（notices 表 · 站内消息）" vertex="1">
-          <mxGeometry height="88" width="243" x="893" y="55" as="geometry" />
+          <mxGeometry height="88" width="243" x="897" y="55" as="geometry" />
         </mxCell>
         <mxCell id="layer4" parent="1" style="swimlane;startSize=28;fillColor=#e8f0fe;strokeColor=#6c8ebf;fontStyle=1;fontSize=13;swimlaneFillColor=#e8f0fe;" value="数据层" vertex="1">
           <mxGeometry height="150" width="1160" x="20" y="745" as="geometry" />

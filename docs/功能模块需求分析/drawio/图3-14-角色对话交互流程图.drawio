@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="draw.io" version="30.0.4">
+  <diagram name="图 3.3-8 角色对话交互流程图" id="mod2-roleplay">
+    <mxGraphModel dx="1100" dy="1100" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="820" pageHeight="620" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/><mxCell id="1" parent="0"/>
+        <mxCell id="s" value="用户选择角色" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.5;fontFamily=PingFang SC;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="235" y="5" width="110" height="28" as="geometry"/>
+        </mxCell>
+        <mxCell id="v_card" value="展示角色说明卡 (角色目标/常见用语/建议话术)" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.5;fontFamily=PingFang SC;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="150" y="50" width="280" height="22" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_s_card" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;strokeColor=#000000;strokeWidth=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="s" target="v_card">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <!-- Roles note -->
+        <mxCell id="note_role" value="角色: 面试者(1) / 服务员(2) / 导游(3)" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=PingFang SC;fontSize=8;fontColor=#666666;" vertex="1" parent="1">
+          <mxGeometry x="185" y="74" width="210" height="14" as="geometry"/>
+        </mxCell>
+        <mxCell id="v_prompt" value="注入角色 Prompt (AI角色设定 + 场景描述 + 评分侧重)" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.5;fontFamily=PingFang SC;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="140" y="96" width="300" height="22" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_card_prompt" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;strokeColor=#000000;strokeWidth=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="v_card" target="v_prompt">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="v_open" value="AI 角色开场白 (文字 + TTS)" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.5;fontFamily=PingFang SC;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="180" y="134" width="220" height="22" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_prompt_open" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;strokeColor=#000000;strokeWidth=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="v_prompt" target="v_open">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <!-- Conversation loop -->
+        <mxCell id="v_voice" value="用户语音输入 (WAV ≤30s)" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.5;fontFamily=PingFang SC;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="185" y="172" width="210" height="22" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_open_voice" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;strokeColor=#000000;strokeWidth=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="v_open" target="v_voice">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="v_whisper" value="Whisper 转写" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.5;fontFamily=PingFang SC;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="215" y="210" width="150" height="22" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_voice_whisper" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;strokeColor=#000000;strokeWidth=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="v_voice" target="v_whisper">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <!-- Role deviation check -->
+        <mxCell id="d1" value="中文/沉默?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.5;fontFamily=PingFang SC;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="217" y="248" width="146" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_whisper_d1" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;strokeColor=#000000;strokeWidth=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="v_whisper" target="d1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_cn" value="回复: Sorry, could you say that in English?" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1;dashed=1;dashPattern=3 3;fontFamily=PingFang SC;fontSize=8;" vertex="1" parent="1">
+          <mxGeometry x="540" y="236" width="180" height="24" as="geometry"/>
+        </mxCell>
+        <mxCell id="end_cn" value="回到录音" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1;dashed=1;dashPattern=3 3;fontFamily=PingFang SC;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="595" y="276" width="70" height="24" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_d1_cn" value="是" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;strokeColor=#000000;strokeWidth=1;dashed=1;dashPattern=3 3;fontFamily=PingFang SC;fontSize=8;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="d1" target="e_cn">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="520" y="268"/><mxPoint x="520" y="248"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e_cn_end" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;strokeColor=#000000;strokeWidth=1;dashed=1;dashPattern=3 3;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="e_cn" target="end_cn">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="v_rdev" value="检测角色偏离 → AI 温和拉回 (如面试: As the interviewer...)" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1;dashed=1;dashPattern=3 3;fontFamily=PingFang SC;fontSize=8;" vertex="1" parent="1">
+          <mxGeometry x="100" y="304" width="310" height="22" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_d1_rdev" value="否(偏离)" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;strokeColor=#000000;strokeWidth=1;dashed=1;dashPattern=3 3;fontFamily=PingFang SC;fontSize=8;exitX=0;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="d1" target="v_rdev">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="217" y="294"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e_rdev_v2" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;strokeColor=#000000;strokeWidth=1;dashed=1;dashPattern=3 3;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="v_rdev" target="v_voice">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="255" y="336"/><mxPoint x="50" y="336"/><mxPoint x="50" y="183"/></Array></mxGeometry>
+        </mxCell>
+        <!-- Main flow -->
+        <mxCell id="v_ds" value="Deepseek 生成角色回复 (注入角色 Prompt + 10轮上下文)" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.5;fontFamily=PingFang SC;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="130" y="344" width="320" height="22" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_d1_vds" value="否(正常)" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;strokeColor=#000000;strokeWidth=1;fontFamily=PingFang SC;fontSize=8;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="d1" target="v_ds">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="v_tts" value="TTS 语音合成 + 展示文字" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.5;fontFamily=PingFang SC;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="185" y="382" width="210" height="22" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_ds_tts" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;strokeColor=#000000;strokeWidth=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="v_ds" target="v_tts">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="d2" value="对话继续?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.5;fontFamily=PingFang SC;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="217" y="420" width="146" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_tts_d2" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;strokeColor=#000000;strokeWidth=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="v_tts" target="d2">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_d2_loop" value="是 (5-10轮)" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;strokeColor=#000000;strokeWidth=1;fontFamily=PingFang SC;fontSize=8;exitX=0;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="d2" target="v_voice">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="50" y="440"/><mxPoint x="50" y="183"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="v_score" value="四维角色评分: 角色贴合度 40% + 场景礼仪 25% + 专业术语 20% + 应对能力 15%" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.5;fontFamily=PingFang SC;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="100" y="476" width="380" height="22" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_d2_score" value="否" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;strokeColor=#000000;strokeWidth=1;fontFamily=PingFang SC;fontSize=8;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="d2" target="v_score">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="v_save" value="存入 conversation_sessions (含 role_id + 评分) + messages" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.5;fontFamily=PingFang SC;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="140" y="514" width="300" height="22" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_score_save" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;strokeColor=#000000;strokeWidth=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="v_score" target="v_save">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="end" value="结束" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.5;fontFamily=PingFang SC;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="255" y="554" width="70" height="28" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_save_end" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;strokeColor=#000000;strokeWidth=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="v_save" target="end">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

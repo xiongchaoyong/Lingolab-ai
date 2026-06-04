@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="draw.io" version="30.0.4">
+  <diagram name="图 3.3-7 语法错误检测流程图" id="mod2-grammar">
+    <mxGraphModel dx="1100" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="820" pageHeight="560" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/><mxCell id="1" parent="0"/>
+        <mxCell id="s" value="每轮对话触发" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.5;fontFamily=PingFang SC;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="235" y="5" width="110" height="28" as="geometry"/>
+        </mxCell>
+        <mxCell id="v1" value="获取转写文本 + 置信度 + 前 3 轮上下文" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.5;fontFamily=PingFang SC;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="165" y="50" width="250" height="22" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_s_v1" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;strokeColor=#000000;strokeWidth=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="s" target="v1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="d1" value="文本 ≥ 3 词?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.5;fontFamily=PingFang SC;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="217" y="88" width="146" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_v1_d1" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;strokeColor=#000000;strokeWidth=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="v1" target="d1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_no" value="标注「回复太短，建议展开表达」" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1;dashed=1;dashPattern=3 3;fontFamily=PingFang SC;fontSize=8;" vertex="1" parent="1">
+          <mxGeometry x="540" y="76" width="190" height="24" as="geometry"/>
+        </mxCell>
+        <mxCell id="end_n" value="结束" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1;dashed=1;dashPattern=3 3;fontFamily=PingFang SC;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="600" y="116" width="70" height="24" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_d1_no" value="否" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;strokeColor=#000000;strokeWidth=1;dashed=1;dashPattern=3 3;fontFamily=PingFang SC;fontSize=8;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="d1" target="e_no">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="520" y="108"/><mxPoint x="520" y="88"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e_no_end" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;strokeColor=#000000;strokeWidth=1;dashed=1;dashPattern=3 3;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="e_no" target="end_n">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="v2" value="Deepseek 语法检查 (6 类错误识别)" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.5;fontFamily=PingFang SC;fontSize=9;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="180" y="144" width="220" height="22" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_d1_v2" value="是" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;strokeColor=#000000;strokeWidth=1;fontFamily=PingFang SC;fontSize=8;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="d1" target="v2">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="note_g" value="时态 | 主谓一致 | 冠词 | 介词 | 词序 | 单复数" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=PingFang SC;fontSize=8;fontColor=#666666;" vertex="1" parent="1">
+          <mxGeometry x="190" y="168" width="200" height="14" as="geometry"/>
+        </mxCell>
+        <mxCell id="d2" value="检测到错误?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.5;fontFamily=PingFang SC;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="217" y="190" width="146" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_v2_d2" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;strokeColor=#000000;strokeWidth=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="v2" target="d2">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_ok" value="✅ 展示「This sounds good!」" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1;dashed=1;dashPattern=3 3;fontFamily=PingFang SC;fontSize=8;" vertex="1" parent="1">
+          <mxGeometry x="540" y="178" width="170" height="24" as="geometry"/>
+        </mxCell>
+        <mxCell id="end_ok" value="结束" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1;dashed=1;dashPattern=3 3;fontFamily=PingFang SC;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="590" y="218" width="70" height="24" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_d2_ok" value="否" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;strokeColor=#000000;strokeWidth=1;dashed=1;dashPattern=3 3;fontFamily=PingFang SC;fontSize=8;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="d2" target="e_ok">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="520" y="210"/><mxPoint x="520" y="190"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e_ok_end" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;strokeColor=#000000;strokeWidth=1;dashed=1;dashPattern=3 3;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="e_ok" target="end_ok">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="v3" value="输出: 错误列表 (word/correction/type/position) + 修正版全文" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.5;fontFamily=PingFang SC;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="110" y="246" width="360" height="22" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_d2_v3" value="是" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;strokeColor=#000000;strokeWidth=1;fontFamily=PingFang SC;fontSize=8;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="d2" target="v3">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="v4" value="润色建议 (礼貌升级/口语化/俚语/缩略/精简) 默认折叠" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.5;fontFamily=PingFang SC;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="115" y="284" width="350" height="22" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_v3_v4" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;strokeColor=#000000;strokeWidth=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="v3" target="v4">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="d3" value="用户采纳?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.5;fontFamily=PingFang SC;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="217" y="322" width="146" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_v4_d3" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;strokeColor=#000000;strokeWidth=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="v4" target="d3">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_adopt" value="标记 polish_adopted=true" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1;dashed=1;dashPattern=3 3;fontFamily=PingFang SC;fontSize=8;" vertex="1" parent="1">
+          <mxGeometry x="540" y="310" width="170" height="24" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_d3_adopt" value="是" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;strokeColor=#000000;strokeWidth=1;fontFamily=PingFang SC;fontSize=8;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="d3" target="e_adopt">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="520" y="342"/><mxPoint x="520" y="322"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="v5" value="存入 conversation_messages (grammar_check JSON)" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.5;fontFamily=PingFang SC;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="145" y="378" width="290" height="22" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_d3_v5" value="否" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;strokeColor=#000000;strokeWidth=1;fontFamily=PingFang SC;fontSize=8;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="d3" target="v5">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_adopt_v5" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;strokeColor=#000000;strokeWidth=1;dashed=1;dashPattern=3 3;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="e_adopt" target="v5">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="625" y="368"/><mxPoint x="290" y="368"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="v_tip" value="多次同类型错误 → 对话结束汇总「常见错误 Top 3」" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1;dashed=1;dashPattern=3 3;fontFamily=PingFang SC;fontSize=8;" vertex="1" parent="1">
+          <mxGeometry x="105" y="416" width="310" height="22" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_v5_tip" value="汇总" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;strokeColor=#000000;strokeWidth=1;dashed=1;dashPattern=3 3;fontFamily=PingFang SC;fontSize=8;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="v5" target="v_tip">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="end" value="结束" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.5;fontFamily=PingFang SC;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="255" y="454" width="70" height="28" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_tip_end" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;strokeColor=#000000;strokeWidth=1;dashed=1;dashPattern=3 3;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="v_tip" target="end">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

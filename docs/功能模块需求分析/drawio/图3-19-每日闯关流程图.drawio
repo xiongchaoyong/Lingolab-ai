@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="draw.io" version="30.0.4">
+  <diagram name="图 3.5-2 每日闯关流程图" id="mod4-challenge">
+    <mxGraphModel dx="1100" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="820" pageHeight="540" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/><mxCell id="1" parent="0"/>
+        <mxCell id="s" value="开始闯关" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.5;fontFamily=PingFang SC;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="250" y="5" width="80" height="28" as="geometry"/>
+        </mxCell>
+        <mxCell id="d0" value="今日已完成?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.5;fontFamily=PingFang SC;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="217" y="50" width="146" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_s_d0" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;strokeColor=#000000;strokeWidth=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="s" target="d0">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_done" value="「明天再来挑战」" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1;dashed=1;dashPattern=3 3;fontFamily=PingFang SC;fontSize=8;" vertex="1" parent="1">
+          <mxGeometry x="540" y="38" width="150" height="24" as="geometry"/>
+        </mxCell>
+        <mxCell id="end_done" value="结束" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1;dashed=1;dashPattern=3 3;fontFamily=PingFang SC;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="580" y="78" width="70" height="24" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_d0_done" value="是" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;strokeColor=#000000;strokeWidth=1;dashed=1;dashPattern=3 3;fontFamily=PingFang SC;fontSize=8;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="d0" target="e_done">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="520" y="70"/><mxPoint x="520" y="50"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e_done_end" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;strokeColor=#000000;strokeWidth=1;dashed=1;dashPattern=3 3;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="e_done" target="end_done">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="v1" value="关卡 1-5 难度递增 A1→B2" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.5;fontFamily=PingFang SC;fontSize=9;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="200" y="106" width="180" height="22" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_d0_v1" value="否" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;strokeColor=#000000;strokeWidth=1;fontFamily=PingFang SC;fontSize=8;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="d0" target="v1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="v2" value="用户跟读 → 调用发音评分 API" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.5;fontFamily=PingFang SC;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="185" y="144" width="210" height="22" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_v1_v2" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;strokeColor=#000000;strokeWidth=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="v1" target="v2">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="d1" value="发音分 ≥ 70?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.5;fontFamily=PingFang SC;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="217" y="182" width="146" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_v2_d1" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;strokeColor=#000000;strokeWidth=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="v2" target="d1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_fail" value="第 N 次失败? N≥3 → 提示听标准音" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1;dashed=1;dashPattern=3 3;fontFamily=PingFang SC;fontSize=8;" vertex="1" parent="1">
+          <mxGeometry x="540" y="170" width="180" height="24" as="geometry"/>
+        </mxCell>
+        <mxCell id="end_f" value="重试" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1;dashed=1;dashPattern=3 3;fontFamily=PingFang SC;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="595" y="210" width="70" height="24" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_d1_fail" value="否" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;strokeColor=#000000;strokeWidth=1;dashed=1;dashPattern=3 3;fontFamily=PingFang SC;fontSize=8;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="d1" target="e_fail">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="520" y="202"/><mxPoint x="520" y="182"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e_fail_end" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;strokeColor=#000000;strokeWidth=1;dashed=1;dashPattern=3 3;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="e_fail" target="end_f">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="v3" value="通过 +20 分" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.5;fontFamily=PingFang SC;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="235" y="238" width="110" height="22" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_d1_v3" value="是" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;strokeColor=#000000;strokeWidth=1;fontFamily=PingFang SC;fontSize=8;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="d1" target="v3">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="d2" value="还有下一关?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.5;fontFamily=PingFang SC;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="217" y="276" width="146" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_v3_d2" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;strokeColor=#000000;strokeWidth=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="v3" target="d2">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_d2_loop" value="是" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;strokeColor=#000000;strokeWidth=1;fontFamily=PingFang SC;fontSize=8;exitX=0;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="d2" target="v2">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="50" y="296"/><mxPoint x="50" y="155"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="v4" value="全通 +30 积分, 计算总分" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.5;fontFamily=PingFang SC;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="200" y="332" width="180" height="22" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_d2_v4" value="否" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;strokeColor=#000000;strokeWidth=1;fontFamily=PingFang SC;fontSize=8;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="d2" target="v4">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="v5" value="更新积分 + 检查勋章触发 (连续 7 天 → 坚持之星等)" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.5;fontFamily=PingFang SC;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="130" y="370" width="320" height="22" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_v4_v5" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;strokeColor=#000000;strokeWidth=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="v4" target="v5">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="end" value="结束" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.5;fontFamily=PingFang SC;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="255" y="410" width="70" height="28" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_v5_end" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;strokeColor=#000000;strokeWidth=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="v5" target="end">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="draw.io" version="30.0.4">
+  <diagram name="图 3.3-5 AI 回复生成流程图" id="mod2-reply">
+    <mxGraphModel dx="1100" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="820" pageHeight="560" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/><mxCell id="1" parent="0"/>
+        <mxCell id="s" value="接收转写文本" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.5;fontFamily=PingFang SC;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="235" y="5" width="110" height="28" as="geometry"/>
+        </mxCell>
+        <mxCell id="v1" value="获取 CEFR 等级 + 场景 ID + 前 10 轮上下文" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.5;fontFamily=PingFang SC;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="150" y="50" width="280" height="22" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_s_v1" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;strokeColor=#000000;strokeWidth=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="s" target="v1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="d1" value="CEFR 等级?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.5;fontFamily=PingFang SC;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="217" y="88" width="146" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_v1_d1" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;strokeColor=#000000;strokeWidth=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="v1" target="d1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <!-- A1-A2 basic -->
+        <mxCell id="va" value="A1-A2 基础: 500-1000词, 慢语速 120wpm, 1-2句, 每轮轻提示" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.5;fontFamily=PingFang SC;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="100" y="144" width="340" height="22" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_d1_a" value="A1-A2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;strokeColor=#000000;strokeWidth=1;fontFamily=PingFang SC;fontSize=8;exitX=0;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="d1" target="va">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="217" y="134"/></Array></mxGeometry>
+        </mxCell>
+        <!-- B1 intermediate -->
+        <mxCell id="vb" value="B1 中阶: 1500-2500词, 正常 150wpm, 2-3句, 每3轮提示" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.5;fontFamily=PingFang SC;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="100" y="180" width="340" height="22" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_d1_b" value="B1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;strokeColor=#000000;strokeWidth=1;fontFamily=PingFang SC;fontSize=8;exitX=0;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="d1" target="vb">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="217" y="134"/></Array></mxGeometry>
+        </mxCell>
+        <!-- B2+ advanced -->
+        <mxCell id="vc" value="B2+ 高阶: 3000+词, 偏快 170wpm, 3-5句, 仅明显错误纠正" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.5;fontFamily=PingFang SC;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="100" y="216" width="340" height="22" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_d1_c" value="B2+" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;strokeColor=#000000;strokeWidth=1;fontFamily=PingFang SC;fontSize=8;exitX=0;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="d1" target="vc">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="217" y="134"/></Array></mxGeometry>
+        </mxCell>
+        <!-- Merge to Deepseek -->
+        <mxCell id="v2" value="组装 Prompt (等级策略 + 场景上下文 + 10轮历史)" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.5;fontFamily=PingFang SC;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="145" y="254" width="290" height="22" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_va_v2" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;strokeColor=#000000;strokeWidth=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="va" target="v2">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="270" y="244"/><mxPoint x="290" y="244"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e_vb_v2" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;strokeColor=#000000;strokeWidth=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="vb" target="v2">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="270" y="244"/><mxPoint x="290" y="244"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e_vc_v2" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;strokeColor=#000000;strokeWidth=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="vc" target="v2">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="270" y="244"/><mxPoint x="290" y="244"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="v3" value="Deepseek 生成回复" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.5;fontFamily=PingFang SC;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="200" y="292" width="180" height="22" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_v2_v3" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;strokeColor=#000000;strokeWidth=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="v2" target="v3">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <!-- Quality check -->
+        <mxCell id="d2" value="质量检查?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.5;fontFamily=PingFang SC;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="217" y="330" width="146" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_v3_d2" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;strokeColor=#000000;strokeWidth=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="v3" target="d2">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_timeout" value="超时 → 应急回复" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1;dashed=1;dashPattern=3 3;fontFamily=PingFang SC;fontSize=8;" vertex="1" parent="1">
+          <mxGeometry x="540" y="318" width="150" height="24" as="geometry"/>
+        </mxCell>
+        <mxCell id="end_to" value="结束" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1;dashed=1;dashPattern=3 3;fontFamily=PingFang SC;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="580" y="358" width="70" height="24" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_d2_timeout" value="异常" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;strokeColor=#000000;strokeWidth=1;dashed=1;dashPattern=3 3;fontFamily=PingFang SC;fontSize=8;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="d2" target="e_timeout">
+          <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="520" y="350"/><mxPoint x="520" y="330"/></Array></mxGeometry>
+        </mxCell>
+        <mxCell id="e_to_end" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;strokeColor=#000000;strokeWidth=1;dashed=1;dashPattern=3 3;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="e_timeout" target="end_to">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="v4" value="TTS 语音合成 + 返回回复文本" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.5;fontFamily=PingFang SC;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="180" y="386" width="220" height="22" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_d2_v4" value="通过" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;strokeColor=#000000;strokeWidth=1;fontFamily=PingFang SC;fontSize=8;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="d2" target="v4">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="v5" value="存入 conversation_messages (含回复+语法检查+评分)" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.5;fontFamily=PingFang SC;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="145" y="424" width="290" height="22" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_v4_v5" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;strokeColor=#000000;strokeWidth=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="v4" target="v5">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="end" value="结束" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.5;fontFamily=PingFang SC;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="255" y="464" width="70" height="28" as="geometry"/>
+        </mxCell>
+        <mxCell id="e_v5_end" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;strokeColor=#000000;strokeWidth=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="v5" target="end">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
