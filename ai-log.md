@@ -77,3 +77,21 @@
 | 10:00 | PRD 迭代 | PRD v1.1 模型架构重构：Whisper→Paraformer→WhisperX、Deepseek→deepseek-v4-flash、Edge TTS→豆包TTS，发音评测从讯飞/驰声→Echoic→wav2vec2(Meta)，管线化架构，延迟目标调整为5s，新增成本分析(全栈月费约15元)；同步更新 CLAUDE.md | XCY  |  ✅   |
 | 20:00 | 模型验证 | WhisperX + wav2vec2 + Edge TTS 三模型实测验证：WhisperX small 转录 1.3s + 单词对齐 0.1s (Apple M4 CPU int8)，wav2vec2 GOP 发音评分 MPS 加速通过，Edge TTS 4音色 SSML 句级时间戳通过；TTS 方案回退：豆包 TTS(收费)→Edge TTS(免费) | XCY | ✅ |
 | 20:30 | 文档更新 | 更新 CLAUDE.md + model-architecture-v1.1.md + lingolab-ai-v1.0-prd.md，豆包 TTS→Edge TTS，新增实测验证章节(含耗时/设备/模型存储位置/关键发现)，修正环境变量配置 | XCY | ✅ |
+
+## 2026-06-05
+
+| 时间  | 操作     | 描述                                                         | 成员 |      |
+| ----- | -------- | :----------------------------------------------------------- | :--: | :--: |
+| 10:00 | 后端骨架 | 搭建 FastAPI 项目骨架：创建 app/ 目录结构、config.py(Settings)、database.py(SQLAlchemy)、models/__init__.py(Base+TimestampMixin)、.env.example、main.py(含 CORS+lifespan+health)；补全 requirements.txt 依赖 | XCY | ✅ |
+| 10:30 | 发音评测 | 实现发音评测模块：PronunciationService(wav2vec2+GOP)封装、score_audio 异步接口(ThreadPoolExecutor)、POST /api/pronunciation/score；Schema 对齐前端 PronunciationView 的 {overall, dimensions, errors} 格式；过滤 CTC 空格 token；服务启动模型预加载验证通过 | XCY | ✅ |
+| 10:30 | 规范更新 | CLAUDE.md 新增编码完成规则：每次编码后总结+追加 ai-log.md+再 commit | XCY | ✅ |
+| 11:00 | 前后端集成 | 前端发音评测对接真实后端：VoiceRecorder 增加 MediaRecorder 真实录音、新建 api/pronunciation.js、vite 代理 /api→localhost:8000、PronunciationView 替换 Mock 为真实 API | XCY | ✅ |
+| 11:30 | bug修复 | 修复录音 mimeType 不支持错误（不指定格式用浏览器默认 webm）、修复 Content-Type boundary 丢失（axios 默认 JSON header 冲突）、后端加 ffmpeg 转码支持任意音频格式 | XCY | ✅ |
+| 12:00 | 功能增强 | 发音页面新增「查看详细评分」弹窗：逐音素色块+表格、评分说明（wav2vec2原理/GOP公式/流程图/评级标准/版本限制） | XCY | ✅ |
+| 12:30 | 文档整理 | 创建 docs/功能实现.md：系统梳理五维评分含义+技术方案+当前状态+分阶段路线，整理自问答讨论 | XCY | ✅ |
+| 13:00 | 功能实现 | 实现重音位置+语调曲线评分：librosa RMS能量包络检测重音变化、librosa PYIN提取F0基频+线性趋势拟合判断语调走向、综合分改为已有维度加权平均、Schema新增analysis_detail分析说明 | XCY | ✅ |
+| 13:30 | 可视化 | 重音+语调增加可视化数据：后端返回每音素归一化能量值+重音标记+F0曲线采样点；前端详情弹窗新增「可视化分析」Tab | XCY | ✅ |
+| 14:00 | 可视化重构 | 可视化拆为两个独立Tab页「重音位置分析」「语调曲线分析」，每个Tab含分析结论卡片+图表+模型输出数据网格（原始指标+通俗解释） | XCY | ✅ |
+| 14:30 | 对比播放 | 新增发音对比功能：后端 POST /api/pronunciation/reference-audio（Edge TTS Jenny 生成标准音MP3流）、前端评分结果页并排显示双播放器（你的录音🎤 VS 标准发音🎧）、并行请求评分+标准音不增加延迟 | XCY | ✅ |
+| 15:00 | 播放器重构 | 音频播放器从结果页移至详情弹窗内，自定义样式（圆形播放按钮+波形动画条+时间显示+VS徽章）、隐藏audio元素由自定义UI控制、requestAnimationFrame驱动波形动画、弹窗固定60vh高度可滚动 | XCY | ✅ |
+| 15:30 | 连读评分 | 实现连读表现评测：WhisperX small 词级时间戳+G2P 辅元连读条件检测+词间间隙gap评分、Schema新增LinkingPair/LinkingVizData、五维中「连读表现」替换占位维度、前端新增「连读表现」Tab（词对表格+gap色标+模型输出数据网格） | XCY | ✅ |
