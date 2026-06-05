@@ -5,7 +5,7 @@ import { useAuthStore } from '@/stores/auth'
 const request = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL,
   timeout: 30000,
-  headers: { 'Content-Type': 'application/json' },
+  // Content-Type 由各请求自行设置，FormData 上传需要 multipart/form-data
 })
 
 // 请求拦截器 — 自动附加 JWT token

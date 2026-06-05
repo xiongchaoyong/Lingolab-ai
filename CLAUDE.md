@@ -28,7 +28,7 @@
 | AI/NLP | deepseek-v4-flash（深度求索） | 对话生成 / 语法纠错 / 推荐 / 客服 |
 | 语音识别(ASR) | WhisperX（开源） | 语音转文字 + 单词级时间对齐，为语法纠错/流利度评估提供文字稿 |
 | 发音评测 | wav2vec2（Meta） | 自监督语音特征提取 + 强制对齐，Apache 2.0 开源 |
-| 语音合成(TTS) | 豆包 TTS（字节跳动） | AI 回复语音合成 + 标准音播放 |
+| 语音合成(TTS) | Edge TTS（微软） | 免费神经网络语音合成，SSML 控速 + 句级时间戳 |
 | 向量数据库 | Milvus（P2 可选） | 长期记忆、个性化推荐语义检索 |
 | 包管理 | 前端 npm，后端 pip + requirements.txt | - |
 
@@ -137,7 +137,7 @@ DATABASE_URL=mysql+pymysql://user:password@localhost:3306/english_training_dev
 OPENAI_API_KEY=
 CLAUDE_API_KEY=
 JWT_SECRET_KEY=
-WHISPER_API_KEY=
+DEEPSEEK_API_KEY=
 ```
 
 前端在 `frontend/.env.local` 中配置：
@@ -196,6 +196,7 @@ VITE_API_BASE_URL=http://localhost:8000
 - 涉及数据库、鉴权、支付等高危模块，必须人工主导
 - Claude 犯错被纠正后，立即将教训写入下方「经验教训」章节
 - CLAUDE.md 控制在 200 行以内，子模块可在对应目录下建独立 CLAUDE.md
+- **每次编码完成后，Claude 必须做三件事：① 在对话中总结做了什么；② 将总结追加写入 ai-log.md（格式：日期 + 模块名 + 变更摘要 + 新增文件清单）；③ 执行顺序：先更新 ai-log.md → 再 commit**
 
 ---
 
