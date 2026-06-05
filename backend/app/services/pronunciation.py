@@ -694,6 +694,83 @@ class PronunciationService:
 
         return linking_score, detail, viz_data
 
+    def _analyze_rhythm(self, char_scores: List[Dict]) -> Tuple[float, str, Dict]:
+        """
+        节奏感分析 — 基于 CTC 对齐的音素时长分布
+
+        已有数据: char_scores 中每个音素的 duration_ms
+        分析维度:
+        1. 时长变异系数 (CV = std/mean) — 越小越均匀
+        2. 异常停顿检测 (duration > 2x 均值)
+        3. 考虑英语 stress-timed 特性，适度波动是自然的
+
+        返回: (score, detail, viz_data)
+        """
+        viz_data = {
+            "durations_ms": [],
+            "chars": [],
+            "mean_ms": 0.0,
+            "std_ms": 0.0,
+            "cv": 0.0,
+            "pause_count": 0,
+            "is_pause": [],
+        }
+
+        if not char_scores or len(char_scores) < 2:
+            return 50.0, "音素数据不足，无法分析节奏", viz_data
+
+        durations = [cs["duration_ms"] for cs in char_scores]
+        chars = [cs["char"] for cs in char_scores]
+        n = len(durations)
+
+        mean_dur = float(np.mean(durations))
+        std_dur = float(np.std(durations))
+        cv = std_dur / mean_dur if mean_dur > 0 else 0
+
+        # 异常停顿检测
+        threshold = mean_dur * 2.0
+        is_pause = [d > threshold for d in durations]
+        pause_count = sum(is_pause)
+
+        viz_data = {
+            "durations_ms": [round(d, 1) for d in durations],
+            "chars": chars,
+            "mean_ms": round(mean_dur, 1),
+            "std_ms": round(std_dur, 1),
+            "cv": round(cv, 3),
+            "pause_count": pause_count,
+            "is_pause": [bool(p) for p in is_pause],
+        }
+
+        # 评分：英语是 stress-timed 语言，CV 在 0.25-0.40 之间最自然
+        if cv < 0.15:
+            # 过于均匀 → 像机器人
+            base = 70.0
+            detail = "音素时长过于均匀，缺乏英语自然节奏的轻重变化"
+        elif cv < 0.30:
+            base = 88.0 - cv * 30
+            detail = "节奏自然流畅，音素时长分布合理"
+        elif cv < 0.50:
+            base = 75.0 - (cv - 0.30) * 100
+            detail = "节奏有些波动，部分音素时长不够稳定"
+        elif cv < 0.80:
+            base = 55.0 - (cv - 0.50) * 70
+            detail = "节奏不够均匀，音素时快时慢较为明显"
+        else:
+            base = 35.0
+            detail = "节奏非常不均匀，忽快忽慢影响可懂度"
+
+        # 异常停顿扣分
+        pause_penalty = min(pause_count * 8, 30)
+        rhythm_score = round(min(max(base - pause_penalty, 5), 100))
+
+        if pause_count > 0:
+            detail += f"；检测到 {pause_count} 处异常卡顿"
+            if pause_count >= 3:
+                detail += "，建议放慢语速保持均匀节奏"
+
+        return rhythm_score, detail, viz_data
+
     def score(self, audio_path: str, text: str) -> Dict:
         """
         对音频进行发音评测
@@ -751,6 +828,9 @@ class PronunciationService:
             audio_path, text
         )
 
+        # 节奏感分析（基于 CTC 对齐的音素时长）
+        rhythm_score, rhythm_detail, rhythm_viz = self._analyze_rhythm(char_scores)
+
         # 五维评分
         accuracy_score = min(round(avg_score), 100)
         dimensions = [
@@ -758,11 +838,11 @@ class PronunciationService:
             {"label": "重音位置", "score": stress_score},
             {"label": "语调曲线", "score": intonation_score},
             {"label": "连读表现", "score": linking_score},
-            {"label": "流利度", "score": 0},    # 待实现（语速+停顿分析）
+            {"label": "节奏感", "score": rhythm_score},
         ]
 
-        # 综合分 = 已有维度的加权平均
-        active_scores = [accuracy_score, stress_score, intonation_score, linking_score]
+        # 综合分 = 五维加权平均
+        active_scores = [accuracy_score, stress_score, intonation_score, linking_score, rhythm_score]
         overall = round(sum(active_scores) / len(active_scores))
 
         return {
@@ -778,6 +858,7 @@ class PronunciationService:
             "stress_viz": stress_viz,
             "intonation_viz": intonation_viz,
             "linking_viz": linking_viz,
+            "rhythm_viz": rhythm_viz,
         }
 
     def score_sync(self, audio_path: str, text: str) -> Dict:

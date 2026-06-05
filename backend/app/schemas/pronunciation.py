@@ -48,6 +48,17 @@ class IntonationVizData(BaseModel):
 class AnalysisDetail(BaseModel):
     stress: str = Field(default="", description="重音分析说明")
     intonation: str = Field(default="", description="语调分析说明")
+    linking: str = Field(default="", description="连读分析说明")
+
+
+class RhythmVizData(BaseModel):
+    durations_ms: List[float] = Field(default_factory=list, description="各音素时长(ms)")
+    chars: List[str] = Field(default_factory=list, description="对应音素字符")
+    mean_ms: float = Field(default=0.0, description="平均音素时长(ms)")
+    std_ms: float = Field(default=0.0, description="音素时长标准差(ms)")
+    cv: float = Field(default=0.0, description="时长变异系数 (CV = std/mean)")
+    pause_count: int = Field(default=0, description="异常停顿数 (时长>2x均值)")
+    is_pause: List[bool] = Field(default_factory=list, description="各音素是否为异常停顿")
 
 
 class LinkingPair(BaseModel):
@@ -75,3 +86,4 @@ class PronunciationResponse(BaseModel):
     stress_viz: Optional[StressVizData] = Field(default=None, description="重音可视化数据")
     intonation_viz: Optional[IntonationVizData] = Field(default=None, description="语调可视化数据")
     linking_viz: Optional[LinkingVizData] = Field(default=None, description="连读可视化数据")
+    rhythm_viz: Optional[RhythmVizData] = Field(default=None, description="节奏可视化数据")

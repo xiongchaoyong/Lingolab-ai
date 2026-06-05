@@ -317,6 +317,37 @@ function phonemeLabel(ph) {
   const p = ph.replace(/[012]/, '')
   return `/ ${p.toLowerCase()} /`
 }
+
+// --- 节奏感分析辅助 ---
+function rhythmCVExplain(cv) {
+  if (cv == null) return ''
+  if (cv < 0.15) return '→ 过于均匀，像机器人发音'
+  if (cv < 0.30) return '→ 节奏自然流畅，符合英语轻重节拍'
+  if (cv < 0.50) return '→ 有些波动，基本可接受'
+  if (cv < 0.80) return '→ 节奏不够稳定，时快时慢'
+  return '→ 节奏非常不均匀，影响可懂度'
+}
+
+const pauseSlots = computed(() => {
+  const viz = scoreResult.value?.rhythm_viz
+  if (!viz?.is_pause) return []
+  return viz.is_pause.map((pause, i) => pause ? { char: viz.chars[i], dur: viz.durations_ms[i] } : null).filter(Boolean)
+})
+
+const rhythmSummary = computed(() => {
+  const viz = scoreResult.value?.rhythm_viz
+  if (!viz) return '暂无节奏数据'
+  const cv = viz.cv
+  const pause = viz.pause_count
+  let msg = `平均音素时长 ${viz.mean_ms}ms，变异系数 ${cv} —— `
+  if (cv < 0.15) msg += '过于均匀，像机器人发音'
+  else if (cv < 0.30) msg += '节奏自然流畅，符合英语轻重节拍'
+  else if (cv < 0.50) msg += '节奏有些波动，基本可接受'
+  else if (cv < 0.80) msg += '节奏不够稳定，时快时慢较明显'
+  else msg += '节奏非常不均匀，忽快忽慢'
+  if (pause > 0) msg += `；检测到 ${pause} 处异常卡顿`
+  return msg
+})
 </script>
 
 <template>
@@ -862,6 +893,87 @@ function phonemeLabel(ph) {
                 <span class="data-label">数据来源</span>
                 <span class="data-value">WhisperX</span>
                 <span class="data-explain">词级时间戳 + G2P 音素分类</span>
+              </div>
+            </div>
+          </div>
+        </el-tab-pane>
+
+        <!-- ===== 节奏感分析 ===== -->
+        <el-tab-pane label="节奏感" name="rhythm">
+          <div class="viz-section">
+            <!-- 分析结论 -->
+            <div class="model-insight">
+              <el-icon :size="16"><InfoFilled /></el-icon>
+              <span>{{ rhythmSummary }}</span>
+            </div>
+
+            <!-- 时长分布柱状图 -->
+            <h4 class="viz-title">音素时长分布</h4>
+            <div v-if="scoreResult.rhythm_viz?.chars?.length" class="rhythm-chart">
+              <div
+                v-for="(ch, i) in scoreResult.rhythm_viz.chars"
+                :key="'rh'+i"
+                class="rhythm-bar-col"
+              >
+                <div class="rhythm-bar-fill-wrap">
+                  <div
+                    class="rhythm-bar-fill"
+                    :style="{
+                      height: (scoreResult.rhythm_viz.durations_ms[i] / Math.max(...scoreResult.rhythm_viz.durations_ms) * 100) + '%',
+                      background: scoreResult.rhythm_viz.is_pause[i]
+                        ? 'var(--color-danger)'
+                        : 'var(--color-primary)',
+                    }"
+                  />
+                </div>
+                <span
+                  class="rhythm-bar-label"
+                  :style="{ color: scoreResult.rhythm_viz.is_pause[i] ? 'var(--color-danger)' : 'var(--color-text-primary)' }"
+                >{{ ch }}</span>
+                <span class="rhythm-bar-ms">{{ scoreResult.rhythm_viz.durations_ms[i] }}ms</span>
+              </div>
+            </div>
+            <p v-else class="text-muted">时长数据不足</p>
+
+            <div class="viz-legend">
+              <span class="legend-dot" style="background:var(--color-primary)"></span> 正常音素
+              <span class="legend-dot" style="background:var(--color-danger)"></span> 异常停顿 (&gt;2x 均值)
+            </div>
+
+            <!-- 模型输出数据 -->
+            <h4 class="viz-title" style="margin-top: 20px;">模型输出数据</h4>
+            <div class="model-data-grid">
+              <div class="model-data-item">
+                <span class="data-label">平均音素时长</span>
+                <span class="data-value">{{ scoreResult.rhythm_viz?.mean_ms ?? '-' }} ms</span>
+                <span class="data-explain">所有音素时长的算术平均</span>
+              </div>
+              <div class="model-data-item">
+                <span class="data-label">时长标准差</span>
+                <span class="data-value">{{ scoreResult.rhythm_viz?.std_ms ?? '-' }} ms</span>
+                <span class="data-explain">音素时长离散程度</span>
+              </div>
+              <div class="model-data-item">
+                <span class="data-label">变异系数 (CV)</span>
+                <span class="data-value">{{ scoreResult.rhythm_viz?.cv ?? '-' }}</span>
+                <span class="data-explain">{{ rhythmCVExplain(scoreResult.rhythm_viz?.cv) }}</span>
+              </div>
+              <div class="model-data-item">
+                <span class="data-label">异常停顿数</span>
+                <span class="data-value">{{ scoreResult.rhythm_viz?.pause_count ?? 0 }} 处</span>
+                <span class="data-explain">时长 &gt; 2x 均值的音素（阈值 {{ (scoreResult.rhythm_viz?.mean_ms || 0) * 2 | 0 }}ms）</span>
+              </div>
+              <div class="model-data-item" v-if="pauseSlots.length > 0">
+                <span class="data-label">卡顿位置</span>
+                <span class="data-value" style="color:var(--color-danger);">
+                  {{ pauseSlots.map(p => `${p.char}(${p.dur}ms)`).join(', ') }}
+                </span>
+                <span class="data-explain">异常卡顿的音素及时长</span>
+              </div>
+              <div class="model-data-item">
+                <span class="data-label">数据来源</span>
+                <span class="data-value">CTC 强制对齐</span>
+                <span class="data-explain">wav2vec2 Viterbi 对齐输出</span>
               </div>
             </div>
           </div>
@@ -1471,6 +1583,56 @@ function phonemeLabel(ph) {
   font-size: var(--font-size-xs);
   color: var(--color-text-disabled);
   margin-top: var(--spacing-sm);
+}
+
+// 节奏感时长分布图
+.rhythm-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  height: 120px;
+  padding: 8px 0;
+}
+
+.rhythm-bar-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  height: 100%;
+  min-width: 0;
+}
+
+.rhythm-bar-fill-wrap {
+  flex: 1;
+  width: 100%;
+  max-width: 28px;
+  border-radius: 4px 4px 0 0;
+  background: var(--color-bg-secondary);
+  position: relative;
+  overflow: hidden;
+}
+
+.rhythm-bar-fill {
+  position: absolute;
+  bottom: 0;
+  width: 100%;
+  border-radius: 4px 4px 0 0;
+  transition: height 0.3s;
+  min-height: 2px;
+}
+
+.rhythm-bar-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: lowercase;
+}
+
+.rhythm-bar-ms {
+  font-size: 9px;
+  color: var(--color-text-disabled);
+  font-variant-numeric: tabular-nums;
 }
 
 // 语调曲线
