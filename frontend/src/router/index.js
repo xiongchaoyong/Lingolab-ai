@@ -45,6 +45,7 @@ const routes = [
         component: () => import('@/views/home/HomeView.vue'),
         meta: { title: '首页', auth: true },
       },
+      // 模块二：学习服务
       {
         path: 'pronunciation',
         name: 'Pronunciation',
@@ -58,11 +59,12 @@ const routes = [
         meta: { title: 'AI 对话', auth: true },
       },
       {
-        path: 'conversation/:id',
-        name: 'ConversationDetail',
-        component: () => import('@/views/conversation/ConversationView.vue'),
-        meta: { title: '对话详情', auth: true },
+        path: 'role-play',
+        name: 'RolePlay',
+        component: () => import('@/views/roleplay/RolePlayView.vue'),
+        meta: { title: '角色扮演', auth: true },
       },
+      // 模块三：个性化推荐
       {
         path: 'learning-path',
         name: 'LearningPath',
@@ -75,6 +77,7 @@ const routes = [
         component: () => import('@/views/learning/RecommendationView.vue'),
         meta: { title: '资料推荐', auth: true },
       },
+      // 模块四：激励服务
       {
         path: 'progress',
         name: 'Progress',
@@ -82,29 +85,19 @@ const routes = [
         meta: { title: '学习进度', auth: true },
       },
       {
-        path: 'role-play',
-        name: 'RolePlay',
-        component: () => import('@/views/roleplay/RolePlayView.vue'),
-        meta: { title: '角色扮演', auth: true },
-      },
-      {
         path: 'challenge',
         name: 'Challenge',
         component: () => import('@/views/gamification/ChallengeView.vue'),
-        meta: { title: '游戏化闯关', auth: true },
+        meta: { title: '闯关挑战', auth: true },
       },
-      {
-        path: 'prediction',
-        name: 'Prediction',
-        component: () => import('@/views/progress/ProgressView.vue'),
-        meta: { title: '学习预测', auth: true },
-      },
+      // 模块五：社区服务
       {
         path: 'community',
         name: 'Community',
         component: () => import('@/views/community/CommunityView.vue'),
-        meta: { title: '学习社区', auth: true },
+        meta: { title: '社区', auth: true },
       },
+      // 模块七：智能客服
       {
         path: 'help',
         name: 'Help',
