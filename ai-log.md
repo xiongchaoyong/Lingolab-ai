@@ -2,6 +2,49 @@
 
 ---
 
+## 2026-06-22 — 角色扮演后端 + 淡紫可爱风 UI 改版 + 路由重构
+
+**变更摘要（拆为两个 commit）：**
+
+### Commit 1 — feat: 角色扮演模块后端 + 前端 API 接入
+- 新增角色扮演 LLM 服务：`chat_roleplay` / `chat_roleplay_stream` / `score_roleplay`（四维评分：角色贴合度/场景礼仪/专业术语/应对能力）
+- 新增 3 个内置场景 Prompt：interviewee（面试官）/ waiter（顾客）/ guide（游客）
+- 新建 `backend/app/api/roleplay.py` + `backend/app/schemas/roleplay.py`，路由挂载到 `/api/roleplay`
+- 前端 `frontend/src/api/roleplay.js` 封装接口调用
+- `.env.example` 中 DEEPSEEK_API_KEY 替换为 BAILIAN_API_KEY
+- `RolePlayView.vue` 大幅增强交互
+
+### Commit 2 — feat: 淡紫可爱风 UI 改版 + 路由扁平化 + 文档
+- 全局设计令牌从「Soft UI Evolution + Vibrant Education」改为「淡紫薰衣草可爱风」（品牌色 #A78BFA，Quicksand+Nunito 字体，马卡龙辅助色系）
+- Favicon 更换为圆角方形 L 字母图标
+- 路由扁平化：Introduction 合并进 TopNavLayout 根路径；/home 重定向到 /；/conversation 改为 TopNavLayout 子路由
+- CLAUDE.md 同步更新技术栈与项目结构
+- .gitignore 新增 `backend/edge_tts_output/`、`backend/test_*.wav`、`.~*` Office 锁文件
+- 新增文档：`docs/8组-熊朝永-系统设计.docx`、`docs/图片/`（17 张设计图）
+- 更新 `docs/需求说明书.docx`
+
+**新增文件：**
+- `backend/app/api/roleplay.py`
+- `backend/app/schemas/roleplay.py`
+- `frontend/src/api/roleplay.js`
+- `docs/8组-熊朝永-系统设计.docx`
+- `docs/图片/`
+
+**修改文件：**
+- `backend/app/services/llm.py` — 新增角色扮演方法
+- `backend/main.py` — 注册 roleplay 路由
+- `backend/.env.example` — deepseek → bailian
+- `CLAUDE.md` — 技术栈/结构/模块状态更新
+- `frontend/index.html` — 字体替换
+- `frontend/public/favicon.svg` — 新图标
+- `frontend/src/assets/styles/{tokens.css,variables.scss,element-override.scss,global.scss}` — 淡紫改版
+- `frontend/src/components/layout/{AppLayout,SidebarNav,TopHeader,TopNavLayout}.vue`
+- `frontend/src/router/index.js` — 路由扁平化
+- `frontend/src/views/{admin/DashboardView,conversation/VoiceCallView,home/HomeView,introduction/IntroductionView,progress/ProgressView,roleplay/RolePlayView,teacher/StudentReportView}.vue`
+- `.gitignore` — 排除生成产物与锁文件
+
+---
+
 ## 2026-06-22 — 对话评分综合报告（v2 丰富版）
 
 **变更摘要：**

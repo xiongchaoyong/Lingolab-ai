@@ -43,6 +43,37 @@ SCENE_PROMPTS = {
     ),
 }
 
+# 角色扮演 Prompt 模板
+ROLE_PROMPTS = {
+    "interviewee": (
+        "You are a professional interviewer conducting a job interview in English. "
+        "The user is the candidate (interviewee) applying for a position. "
+        "Your role: ask realistic interview questions about self-introduction, project experience, "
+        "career planning, strengths and weaknesses, and salary expectations. "
+        "Respond naturally to their answers and ask follow-up questions. "
+        "Keep responses short (1-3 sentences), professional and natural. "
+        "Adapt your vocabulary to the user's CEFR level ({level})."
+    ),
+    "waiter": (
+        "You are a customer dining at a restaurant. "
+        "The user is the waiter/waitress serving you. "
+        "Your role: order food, ask about menu ingredients and specials, make special requests "
+        "(allergies, dietary restrictions), ask for recommendations, and pay the bill. "
+        "Act like a real customer — be polite but also ask questions. "
+        "Keep responses short (1-3 sentences), friendly and natural. "
+        "Adapt your vocabulary to the user's CEFR level ({level})."
+    ),
+    "guide": (
+        "You are a tourist visiting a famous attraction. "
+        "The user is your tour guide showing you around. "
+        "Your role: ask about the history and culture of the site, get directions to specific spots, "
+        "ask for food recommendations, and inquire about local customs. "
+        "Show curiosity and engagement in the tour. "
+        "Keep responses short (1-3 sentences), curious and engaged. "
+        "Adapt your vocabulary to the user's CEFR level ({level})."
+    ),
+}
+
 # CEFR 难度对应的语言要求
 CEFR_DIFFICULTY = {
     "A1": "Use very simple words and short sentences. Speak slowly with basic vocabulary.",
@@ -268,6 +299,224 @@ class LLMService:
                 "engagement_strengths": "",
                 "engagement_weaknesses": "",
                 "suggestions": "继续练习，多说多练！",
+            }
+
+    async def chat_roleplay(
+        self,
+        role: str,
+        user_text: str,
+        history: list[dict],
+        cefr_level: str = "B1",
+    ) -> str:
+        """
+        角色扮演 — 生成 AI 对话回复
+
+        Args:
+            role: 角色标识 (interviewee/waiter/guide)
+            user_text: 用户当前轮次的转写文本
+            history: 对话历史
+            cefr_level: 用户 CEFR 等级
+
+        Returns:
+            AI 回复文本
+        """
+        system_prompt = ROLE_PROMPTS.get(role, ROLE_PROMPTS["interviewee"])
+        level_instruction = CEFR_DIFFICULTY.get(cefr_level, CEFR_DIFFICULTY["B1"])
+        system_prompt = system_prompt.format(level=cefr_level) + " " + level_instruction
+        system_prompt += " Vary your phrasing each time — never repeat the same opening or question. Do NOT use emojis or special symbols in your replies — plain English text only."
+
+        messages = [{"role": "system", "content": system_prompt}]
+
+        for h in history[-10:]:
+            if h["role"] == "user":
+                messages.append({"role": "user", "content": h["text"]})
+            elif h["role"] == "ai":
+                messages.append({"role": "assistant", "content": h["text"]})
+
+        messages.append({"role": "user", "content": user_text})
+
+        try:
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                resp = await client.post(
+                    BAILIAN_API_URL,
+                    headers={
+                        "Authorization": f"Bearer {self.api_key}",
+                        "Content-Type": "application/json",
+                    },
+                    json={
+                        "model": self.model,
+                        "messages": messages,
+                        "max_tokens": 150,
+                        "temperature": 0.9,
+                    },
+                )
+                resp.raise_for_status()
+                data = resp.json()
+                reply = data["choices"][0]["message"]["content"].strip()
+                logger.info(f"角色扮演 LLM 回复: {reply[:80]}...")
+                return reply
+
+        except httpx.HTTPStatusError as e:
+            logger.error(f"百炼 API 错误 {e.response.status_code}: {e.response.text[:200]}")
+            return "I'm sorry, I'm having trouble connecting right now. Could you repeat that?"
+        except Exception as e:
+            logger.error(f"LLM 角色扮演调用失败: {e}")
+            return "I didn't catch that. Could you say it again?"
+
+    async def chat_roleplay_stream(
+        self,
+        role: str,
+        user_text: str,
+        history: list[dict],
+        cefr_level: str = "B1",
+    ):
+        """
+        角色扮演 — 流式生成 AI 回复
+
+        Yields:
+            str: 增量文本片段
+        """
+        system_prompt = ROLE_PROMPTS.get(role, ROLE_PROMPTS["interviewee"])
+        level_instruction = CEFR_DIFFICULTY.get(cefr_level, CEFR_DIFFICULTY["B1"])
+        system_prompt = system_prompt.format(level=cefr_level) + " " + level_instruction
+        system_prompt += " Vary your phrasing each time — never repeat the same opening or question. Do NOT use emojis or special symbols in your replies — plain English text only."
+
+        messages = [{"role": "system", "content": system_prompt}]
+
+        for h in history[-10:]:
+            if h["role"] == "user":
+                messages.append({"role": "user", "content": h["text"]})
+            elif h["role"] == "ai":
+                messages.append({"role": "assistant", "content": h["text"]})
+
+        messages.append({"role": "user", "content": user_text})
+
+        try:
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                async with client.stream(
+                    "POST",
+                    BAILIAN_API_URL,
+                    headers={
+                        "Authorization": f"Bearer {self.api_key}",
+                        "Content-Type": "application/json",
+                    },
+                    json={
+                        "model": self.model,
+                        "messages": messages,
+                        "max_tokens": 150,
+                        "temperature": 0.9,
+                        "stream": True,
+                    },
+                ) as resp:
+                    resp.raise_for_status()
+                    async for line in resp.aiter_lines():
+                        if line.startswith("data: "):
+                            data_str = line[6:]
+                            if data_str == "[DONE]":
+                                break
+                            try:
+                                chunk = json.loads(data_str)
+                                delta = chunk["choices"][0].get("delta", {})
+                                content = delta.get("content", "")
+                                if content:
+                                    yield content
+                            except json.JSONDecodeError:
+                                continue
+
+        except httpx.HTTPStatusError as e:
+            logger.error(f"百炼流式 API 错误: {e}")
+            yield "I'm sorry, I'm having trouble connecting right now. Could you repeat that?"
+        except Exception as e:
+            logger.error(f"LLM 角色扮演流式调用失败: {e}")
+            yield "I didn't catch that. Could you say it again?"
+
+    async def score_roleplay(self, history: list[dict], cefr_level: str = "B1") -> dict:
+        """
+        角色扮演结束后评分 — 四维评分（角色贴合度/场景礼仪/专业术语/应对能力）
+
+        Returns:
+            {"role_fit": 80, "etiquette": 75, "terminology": 70, "response": 72,
+             "suggestions": "..."}
+        """
+        dialogue = ""
+        for h in history:
+            role = "User" if h["role"] == "user" else "AI"
+            dialogue += f"{role}: {h['text']}\n"
+
+        prompt = (
+            f"You are an English teacher evaluating a student's role-play performance.\n"
+            f"Student CEFR level: {cefr_level}\n\n"
+            f"Role-play conversation:\n{dialogue}\n\n"
+            f"Score the student on 4 dimensions (0-100 each) specific to role-play scenarios.\n"
+            f"For each dimension, provide a score, a brief feedback sentence in Chinese, "
+            f"one strength observation, and one weakness/improvement suggestion.\n\n"
+            f"1. role_fit - whether the student's expressions match their assigned role and context\n"
+            f"2. etiquette - use of polite language, appropriate greetings, formality level\n"
+            f"3. terminology - correct use of scenario-specific vocabulary and professional terms\n"
+            f"4. response - ability to handle unexpected situations and respond appropriately\n\n"
+            f"Return ONLY a JSON object (no markdown, no code fences):\n"
+            f'{{"role_fit": 80,'
+            f'"role_fit_feedback": "brief Chinese feedback on role fit",'
+            f'"role_fit_strengths": "specific role fit strength",'
+            f'"role_fit_weaknesses": "specific role fit improvement",'
+            f'"etiquette": 75,'
+            f'"etiquette_feedback": "brief Chinese feedback on etiquette",'
+            f'"etiquette_strengths": "specific etiquette strength",'
+            f'"etiquette_weaknesses": "specific etiquette improvement",'
+            f'"terminology": 70,'
+            f'"terminology_feedback": "brief Chinese feedback on terminology",'
+            f'"terminology_strengths": "specific terminology strength",'
+            f'"terminology_weaknesses": "specific terminology improvement",'
+            f'"response": 72,'
+            f'"response_feedback": "brief Chinese feedback on response ability",'
+            f'"response_strengths": "specific response strength",'
+            f'"response_weaknesses": "specific response improvement",'
+            f'"suggestions": "overall improvement advice in Chinese"}}'
+        )
+
+        try:
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                resp = await client.post(
+                    BAILIAN_API_URL,
+                    headers={
+                        "Authorization": f"Bearer {self.api_key}",
+                        "Content-Type": "application/json",
+                    },
+                    json={
+                        "model": self.model,
+                        "messages": [{"role": "user", "content": prompt}],
+                        "max_tokens": 800,
+                        "temperature": 0.3,
+                    },
+                )
+                resp.raise_for_status()
+                data = resp.json()
+                content = data["choices"][0]["message"]["content"].strip()
+                content = content.replace("```json", "").replace("```", "").strip()
+                result = json.loads(content)
+                logger.info(f"角色扮演评分完成: role_fit={result.get('role_fit')}, etiquette={result.get('etiquette')}")
+                return result
+
+        except Exception as e:
+            logger.error(f"角色扮演评分失败: {e}")
+            return {
+                "role_fit": 75,
+                "role_fit_feedback": "角色贴合度评估暂时不可用",
+                "role_fit_strengths": "",
+                "role_fit_weaknesses": "",
+                "etiquette": 75,
+                "etiquette_feedback": "场景礼仪评估暂时不可用",
+                "etiquette_strengths": "",
+                "etiquette_weaknesses": "",
+                "terminology": 75,
+                "terminology_feedback": "专业术语评估暂时不可用",
+                "terminology_strengths": "",
+                "terminology_weaknesses": "",
+                "response": 75,
+                "response_feedback": "应对能力评估暂时不可用",
+                "response_strengths": "",
+                "response_weaknesses": "",
+                "suggestions": "继续练习，尝试在角色中更自然地表达自己！",
             }
 
 
