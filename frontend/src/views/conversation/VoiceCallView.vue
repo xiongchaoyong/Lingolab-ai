@@ -196,14 +196,14 @@ async function hangUp() {
       scoreReport.value = await endConversation(sessionId.value)
     } catch (e) {
       scoreReport.value = {
-        overall: 75,
+        overall: 0,
         pronunciation: [],
         text_dimensions: [
-          { label: '语法正确率', score: 75 },
-          { label: '词汇丰富度', score: 75 },
-          { label: '对话参与度', score: 75 },
+          { label: '语法正确率', score: 0 },
+          { label: '词汇丰富度', score: 0 },
+          { label: '对话参与度', score: 0 },
         ],
-        suggestions: '继续练习，多说多练！',
+        suggestions: '评分服务暂时异常，请稍后重试',
       }
     }
     isScoring.value = false

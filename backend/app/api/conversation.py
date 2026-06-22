@@ -371,8 +371,11 @@ async def conversation_end(
     # 默认值
     pronunciation = []
     text_dimensions = []
-    overall = 60
+    overall = 0
     suggestions = ""
+
+    # 统计用户实际发言次数
+    user_messages = [h for h in history if h["role"] == "user"]
 
     try:
         # 1. 语音评测：对每段用户音频调用 wav2vec2
@@ -403,7 +406,7 @@ async def conversation_end(
                 logger.info(f"发音评测完成: {pronunciation}")
 
         # 2. 文本评测：LLM 评分
-        if len(history) >= 2:
+        if len(user_messages) >= 1:
             llm = get_llm_service()
             text_result = await llm.score_conversation(history, cefr_level)
             text_dimensions = [
@@ -413,12 +416,13 @@ async def conversation_end(
             ]
             suggestions = text_result.get("suggestions", "")
         else:
+            # 用户未发言，各项评分归零
             text_dimensions = [
-                {"label": "语法正确率", "score": 60},
-                {"label": "词汇丰富度", "score": 60},
-                {"label": "对话参与度", "score": 60},
+                {"label": "语法正确率", "score": 0},
+                {"label": "词汇丰富度", "score": 0},
+                {"label": "对话参与度", "score": 0},
             ]
-            suggestions = "对话太短，多说几句才能获得更准确的评分哦！"
+            suggestions = "你还没有开口说话，无法评估你的口语水平。再来一次试试吧！"
 
         # 3. 综合分 = 语音均分 × 0.5 + 文本均分 × 0.5
         pron_avg = sum(d["score"] for d in pronunciation) / len(pronunciation) if pronunciation else 0
@@ -435,11 +439,11 @@ async def conversation_end(
         logger.error(f"对话评分失败: {e}")
         pronunciation = []
         text_dimensions = [
-            {"label": "语法正确率", "score": 75},
-            {"label": "词汇丰富度", "score": 75},
-            {"label": "对话参与度", "score": 75},
+            {"label": "语法正确率", "score": 0},
+            {"label": "词汇丰富度", "score": 0},
+            {"label": "对话参与度", "score": 0},
         ]
-        overall = 75
+        overall = 0
         suggestions = "评分服务暂时异常，请稍后重试"
 
     finally:
