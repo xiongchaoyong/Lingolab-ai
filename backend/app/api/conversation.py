@@ -371,8 +371,11 @@ async def conversation_end(
     # 默认值
     pronunciation = []
     text_dimensions = []
+    text_dimension_details = []
+    utterances = []
     overall = 0
     suggestions = ""
+    scoring_methodology = ""
 
     # 统计用户实际发言次数
     user_messages = [h for h in history if h["role"] == "user"]
@@ -386,6 +389,20 @@ async def conversation_end(
             for wav_path, asr_text in user_audios:
                 try:
                     result = await score_audio(wav_path, asr_text, mode="sentence")
+                    # 保留完整结果到 utterances
+                    utterances.append({
+                        "text": asr_text,
+                        "overall": result.get("overall"),
+                        "dimensions": result.get("dimensions"),
+                        "errors": result.get("errors"),
+                        "char_scores": result.get("char_scores"),
+                        "analysis_detail": result.get("analysis_detail"),
+                        "stress_viz": result.get("stress_viz"),
+                        "intonation_viz": result.get("intonation_viz"),
+                        "linking_viz": result.get("linking_viz"),
+                        "rhythm_viz": result.get("rhythm_viz"),
+                    })
+                    # 累加维度分数用于平均
                     for dim in result.get("dimensions", []):
                         key = dim["label"]
                         if key in all_dim_scores:
@@ -394,7 +411,7 @@ async def conversation_end(
                     logger.warning(f"单段音频发音评测失败: {e}")
                     continue
 
-            # 平均各维度
+            # 平均各维度（简化版，向后兼容）
             for label, scores in all_dim_scores.items():
                 if scores:
                     pronunciation.append({
@@ -414,9 +431,32 @@ async def conversation_end(
                 {"label": "词汇丰富度", "score": text_result.get("vocabulary", 75)},
                 {"label": "对话参与度", "score": text_result.get("engagement", 75)},
             ]
+            # 详细版文本维度
+            text_dimension_details = [
+                {
+                    "label": "语法正确率",
+                    "score": text_result.get("grammar", 75),
+                    "feedback": text_result.get("grammar_feedback", ""),
+                    "strengths": text_result.get("grammar_strengths", ""),
+                    "weaknesses": text_result.get("grammar_weaknesses", ""),
+                },
+                {
+                    "label": "词汇丰富度",
+                    "score": text_result.get("vocabulary", 75),
+                    "feedback": text_result.get("vocabulary_feedback", ""),
+                    "strengths": text_result.get("vocabulary_strengths", ""),
+                    "weaknesses": text_result.get("vocabulary_weaknesses", ""),
+                },
+                {
+                    "label": "对话参与度",
+                    "score": text_result.get("engagement", 75),
+                    "feedback": text_result.get("engagement_feedback", ""),
+                    "strengths": text_result.get("engagement_strengths", ""),
+                    "weaknesses": text_result.get("engagement_weaknesses", ""),
+                },
+            ]
             suggestions = text_result.get("suggestions", "")
         else:
-            # 用户未发言，各项评分归零
             text_dimensions = [
                 {"label": "语法正确率", "score": 0},
                 {"label": "词汇丰富度", "score": 0},
@@ -434,6 +474,13 @@ async def conversation_end(
             overall = round(pron_avg)
         elif text_dimensions:
             overall = round(text_avg)
+
+        # 4. 评分方法论说明
+        scoring_methodology = (
+            "综合分 = 语音平均分 × 50% + 文本平均分 × 50%\n"
+            "语音评测（wav2vec2 + GOP 算法）：音素准确度、重音位置、语调曲线、连读表现、节奏感\n"
+            "文本评测（LLM 评估）：语法正确率、词汇丰富度、对话参与度"
+        )
 
     except Exception as e:
         logger.error(f"对话评分失败: {e}")
@@ -463,4 +510,8 @@ async def conversation_end(
         pronunciation=pronunciation,
         text_dimensions=text_dimensions,
         suggestions=suggestions,
+        utterances=utterances,
+        transcript=history,
+        text_dimension_details=text_dimension_details,
+        scoring_methodology=scoring_methodology,
     )

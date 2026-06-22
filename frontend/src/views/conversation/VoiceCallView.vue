@@ -1,7 +1,9 @@
 <script setup>
-import { ref, onUnmounted } from 'vue'
+import { ref, computed, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { ArrowLeft, InfoFilled } from '@element-plus/icons-vue'
 import { streamStartConversation, streamSpeakConversation, ttsConversation, endConversation } from '@/api/conversation'
+import UtteranceDetailPanel from '@/components/pronunciation/UtteranceDetailPanel.vue'
 
 const router = useRouter()
 
@@ -23,6 +25,30 @@ const userSubtitle = ref('')
 const isConnecting = ref(false)
 const scoreReport = ref(null)
 const isScoring = ref(false)
+
+// 报告数据计算属性
+const hasDetailedReport = computed(() => {
+  return scoreReport.value?.utterances?.length > 0
+})
+
+const aggregatedErrors = computed(() => {
+  if (!scoreReport.value?.utterances) return []
+  const errorMap = new Map()
+  for (const utt of scoreReport.value.utterances) {
+    for (const err of utt.errors || []) {
+      const key = err.phoneme
+      if (!errorMap.has(key) || errorMap.get(key).score > err.score) {
+        errorMap.set(key, err)
+      }
+    }
+  }
+  return [...errorMap.values()].sort((a, b) => a.score - b.score)
+})
+
+const expandedUtterance = ref(null)
+function toggleUtterance(index) {
+  expandedUtterance.value = expandedUtterance.value === index ? null : index
+}
 
 // 音频相关
 let audioContext = null
@@ -357,94 +383,192 @@ onUnmounted(() => {
     <!-- 评分报告 -->
     <template v-else-if="phase === 'report'">
       <div class="report-screen">
-        <div class="report-header">
-          <div class="report-mascot">🌟</div>
-          <h2>对话报告</h2>
-          <p v-if="scoreReport" class="report-scene">
-            {{ selectedScenario?.emoji }} {{ selectedScenario?.title }} 场景
-          </p>
-        </div>
+        <!-- 加载中 -->
+        <template v-if="isScoring || !scoreReport">
+          <div class="report-header">
+            <div class="report-mascot">🌟</div>
+            <h2>对话报告</h2>
+          </div>
+          <div class="report-loading">
+            <div class="loading-spinner"></div>
+            <p>正在生成报告...</p>
+          </div>
+        </template>
 
-        <div class="report-content" v-if="scoreReport && !isScoring">
-          <!-- 综合分 -->
-          <div class="overall-circle" :style="{ '--score': scoreReport.overall }">
-            <span class="overall-num">{{ scoreReport.overall }}</span>
-            <span class="overall-unit">分</span>
-            <span class="overall-level">
-              {{ scoreReport.overall >= 80 ? '🎉 优秀' : scoreReport.overall >= 60 ? '👍 良好' : '💪 加油' }}
-            </span>
+        <!-- 报告内容 -->
+        <template v-else>
+          <div class="report-header">
+            <div class="report-mascot">🌟</div>
+            <h2>对话报告</h2>
+            <p class="report-scene">{{ selectedScenario?.emoji }} {{ selectedScenario?.title }} 场景</p>
           </div>
 
-          <!-- 语音评测维度 -->
-          <div class="dimension-group" v-if="scoreReport.pronunciation && scoreReport.pronunciation.length">
-            <div class="dim-group-title">
-              <span class="group-icon">🎤</span> 语音评测
-            </div>
-            <div class="dimension-list">
-              <div
-                v-for="dim in scoreReport.pronunciation"
-                :key="dim.label"
-                class="dimension-item"
-              >
-                <div class="dim-header">
-                  <span class="dim-label">{{ dim.label }}</span>
-                  <span class="dim-score" :style="{ color: dimScoreColor(dim.score) }">{{ dim.score }}</span>
-                </div>
-                <div class="dim-bar-bg">
-                  <div
-                    class="dim-bar-fill"
-                    :style="{ width: dim.score + '%', background: dimBarColor(dim.score) }"
-                  ></div>
+          <div class="report-scroll">
+            <!-- ===== 1. 综合评分 ===== -->
+            <section class="report-section">
+              <div class="overall-circle" :style="{ '--score': scoreReport.overall }">
+                <span class="overall-num">{{ scoreReport.overall }}</span>
+                <span class="overall-unit">分</span>
+                <span class="overall-level">
+                  {{ scoreReport.overall >= 80 ? '🎉 优秀' : scoreReport.overall >= 60 ? '👍 良好' : '💪 加油' }}
+                </span>
+              </div>
+
+              <!-- 评分方法说明 -->
+              <div class="methodology-card" v-if="scoreReport.scoring_methodology">
+                <div class="methodology-title">📐 评分计算方式</div>
+                <pre class="methodology-text">{{ scoreReport.scoring_methodology }}</pre>
+              </div>
+            </section>
+
+            <!-- ===== 2. 语音评测 ===== -->
+            <section class="report-section" v-if="scoreReport.pronunciation?.length">
+              <div class="section-title">
+                <span class="section-icon">🎤</span> 语音评测
+              </div>
+
+              <!-- 平均维度 -->
+              <div class="dimension-list">
+                <div v-for="dim in scoreReport.pronunciation" :key="dim.label" class="dimension-item">
+                  <div class="dim-header">
+                    <span class="dim-label">{{ dim.label }}</span>
+                    <span class="dim-score" :style="{ color: dimScoreColor(dim.score) }">{{ dim.score }}</span>
+                  </div>
+                  <div class="dim-bar-bg">
+                    <div class="dim-bar-fill" :style="{ width: dim.score + '%', background: dimBarColor(dim.score) }"></div>
+                  </div>
                 </div>
               </div>
-            </div>
-          </div>
 
-          <!-- 文本评测维度 -->
-          <div class="dimension-group" v-if="scoreReport.text_dimensions && scoreReport.text_dimensions.length">
-            <div class="dim-group-title">
-              <span class="group-icon">📝</span> 文本评测
-            </div>
-            <div class="dimension-list">
-              <div
-                v-for="dim in scoreReport.text_dimensions"
-                :key="dim.label"
-                class="dimension-item"
-              >
-                <div class="dim-header">
-                  <span class="dim-label">{{ dim.label }}</span>
-                  <span class="dim-score" :style="{ color: dimScoreColor(dim.score) }">{{ dim.score }}</span>
-                </div>
-                <div class="dim-bar-bg">
-                  <div
-                    class="dim-bar-fill"
-                    :style="{ width: dim.score + '%', background: dimBarColor(dim.score) }"
-                  ></div>
+              <!-- 聚合错误音素 -->
+              <div class="error-section" v-if="aggregatedErrors.length > 0">
+                <div class="error-title">⚠️ 问题音素定位</div>
+                <div v-for="err in aggregatedErrors" :key="err.phoneme" class="error-item">
+                  <div class="error-phoneme">
+                    <el-tag type="danger" size="small">{{ err.phoneme }}</el-tag>
+                    <span class="error-actual">{{ err.actual }}</span>
+                  </div>
+                  <div class="error-tip">
+                    <el-icon :size="14"><InfoFilled /></el-icon>
+                    <span>{{ err.tip }}</span>
+                  </div>
                 </div>
               </div>
-            </div>
+
+              <!-- 逐句发音详情 -->
+              <div class="utterance-list" v-if="hasDetailedReport">
+                <div class="utterance-title">📋 逐句发音分析</div>
+                <div
+                  v-for="(utt, idx) in scoreReport.utterances"
+                  :key="idx"
+                  class="utterance-item"
+                >
+                  <div class="utterance-header" @click="toggleUtterance(idx)">
+                    <div class="utterance-left">
+                      <span class="utterance-num">第 {{ idx + 1 }} 句</span>
+                      <span class="utterance-text-preview">{{ utt.text?.slice(0, 50) }}{{ utt.text?.length > 50 ? '...' : '' }}</span>
+                    </div>
+                    <div class="utterance-right">
+                      <span class="utterance-score" :style="{ color: dimScoreColor(utt.overall) }">{{ utt.overall }} 分</span>
+                      <span class="utterance-arrow" :class="{ expanded: expandedUtterance === idx }">▶</span>
+                    </div>
+                  </div>
+                  <div class="utterance-detail-wrap" v-show="expandedUtterance === idx">
+                    <UtteranceDetailPanel
+                      :pronunciation-data="utt"
+                      :text="utt.text"
+                    />
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <!-- ===== 3. 文本评测 ===== -->
+            <section class="report-section" v-if="scoreReport.text_dimension_details?.length">
+              <div class="section-title">
+                <span class="section-icon">📝</span> 文本评测（LLM）
+              </div>
+
+              <div class="text-dim-cards">
+                <div
+                  v-for="dim in scoreReport.text_dimension_details"
+                  :key="dim.label"
+                  class="text-dim-card"
+                >
+                  <div class="tdc-header">
+                    <span class="tdc-label">{{ dim.label }}</span>
+                    <span class="tdc-score" :style="{ color: dimScoreColor(dim.score) }">{{ dim.score }}</span>
+                  </div>
+                  <div class="dim-bar-bg" style="margin-bottom: 10px;">
+                    <div class="dim-bar-fill" :style="{ width: dim.score + '%', background: dimBarColor(dim.score) }"></div>
+                  </div>
+                  <div class="tdc-feedback" v-if="dim.feedback">
+                    <span class="tdc-fb-label">评价：</span>{{ dim.feedback }}
+                  </div>
+                  <div class="tdc-detail" v-if="dim.strengths">
+                    <span class="tdc-tag good">✅ {{ dim.strengths }}</span>
+                  </div>
+                  <div class="tdc-detail" v-if="dim.weaknesses">
+                    <span class="tdc-tag improve">📌 {{ dim.weaknesses }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 简化版文本维度（向后兼容） -->
+              <div v-if="!scoreReport.text_dimension_details?.length && scoreReport.text_dimensions?.length" class="dimension-list">
+                <div v-for="dim in scoreReport.text_dimensions" :key="dim.label" class="dimension-item">
+                  <div class="dim-header">
+                    <span class="dim-label">{{ dim.label }}</span>
+                    <span class="dim-score" :style="{ color: dimScoreColor(dim.score) }">{{ dim.score }}</span>
+                  </div>
+                  <div class="dim-bar-bg">
+                    <div class="dim-bar-fill" :style="{ width: dim.score + '%', background: dimBarColor(dim.score) }"></div>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <!-- ===== 4. 对话记录 ===== -->
+            <section class="report-section" v-if="scoreReport.transcript?.length">
+              <div class="section-title">
+                <span class="section-icon">💬</span> 对话记录
+              </div>
+              <div class="transcript-list">
+                <div
+                  v-for="(msg, idx) in scoreReport.transcript"
+                  :key="idx"
+                  class="transcript-msg"
+                  :class="msg.role"
+                >
+                  <div class="transcript-role">
+                    {{ msg.role === 'user' ? '😊 你' : '🐱 AI' }}
+                  </div>
+                  <div class="transcript-bubble">{{ msg.text }}</div>
+                </div>
+              </div>
+            </section>
+
+            <!-- ===== 5. 改进建议 ===== -->
+            <section class="report-section" v-if="scoreReport.suggestions">
+              <div class="section-title">
+                <span class="section-icon">💡</span> 改进建议
+              </div>
+              <div class="report-suggestions">
+                <p>{{ scoreReport.suggestions }}</p>
+              </div>
+            </section>
           </div>
 
-          <!-- 建议 -->
-          <div class="report-suggestions" v-if="scoreReport.suggestions">
-            <div class="suggestion-icon">💬</div>
-            <p>{{ scoreReport.suggestions }}</p>
+          <!-- 操作按钮 -->
+          <div class="report-actions">
+            <button class="retry-btn" @click="selectScenario(selectedScenario)">
+              <span>🔄</span> 再来一次
+            </button>
+            <button class="back-btn" @click="backToScenes">
+              <span>🏠</span> 返回场景
+            </button>
           </div>
-        </div>
-
-        <div class="report-loading" v-else>
-          <div class="loading-spinner"></div>
-          <p>正在生成报告...</p>
-        </div>
-
-        <div class="report-actions">
-          <button class="retry-btn" @click="selectScenario(selectedScenario)">
-            <span>🔄</span> 再来一次
-          </button>
-          <button class="back-btn" @click="backToScenes">
-            <span>🏠</span> 返回场景
-          </button>
-        </div>
+        </template>
       </div>
     </template>
   </div>
@@ -774,7 +898,7 @@ onUnmounted(() => {
 
 .report-header {
   text-align: center;
-  margin-bottom: 24px;
+  margin-bottom: 20px;
 
   .report-mascot {
     font-size: 48px;
@@ -792,9 +916,58 @@ onUnmounted(() => {
   }
 }
 
-.report-content {
+.report-scroll {
   width: 100%;
-  max-width: 380px;
+  max-width: 520px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding-bottom: 20px;
+}
+
+.report-section {
+  background: #fff;
+  border-radius: 20px;
+  padding: 20px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+}
+
+.section-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: #3D3D5C;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  .section-icon {
+    font-size: 20px;
+  }
+}
+
+// 评分方法
+.methodology-card {
+  margin-top: 16px;
+  padding: 14px 16px;
+  background: #F8F0FF;
+  border-radius: 14px;
+
+  .methodology-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: #7C6FF7;
+    margin-bottom: 8px;
+  }
+
+  .methodology-text {
+    font-size: 12px;
+    color: #666;
+    line-height: 1.8;
+    white-space: pre-wrap;
+    font-family: inherit;
+    margin: 0;
+  }
 }
 
 // 综合分圆圈
@@ -808,7 +981,7 @@ onUnmounted(() => {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  margin: 0 auto 28px;
+  margin: 0 auto;
 
   .overall-num {
     font-size: 42px;
@@ -829,31 +1002,11 @@ onUnmounted(() => {
   }
 }
 
-// 维度分组
-.dimension-group {
-  margin-bottom: 20px;
-
-  .dim-group-title {
-    font-size: 15px;
-    font-weight: 600;
-    color: #3D3D5C;
-    margin-bottom: 12px;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-
-    .group-icon {
-      font-size: 18px;
-    }
-  }
-}
-
 // 维度列表
 .dimension-list {
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  margin-bottom: 20px;
+  gap: 12px;
 }
 
 .dimension-item {
@@ -861,14 +1014,8 @@ onUnmounted(() => {
     display: flex;
     justify-content: space-between;
     margin-bottom: 6px;
-    .dim-label {
-      font-size: 14px;
-      color: #666;
-    }
-    .dim-score {
-      font-size: 14px;
-      font-weight: 700;
-    }
+    .dim-label { font-size: 14px; color: #666; }
+    .dim-score { font-size: 14px; font-weight: 700; }
   }
   .dim-bar-bg {
     height: 8px;
@@ -883,29 +1030,227 @@ onUnmounted(() => {
   }
 }
 
+// 错误音素
+.error-section {
+  margin-top: 20px;
+
+  .error-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #3D3D5C;
+    margin-bottom: 10px;
+  }
+}
+
+.error-item {
+  padding: 10px 12px;
+  background: rgba(255, 107, 138, 0.04);
+  border-radius: 10px;
+  margin-bottom: 8px;
+
+  .error-phoneme {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+  }
+
+  .error-actual {
+    font-size: 13px;
+    color: #FF6B8A;
+    font-family: monospace;
+  }
+
+  .error-tip {
+    color: #999;
+    font-size: 12px;
+    display: flex;
+    align-items: flex-start;
+    gap: 4px;
+    line-height: 1.5;
+  }
+}
+
+// 逐句列表
+.utterance-list {
+  margin-top: 20px;
+}
+
+.utterance-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #3D3D5C;
+  margin-bottom: 10px;
+}
+
+.utterance-item {
+  border: 1px solid #F0E8FF;
+  border-radius: 14px;
+  margin-bottom: 10px;
+  overflow: hidden;
+}
+
+.utterance-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 14px;
+  cursor: pointer;
+  transition: background 0.2s;
+
+  &:hover { background: #FAFAFF; }
+}
+
+.utterance-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.utterance-num {
+  font-size: 12px;
+  font-weight: 600;
+  color: #7C6FF7;
+  background: rgba(124, 111, 247, 0.08);
+  padding: 2px 8px;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+.utterance-text-preview {
+  font-size: 13px;
+  color: #666;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.utterance-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.utterance-score {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.utterance-arrow {
+  font-size: 10px;
+  color: #ccc;
+  transition: transform 0.25s;
+  &.expanded { transform: rotate(90deg); }
+}
+
+.utterance-detail-wrap {
+  border-top: 1px solid #F0E8FF;
+  padding: 0 16px 8px;
+}
+
+// 文本维度卡片
+.text-dim-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.text-dim-card {
+  padding: 16px;
+  background: #FAFAFF;
+  border-radius: 14px;
+  border: 1px solid #F0E8FF;
+
+  .tdc-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+  .tdc-label { font-size: 15px; font-weight: 600; color: #3D3D5C; }
+  .tdc-score { font-size: 20px; font-weight: 800; }
+
+  .tdc-feedback {
+    font-size: 13px;
+    color: #666;
+    line-height: 1.6;
+    margin-bottom: 8px;
+    .tdc-fb-label { font-weight: 600; color: #999; }
+  }
+
+  .tdc-detail { margin-bottom: 4px; }
+  .tdc-tag {
+    font-size: 12px;
+    display: inline-block;
+    &.good { color: #5AD8A6; }
+    &.improve { color: #FF6B8A; }
+  }
+}
+
+// 对话记录
+.transcript-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.transcript-msg {
+  display: flex;
+  flex-direction: column;
+  max-width: 85%;
+
+  &.user { align-self: flex-end; }
+  &.ai { align-self: flex-start; }
+
+  .transcript-role {
+    font-size: 11px;
+    color: #999;
+    margin-bottom: 4px;
+    padding: 0 4px;
+  }
+
+  &.user .transcript-role { text-align: right; }
+
+  .transcript-bubble {
+    padding: 10px 14px;
+    border-radius: 14px;
+    font-size: 13px;
+    line-height: 1.5;
+    color: #4A4A5A;
+  }
+
+  &.user .transcript-bubble {
+    background: #F0F0FF;
+    border-bottom-right-radius: 4px;
+  }
+
+  &.ai .transcript-bubble {
+    background: #FFF0F3;
+    border-bottom-left-radius: 4px;
+  }
+}
+
 // 建议
 .report-suggestions {
-  display: flex;
-  gap: 10px;
-  padding: 16px;
-  background: #fff;
-  border-radius: 16px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
-  .suggestion-icon {
-    font-size: 22px;
-    flex-shrink: 0;
-  }
+  padding: 14px;
+  background: #FAFAFF;
+  border-radius: 14px;
   p {
     font-size: 14px;
     color: #666;
-    line-height: 1.6;
+    line-height: 1.7;
+    margin: 0;
   }
 }
 
 // 加载
 .report-loading {
   text-align: center;
-  padding: 40px;
+  padding: 60px 20px;
   .loading-spinner {
     width: 40px;
     height: 40px;
@@ -915,10 +1260,7 @@ onUnmounted(() => {
     animation: spin 0.8s linear infinite;
     margin: 0 auto 16px;
   }
-  p {
-    color: #999;
-    font-size: 14px;
-  }
+  p { color: #999; font-size: 14px; }
 }
 
 @keyframes spin {
@@ -929,7 +1271,8 @@ onUnmounted(() => {
 .report-actions {
   display: flex;
   gap: 12px;
-  margin-top: 28px;
+  margin-top: 20px;
+  padding-bottom: 20px;
 
   .retry-btn, .back-btn {
     display: flex;
