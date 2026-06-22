@@ -853,8 +853,8 @@ onUnmounted(() => {
 .report-screen {
   min-height: 100vh;
   background: linear-gradient(180deg, #FFF5F5 0%, #F8F0FF 30%, #FFF9F0 100%);
-  padding: 32px 40px 40px;
-  max-width: 1100px;
+  padding: 24px 24px 32px;
+  max-width: 1400px;
   margin: 0 auto;
 }
 
@@ -870,9 +870,9 @@ onUnmounted(() => {
 .report-top {
   display: flex;
   align-items: center;
-  gap: 32px;
-  margin-bottom: 28px;
-  padding: 24px 32px;
+  gap: 24px;
+  margin-bottom: 20px;
+  padding: 20px 28px;
   background: #fff;
   border-radius: 20px;
   box-shadow: 0 2px 16px rgba(0, 0, 0, 0.04);
@@ -917,28 +917,28 @@ onUnmounted(() => {
 .report-main {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 20px;
-  margin-bottom: 20px;
+  gap: 16px;
+  margin-bottom: 16px;
 }
 
 // 底部双列
 .report-bottom {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 20px;
-  margin-bottom: 20px;
+  gap: 16px;
+  margin-bottom: 16px;
 }
 
 // 通用卡片
 .report-card {
   background: #fff;
   border-radius: 20px;
-  padding: 20px 24px;
+  padding: 20px 28px;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
 
   &--full {
     grid-column: 1 / -1;
-    margin-bottom: 20px;
+    margin-bottom: 16px;
   }
 }
 
@@ -1027,7 +1027,7 @@ onUnmounted(() => {
 // 逐句网格
 .utterance-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
   gap: 10px;
 }
 
