@@ -397,15 +397,15 @@ onUnmounted(() => {
 
         <!-- 报告内容 -->
         <template v-else>
-          <div class="report-header">
-            <div class="report-mascot">🌟</div>
-            <h2>对话报告</h2>
-            <p class="report-scene">{{ selectedScenario?.emoji }} {{ selectedScenario?.title }} 场景</p>
-          </div>
+          <!-- 顶部：标题 + 综合分 + 方法论 -->
+          <div class="report-top">
+            <div class="report-header">
+              <div class="report-mascot">🌟</div>
+              <h2>对话报告</h2>
+              <p class="report-scene">{{ selectedScenario?.emoji }} {{ selectedScenario?.title }} 场景</p>
+            </div>
 
-          <div class="report-scroll">
-            <!-- ===== 1. 综合评分 ===== -->
-            <section class="report-section">
+            <div class="overall-area">
               <div class="overall-circle" :style="{ '--score': scoreReport.overall }">
                 <span class="overall-num">{{ scoreReport.overall }}</span>
                 <span class="overall-unit">分</span>
@@ -413,21 +413,20 @@ onUnmounted(() => {
                   {{ scoreReport.overall >= 80 ? '🎉 优秀' : scoreReport.overall >= 60 ? '👍 良好' : '💪 加油' }}
                 </span>
               </div>
-
-              <!-- 评分方法说明 -->
               <div class="methodology-card" v-if="scoreReport.scoring_methodology">
                 <div class="methodology-title">📐 评分计算方式</div>
                 <pre class="methodology-text">{{ scoreReport.scoring_methodology }}</pre>
               </div>
-            </section>
+            </div>
+          </div>
 
-            <!-- ===== 2. 语音评测 ===== -->
-            <section class="report-section" v-if="scoreReport.pronunciation?.length">
-              <div class="section-title">
-                <span class="section-icon">🎤</span> 语音评测
+          <!-- 主体：双列网格 -->
+          <div class="report-main">
+            <!-- 左列：语音评测 -->
+            <section class="report-card" v-if="scoreReport.pronunciation?.length">
+              <div class="card-title">
+                <span class="card-icon">🎤</span> 语音评测
               </div>
-
-              <!-- 平均维度 -->
               <div class="dimension-list">
                 <div v-for="dim in scoreReport.pronunciation" :key="dim.label" class="dimension-item">
                   <div class="dim-header">
@@ -440,120 +439,84 @@ onUnmounted(() => {
                 </div>
               </div>
 
-              <!-- 聚合错误音素 -->
               <div class="error-section" v-if="aggregatedErrors.length > 0">
-                <div class="error-title">⚠️ 问题音素定位</div>
+                <div class="error-title">⚠️ 问题音素</div>
                 <div v-for="err in aggregatedErrors" :key="err.phoneme" class="error-item">
-                  <div class="error-phoneme">
-                    <el-tag type="danger" size="small">{{ err.phoneme }}</el-tag>
-                    <span class="error-actual">{{ err.actual }}</span>
-                  </div>
-                  <div class="error-tip">
-                    <el-icon :size="14"><InfoFilled /></el-icon>
-                    <span>{{ err.tip }}</span>
-                  </div>
-                </div>
-              </div>
-
-              <!-- 逐句发音详情 -->
-              <div class="utterance-list" v-if="hasDetailedReport">
-                <div class="utterance-title">📋 逐句发音分析</div>
-                <div
-                  v-for="(utt, idx) in scoreReport.utterances"
-                  :key="idx"
-                  class="utterance-item"
-                >
-                  <div class="utterance-header" @click="toggleUtterance(idx)">
-                    <div class="utterance-left">
-                      <span class="utterance-num">第 {{ idx + 1 }} 句</span>
-                      <span class="utterance-text-preview">{{ utt.text?.slice(0, 50) }}{{ utt.text?.length > 50 ? '...' : '' }}</span>
-                    </div>
-                    <div class="utterance-right">
-                      <span class="utterance-score" :style="{ color: dimScoreColor(utt.overall) }">{{ utt.overall }} 分</span>
-                      <span class="utterance-arrow" :class="{ expanded: expandedUtterance === idx }">▶</span>
-                    </div>
-                  </div>
-                  <div class="utterance-detail-wrap" v-show="expandedUtterance === idx">
-                    <UtteranceDetailPanel
-                      :pronunciation-data="utt"
-                      :text="utt.text"
-                    />
-                  </div>
+                  <el-tag type="danger" size="small">{{ err.phoneme }}</el-tag>
+                  <span class="error-actual">{{ err.actual }}</span>
+                  <span class="error-tip-text">{{ err.tip }}</span>
                 </div>
               </div>
             </section>
 
-            <!-- ===== 3. 文本评测 ===== -->
-            <section class="report-section" v-if="scoreReport.text_dimension_details?.length">
-              <div class="section-title">
-                <span class="section-icon">📝</span> 文本评测（LLM）
+            <!-- 右列：文本评测 -->
+            <section class="report-card" v-if="scoreReport.text_dimension_details?.length">
+              <div class="card-title">
+                <span class="card-icon">📝</span> 文本评测（LLM）
               </div>
-
               <div class="text-dim-cards">
-                <div
-                  v-for="dim in scoreReport.text_dimension_details"
-                  :key="dim.label"
-                  class="text-dim-card"
-                >
+                <div v-for="dim in scoreReport.text_dimension_details" :key="dim.label" class="text-dim-card">
                   <div class="tdc-header">
                     <span class="tdc-label">{{ dim.label }}</span>
                     <span class="tdc-score" :style="{ color: dimScoreColor(dim.score) }">{{ dim.score }}</span>
                   </div>
-                  <div class="dim-bar-bg" style="margin-bottom: 10px;">
+                  <div class="dim-bar-bg" style="margin-bottom: 8px;">
                     <div class="dim-bar-fill" :style="{ width: dim.score + '%', background: dimBarColor(dim.score) }"></div>
                   </div>
-                  <div class="tdc-feedback" v-if="dim.feedback">
-                    <span class="tdc-fb-label">评价：</span>{{ dim.feedback }}
-                  </div>
-                  <div class="tdc-detail" v-if="dim.strengths">
-                    <span class="tdc-tag good">✅ {{ dim.strengths }}</span>
-                  </div>
-                  <div class="tdc-detail" v-if="dim.weaknesses">
-                    <span class="tdc-tag improve">📌 {{ dim.weaknesses }}</span>
-                  </div>
-                </div>
-              </div>
-
-              <!-- 简化版文本维度（向后兼容） -->
-              <div v-if="!scoreReport.text_dimension_details?.length && scoreReport.text_dimensions?.length" class="dimension-list">
-                <div v-for="dim in scoreReport.text_dimensions" :key="dim.label" class="dimension-item">
-                  <div class="dim-header">
-                    <span class="dim-label">{{ dim.label }}</span>
-                    <span class="dim-score" :style="{ color: dimScoreColor(dim.score) }">{{ dim.score }}</span>
-                  </div>
-                  <div class="dim-bar-bg">
-                    <div class="dim-bar-fill" :style="{ width: dim.score + '%', background: dimBarColor(dim.score) }"></div>
+                  <div class="tdc-feedback" v-if="dim.feedback">{{ dim.feedback }}</div>
+                  <div class="tdc-tags">
+                    <span v-if="dim.strengths" class="tdc-tag good">✅ {{ dim.strengths }}</span>
+                    <span v-if="dim.weaknesses" class="tdc-tag improve">📌 {{ dim.weaknesses }}</span>
                   </div>
                 </div>
               </div>
             </section>
+          </div>
 
-            <!-- ===== 4. 对话记录 ===== -->
-            <section class="report-section" v-if="scoreReport.transcript?.length">
-              <div class="section-title">
-                <span class="section-icon">💬</span> 对话记录
+          <!-- 逐句发音分析（全宽） -->
+          <section class="report-card report-card--full" v-if="hasDetailedReport">
+            <div class="card-title">
+              <span class="card-icon">📋</span> 逐句发音分析
+            </div>
+            <div class="utterance-grid">
+              <div
+                v-for="(utt, idx) in scoreReport.utterances"
+                :key="idx"
+                class="utterance-item"
+                :class="{ expanded: expandedUtterance === idx }"
+              >
+                <div class="utterance-header" @click="toggleUtterance(idx)">
+                  <span class="utterance-num">#{{ idx + 1 }}</span>
+                  <span class="utterance-text-preview">{{ utt.text?.slice(0, 60) }}{{ utt.text?.length > 60 ? '...' : '' }}</span>
+                  <span class="utterance-score" :style="{ color: dimScoreColor(utt.overall) }">{{ utt.overall }}</span>
+                  <span class="utterance-arrow" :class="{ expanded: expandedUtterance === idx }">▶</span>
+                </div>
+                <div class="utterance-detail-wrap" v-show="expandedUtterance === idx">
+                  <UtteranceDetailPanel :pronunciation-data="utt" :text="utt.text" />
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- 底部双列：对话记录 + 建议 -->
+          <div class="report-bottom">
+            <section class="report-card" v-if="scoreReport.transcript?.length">
+              <div class="card-title">
+                <span class="card-icon">💬</span> 对话记录
               </div>
               <div class="transcript-list">
-                <div
-                  v-for="(msg, idx) in scoreReport.transcript"
-                  :key="idx"
-                  class="transcript-msg"
-                  :class="msg.role"
-                >
-                  <div class="transcript-role">
-                    {{ msg.role === 'user' ? '😊 你' : '🐱 AI' }}
-                  </div>
+                <div v-for="(msg, idx) in scoreReport.transcript" :key="idx" class="transcript-msg" :class="msg.role">
+                  <div class="transcript-role">{{ msg.role === 'user' ? '😊 你' : '🐱 AI' }}</div>
                   <div class="transcript-bubble">{{ msg.text }}</div>
                 </div>
               </div>
             </section>
 
-            <!-- ===== 5. 改进建议 ===== -->
-            <section class="report-section" v-if="scoreReport.suggestions">
-              <div class="section-title">
-                <span class="section-icon">💡</span> 改进建议
+            <section class="report-card" v-if="scoreReport.suggestions">
+              <div class="card-title">
+                <span class="card-icon">💡</span> 改进建议
               </div>
-              <div class="report-suggestions">
+              <div class="suggestions-content">
                 <p>{{ scoreReport.suggestions }}</p>
               </div>
             </section>
@@ -890,90 +853,41 @@ onUnmounted(() => {
 .report-screen {
   min-height: 100vh;
   background: linear-gradient(180deg, #FFF5F5 0%, #F8F0FF 30%, #FFF9F0 100%);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 40px 24px;
+  padding: 32px 40px 40px;
+  max-width: 1100px;
+  margin: 0 auto;
 }
 
 .report-header {
   text-align: center;
-  margin-bottom: 20px;
-
-  .report-mascot {
-    font-size: 48px;
-    margin-bottom: 8px;
-  }
-  h2 {
-    font-size: 24px;
-    font-weight: 700;
-    color: #3D3D5C;
-  }
-  .report-scene {
-    font-size: 14px;
-    color: #999;
-    margin-top: 4px;
-  }
-}
-
-.report-scroll {
-  width: 100%;
-  max-width: 520px;
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-  padding-bottom: 20px;
-}
-
-.report-section {
-  background: #fff;
-  border-radius: 20px;
-  padding: 20px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
-}
-
-.section-title {
-  font-size: 17px;
-  font-weight: 700;
-  color: #3D3D5C;
   margin-bottom: 16px;
+  .report-mascot { font-size: 40px; margin-bottom: 4px; }
+  h2 { font-size: 22px; font-weight: 700; color: #3D3D5C; margin: 0; }
+  .report-scene { font-size: 13px; color: #999; margin-top: 4px; }
+}
+
+// 顶部：综合分 + 方法论
+.report-top {
   display: flex;
   align-items: center;
-  gap: 8px;
-
-  .section-icon {
-    font-size: 20px;
-  }
+  gap: 32px;
+  margin-bottom: 28px;
+  padding: 24px 32px;
+  background: #fff;
+  border-radius: 20px;
+  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.04);
 }
 
-// 评分方法
-.methodology-card {
-  margin-top: 16px;
-  padding: 14px 16px;
-  background: #F8F0FF;
-  border-radius: 14px;
-
-  .methodology-title {
-    font-size: 13px;
-    font-weight: 600;
-    color: #7C6FF7;
-    margin-bottom: 8px;
-  }
-
-  .methodology-text {
-    font-size: 12px;
-    color: #666;
-    line-height: 1.8;
-    white-space: pre-wrap;
-    font-family: inherit;
-    margin: 0;
-  }
+.overall-area {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  flex: 1;
 }
 
-// 综合分圆圈
 .overall-circle {
-  width: 130px;
-  height: 130px;
+  width: 110px;
+  height: 110px;
   border-radius: 50%;
   background: #fff;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
@@ -981,44 +895,81 @@ onUnmounted(() => {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  margin: 0 auto;
+  flex-shrink: 0;
+  .overall-num { font-size: 38px; font-weight: 800; color: #3D3D5C; line-height: 1; }
+  .overall-unit { font-size: 12px; color: #999; margin-top: 2px; }
+  .overall-level { font-size: 12px; font-weight: 600; margin-top: 2px; color: #FF6B8A; }
+}
 
-  .overall-num {
-    font-size: 42px;
-    font-weight: 800;
-    color: #3D3D5C;
-    line-height: 1;
+.methodology-card {
+  flex: 1;
+  padding: 14px 18px;
+  background: #F8F0FF;
+  border-radius: 14px;
+  .methodology-title { font-size: 13px; font-weight: 600; color: #7C6FF7; margin-bottom: 6px; }
+  .methodology-text {
+    font-size: 12px; color: #666; line-height: 1.7;
+    white-space: pre-wrap; font-family: inherit; margin: 0;
   }
-  .overall-unit {
-    font-size: 13px;
-    color: #999;
-    margin-top: 2px;
+}
+
+// 主体双列
+.report-main {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin-bottom: 20px;
+}
+
+// 底部双列
+.report-bottom {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin-bottom: 20px;
+}
+
+// 通用卡片
+.report-card {
+  background: #fff;
+  border-radius: 20px;
+  padding: 20px 24px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+
+  &--full {
+    grid-column: 1 / -1;
+    margin-bottom: 20px;
   }
-  .overall-level {
-    font-size: 13px;
-    font-weight: 600;
-    margin-top: 4px;
-    color: #FF6B8A;
-  }
+}
+
+.card-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #3D3D5C;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  .card-icon { font-size: 18px; }
 }
 
 // 维度列表
 .dimension-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
 }
 
 .dimension-item {
   .dim-header {
     display: flex;
     justify-content: space-between;
-    margin-bottom: 6px;
-    .dim-label { font-size: 14px; color: #666; }
+    margin-bottom: 4px;
+    .dim-label { font-size: 13px; color: #666; }
     .dim-score { font-size: 14px; font-weight: 700; }
   }
   .dim-bar-bg {
-    height: 8px;
+    height: 7px;
     border-radius: 4px;
     background: #F0E8FF;
     overflow: hidden;
@@ -1032,122 +983,20 @@ onUnmounted(() => {
 
 // 错误音素
 .error-section {
-  margin-top: 20px;
-
-  .error-title {
-    font-size: 14px;
-    font-weight: 600;
-    color: #3D3D5C;
-    margin-bottom: 10px;
-  }
+  margin-top: 16px;
+  .error-title { font-size: 13px; font-weight: 600; color: #3D3D5C; margin-bottom: 8px; }
 }
 
 .error-item {
-  padding: 10px 12px;
-  background: rgba(255, 107, 138, 0.04);
-  border-radius: 10px;
-  margin-bottom: 8px;
-
-  .error-phoneme {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 6px;
-  }
-
-  .error-actual {
-    font-size: 13px;
-    color: #FF6B8A;
-    font-family: monospace;
-  }
-
-  .error-tip {
-    color: #999;
-    font-size: 12px;
-    display: flex;
-    align-items: flex-start;
-    gap: 4px;
-    line-height: 1.5;
-  }
-}
-
-// 逐句列表
-.utterance-list {
-  margin-top: 20px;
-}
-
-.utterance-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: #3D3D5C;
-  margin-bottom: 10px;
-}
-
-.utterance-item {
-  border: 1px solid #F0E8FF;
-  border-radius: 14px;
-  margin-bottom: 10px;
-  overflow: hidden;
-}
-
-.utterance-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 12px 14px;
-  cursor: pointer;
-  transition: background 0.2s;
-
-  &:hover { background: #FAFAFF; }
-}
-
-.utterance-left {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-}
-
-.utterance-num {
-  font-size: 12px;
-  font-weight: 600;
-  color: #7C6FF7;
-  background: rgba(124, 111, 247, 0.08);
-  padding: 2px 8px;
-  border-radius: 8px;
-  flex-shrink: 0;
-}
-
-.utterance-text-preview {
-  font-size: 13px;
-  color: #666;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.utterance-right {
   display: flex;
   align-items: center;
   gap: 8px;
-  flex-shrink: 0;
-}
-
-.utterance-score {
-  font-size: 16px;
-  font-weight: 700;
-}
-
-.utterance-arrow {
-  font-size: 10px;
-  color: #ccc;
-  transition: transform 0.25s;
-  &.expanded { transform: rotate(90deg); }
-}
-
-.utterance-detail-wrap {
-  border-top: 1px solid #F0E8FF;
-  padding: 0 16px 8px;
+  padding: 8px 10px;
+  background: rgba(255, 107, 138, 0.04);
+  border-radius: 8px;
+  margin-bottom: 6px;
+  .error-actual { font-size: 12px; color: #FF6B8A; font-family: monospace; }
+  .error-tip-text { font-size: 11px; color: #999; flex: 1; }
 }
 
 // 文本维度卡片
@@ -1158,102 +1007,102 @@ onUnmounted(() => {
 }
 
 .text-dim-card {
-  padding: 16px;
+  padding: 14px;
   background: #FAFAFF;
   border-radius: 14px;
   border: 1px solid #F0E8FF;
-
   .tdc-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 8px;
+    margin-bottom: 6px;
   }
-  .tdc-label { font-size: 15px; font-weight: 600; color: #3D3D5C; }
-  .tdc-score { font-size: 20px; font-weight: 800; }
+  .tdc-label { font-size: 14px; font-weight: 600; color: #3D3D5C; }
+  .tdc-score { font-size: 22px; font-weight: 800; }
+  .tdc-feedback { font-size: 12px; color: #666; line-height: 1.5; margin-bottom: 6px; }
+  .tdc-tags { display: flex; flex-direction: column; gap: 3px; }
+  .tdc-tag { font-size: 11px; &.good { color: #5AD8A6; } &.improve { color: #FF6B8A; } }
+}
 
-  .tdc-feedback {
-    font-size: 13px;
-    color: #666;
-    line-height: 1.6;
-    margin-bottom: 8px;
-    .tdc-fb-label { font-weight: 600; color: #999; }
-  }
+// 逐句网格
+.utterance-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 10px;
+}
 
-  .tdc-detail { margin-bottom: 4px; }
-  .tdc-tag {
-    font-size: 12px;
-    display: inline-block;
-    &.good { color: #5AD8A6; }
-    &.improve { color: #FF6B8A; }
+.utterance-item {
+  border: 1px solid #F0E8FF;
+  border-radius: 12px;
+  overflow: hidden;
+  &.expanded { grid-column: 1 / -1; }
+}
+
+.utterance-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  cursor: pointer;
+  transition: background 0.2s;
+  &:hover { background: #FAFAFF; }
+  .utterance-num {
+    font-size: 11px; font-weight: 600; color: #7C6FF7;
+    background: rgba(124, 111, 247, 0.08);
+    padding: 2px 8px; border-radius: 8px; flex-shrink: 0;
   }
+  .utterance-text-preview {
+    font-size: 13px; color: #666;
+    flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .utterance-score { font-size: 15px; font-weight: 700; flex-shrink: 0; }
+  .utterance-arrow {
+    font-size: 10px; color: #ccc; flex-shrink: 0;
+    transition: transform 0.25s;
+    &.expanded { transform: rotate(90deg); }
+  }
+}
+
+.utterance-detail-wrap {
+  border-top: 1px solid #F0E8FF;
+  padding: 0 16px 8px;
 }
 
 // 对话记录
 .transcript-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  max-height: 360px;
+  gap: 10px;
+  max-height: 300px;
   overflow-y: auto;
 }
 
 .transcript-msg {
   display: flex;
   flex-direction: column;
-  max-width: 85%;
-
+  max-width: 90%;
   &.user { align-self: flex-end; }
   &.ai { align-self: flex-start; }
-
-  .transcript-role {
-    font-size: 11px;
-    color: #999;
-    margin-bottom: 4px;
-    padding: 0 4px;
-  }
-
+  .transcript-role { font-size: 10px; color: #999; margin-bottom: 2px; padding: 0 4px; }
   &.user .transcript-role { text-align: right; }
-
   .transcript-bubble {
-    padding: 10px 14px;
-    border-radius: 14px;
-    font-size: 13px;
-    line-height: 1.5;
-    color: #4A4A5A;
+    padding: 8px 12px; border-radius: 12px; font-size: 12px; line-height: 1.5; color: #4A4A5A;
   }
-
-  &.user .transcript-bubble {
-    background: #F0F0FF;
-    border-bottom-right-radius: 4px;
-  }
-
-  &.ai .transcript-bubble {
-    background: #FFF0F3;
-    border-bottom-left-radius: 4px;
-  }
+  &.user .transcript-bubble { background: #F0F0FF; border-bottom-right-radius: 4px; }
+  &.ai .transcript-bubble { background: #FFF0F3; border-bottom-left-radius: 4px; }
 }
 
 // 建议
-.report-suggestions {
-  padding: 14px;
-  background: #FAFAFF;
-  border-radius: 14px;
-  p {
-    font-size: 14px;
-    color: #666;
-    line-height: 1.7;
-    margin: 0;
-  }
+.suggestions-content {
+  p { font-size: 13px; color: #666; line-height: 1.7; margin: 0; }
 }
 
 // 加载
 .report-loading {
   text-align: center;
-  padding: 60px 20px;
+  padding: 80px 20px;
   .loading-spinner {
-    width: 40px;
-    height: 40px;
+    width: 40px; height: 40px;
     border: 3px solid #F0E8FF;
     border-top-color: #FF6B8A;
     border-radius: 50%;
@@ -1263,40 +1112,27 @@ onUnmounted(() => {
   p { color: #999; font-size: 14px; }
 }
 
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
+@keyframes spin { to { transform: rotate(360deg); } }
 
-// 报告按钮
+// 按钮
 .report-actions {
   display: flex;
   gap: 12px;
-  margin-top: 20px;
-  padding-bottom: 20px;
-
+  justify-content: center;
+  padding-top: 8px;
   .retry-btn, .back-btn {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 12px 24px;
-    border-radius: 24px;
-    border: none;
-    font-size: 14px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.2s;
-
+    display: flex; align-items: center; gap: 6px;
+    padding: 10px 22px; border-radius: 22px; border: none;
+    font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.2s;
     span { font-size: 16px; }
   }
   .retry-btn {
     background: linear-gradient(135deg, #FF6B8A, #FF8E9E);
-    color: #fff;
-    box-shadow: 0 4px 12px rgba(255, 107, 138, 0.3);
+    color: #fff; box-shadow: 0 4px 12px rgba(255, 107, 138, 0.3);
     &:hover { transform: translateY(-2px); }
   }
   .back-btn {
-    background: #fff;
-    color: #666;
+    background: #fff; color: #666;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
     &:hover { transform: translateY(-2px); }
   }
