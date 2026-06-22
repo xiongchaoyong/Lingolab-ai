@@ -32,12 +32,14 @@ def convert_to_wav(input_path: str) -> str:
 async def pronunciation_score(
     audio: UploadFile = File(..., description="学习者录音文件（任意格式，后端自动转 WAV）"),
     text: str = Form(..., description="跟读的标准文本"),
+    mode: str = Form(default="word", description="跟读模式：word/sentence"),
 ):
     """
     发音评测接口
 
-    接收音频 + 标准文本，返回基于 wav2vec2 + GOP 的音素级评分结果。
+    接收音频 + 标准文本 + 模式，返回基于 wav2vec2 + GOP 的音素级评分结果。
     支持任意浏览器录音格式（webm, mp4, wav 等），后端自动转码。
+    综合分按模式加权：单词（音素50%/重音25%/节奏25%），句子（音素40%/重音15%/连读15%/语调15%/节奏15%）。
     """
     # 参数校验
     if not text or not text.strip():
@@ -46,6 +48,9 @@ async def pronunciation_score(
     text = text.strip()
     if len(text) > 500:
         raise HTTPException(status_code=422, detail="文本长度不能超过 500 字符")
+
+    if mode not in ("word", "sentence"):
+        raise HTTPException(status_code=422, detail="mode 参数必须为 word 或 sentence")
 
     # 保存上传的音频到临时文件
     suffix = ".webm"
@@ -68,7 +73,7 @@ async def pronunciation_score(
         logger.info(f"音频转码完成: {os.path.getsize(converted_path)} bytes")
 
         # 执行发音评测
-        result = await score_audio(converted_path, text)
+        result = await score_audio(converted_path, text, mode)
         return PronunciationResponse(**result)
 
     except subprocess.CalledProcessError as e:

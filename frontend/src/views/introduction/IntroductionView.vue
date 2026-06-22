@@ -1,7 +1,4 @@
 <script setup>
-import { useRouter } from 'vue-router'
-const router = useRouter()
-
 const pipeline = [
   { label: '语音输入', tech: 'Whisper ASR', icon: 'Microphone', color: 'var(--color-success)' },
   { label: '文本理解', tech: 'LLM 意图识别', icon: 'ChatDotRound', color: 'var(--color-primary)' },
@@ -81,25 +78,6 @@ const architecture = [
 
 <template>
   <div class="intro-page">
-    <!-- 顶部导航栏 -->
-    <header class="landing-header">
-      <h1 class="landing-logo">Lingolab</h1>
-      <div class="landing-actions">
-        <a
-          href="https://github.com/xiongchaoyong/Lingolab-ai"
-          target="_blank"
-          class="github-link"
-          title="GitHub 仓库"
-        >
-          <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
-            <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/>
-          </svg>
-        </a>
-        <el-button text @click="router.push('/login')">登录</el-button>
-        <el-button type="primary" @click="router.push('/register')">免费注册</el-button>
-      </div>
-    </header>
-
     <!-- Hero -->
     <section class="hero">
       <div class="hero-badge">AI · NLP · EdTech</div>
@@ -109,10 +87,6 @@ const architecture = [
       <p class="hero-desc">
         从语音识别到智能纠音，从对话模拟到个性化推荐——<br />ASR → NLP 评分 → LLM 生成 → TTS 合成，全链路 AI 驱动
       </p>
-      <div class="hero-cta">
-        <el-button type="primary" size="large" @click="router.push('/register')">免费开始</el-button>
-        <el-button size="large" text @click="router.push('/login')">已有账号？登录</el-button>
-      </div>
     </section>
 
     <!-- 核心技术链路 -->
@@ -192,42 +166,10 @@ const architecture = [
   padding: 0 var(--spacing-xl) var(--spacing-huge);
 }
 
-/* Landing Header */
-.landing-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: var(--spacing-base) 0;
-  position: sticky;
-  top: 0;
-  background: var(--color-bg-primary);
-  z-index: 10;
-}
-.landing-logo {
-  font-family: var(--font-heading);
-  font-size: var(--font-size-xl);
-  font-weight: 700;
-  color: var(--color-primary);
-  letter-spacing: -0.5px;
-  margin: 0;
-}
-.landing-actions {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-sm);
-}
-.github-link {
-  display: flex;
-  align-items: center;
-  color: var(--color-text-secondary);
-  transition: color var(--transition-fast);
-  &:hover { color: var(--color-text-primary); }
-}
-
 /* Hero */
 .hero {
   text-align: center;
-  padding: var(--spacing-xxxl) 0 var(--spacing-xxl);
+  padding: var(--spacing-xxl) 0 var(--spacing-xxl);
   .hero-badge {
     display: inline-block;
     padding: var(--spacing-xs) var(--spacing-base);
@@ -259,12 +201,6 @@ const architecture = [
     font-family: var(--font-body);
     font-size: var(--font-size-lg);
     line-height: 1.8;
-  }
-  .hero-cta {
-    margin-top: var(--spacing-xxl);
-    display: flex;
-    gap: var(--spacing-md);
-    justify-content: center;
   }
 }
 

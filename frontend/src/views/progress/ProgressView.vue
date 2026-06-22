@@ -53,8 +53,8 @@ const radarOption = computed(() => ({
   series: [{
     type: 'radar',
     data: [
-      { value: radarData.current, name: '当前', lineStyle: { color: '#4F46E5' }, areaStyle: { color: 'rgba(79,70,229,0.15)' } },
-      { value: radarData.previous, name: '上次', lineStyle: { color: '#94A3B8', type: 'dashed' }, areaStyle: { color: 'rgba(148,163,184,0.08)' } },
+      { value: radarData.current, name: '当前', lineStyle: { color: '#A78BFA' }, areaStyle: { color: 'rgba(167,139,250,0.15)' } },
+      { value: radarData.previous, name: '上次', lineStyle: { color: '#C4B5D4', type: 'dashed' }, areaStyle: { color: 'rgba(196,181,212,0.12)' } },
     ],
   }],
 }))
@@ -68,8 +68,8 @@ const lineOption = computed(() => {
     xAxis: { type: 'category', data: data.labels },
     yAxis: { type: 'value', min: 0, max: 100 },
     series: [
-      { name: '发音准确率', type: 'line', data: data.pronunciation, smooth: true, lineStyle: { color: '#4F46E5' }, itemStyle: { color: '#4F46E5' } },
-      { name: '流利度', type: 'line', data: data.fluency, smooth: true, lineStyle: { color: '#059669' }, itemStyle: { color: '#059669' } },
+      { name: '发音准确率', type: 'line', data: data.pronunciation, smooth: true, lineStyle: { color: '#A78BFA' }, itemStyle: { color: '#A78BFA' } },
+      { name: '流利度', type: 'line', data: data.fluency, smooth: true, lineStyle: { color: '#C4B5FD' }, itemStyle: { color: '#C4B5FD' } },
     ],
   }
 })

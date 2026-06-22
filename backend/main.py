@@ -56,5 +56,9 @@ def health_check():
 
 # 注册路由
 from app.api.pronunciation import router as pronunciation_router
+from app.api.conversation import router as conversation_router
+from app.api.roleplay import router as roleplay_router
 
 app.include_router(pronunciation_router, prefix="/api/pronunciation", tags=["发音评测"])
+app.include_router(conversation_router, prefix="/api/conversation", tags=["语音对话"])
+app.include_router(roleplay_router, prefix="/api/roleplay", tags=["角色扮演"])

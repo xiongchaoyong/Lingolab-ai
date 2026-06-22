@@ -35,7 +35,7 @@ import SidebarNav from './SidebarNav.vue'
   margin: 0 auto;
   width: 100%;
   background-image:
-    radial-gradient(ellipse at 20% 0%, rgba(var(--color-primary-rgb), 0.03) 0%, transparent 50%),
-    radial-gradient(ellipse at 80% 100%, rgba(var(--color-success-rgb), 0.03) 0%, transparent 50%);
+    radial-gradient(ellipse at 20% 0%, rgba(var(--color-primary-rgb), 0.04) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 100%, rgba(var(--color-secondary-rgb), 0.04) 0%, transparent 50%);
 }
 </style>

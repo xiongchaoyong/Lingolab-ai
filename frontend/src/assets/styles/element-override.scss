@@ -1,5 +1,5 @@
 // ===========================
-// Element Plus 主题覆盖
+// Element Plus 主题覆盖 — 淡紫可爱风
 // ===========================
 
 :root {
@@ -20,12 +20,13 @@
   --el-box-shadow-light: var(--shadow-card);
   --el-box-shadow-dark: var(--shadow-hover);
   --el-border-color: var(--color-border);
+  --el-border-color-light: var(--color-border-light);
   --el-text-color-primary: var(--color-text-primary);
   --el-text-color-regular: var(--color-text-secondary);
   --el-bg-color: var(--color-bg-secondary);
   --el-bg-color-page: var(--color-bg-primary);
   --el-fill-color-blank: var(--color-bg-secondary);
-  --el-transition-duration: 0.2s;
+  --el-transition-duration: 0.25s;
 }
 
 // Element Plus 组件微调
@@ -36,45 +37,49 @@
 .el-menu-item {
   font-family: var(--font-body);
   font-size: var(--font-size-base);
-  transition: all var(--transition-fast);
+  border-radius: var(--radius-sm);
+  margin: 2px 6px;
+  transition: all var(--transition-base);
 
   &:hover {
-    background: rgba(var(--color-primary-rgb), 0.05) !important;
+    background: rgba(var(--color-primary-rgb), 0.08) !important;
     color: var(--color-primary) !important;
   }
 
   &.is-active {
-    background: rgba(var(--color-primary-rgb), 0.08) !important;
-    color: var(--color-primary) !important;
+    background: rgba(var(--color-primary-rgb), 0.12) !important;
+    color: var(--color-primary-dark) !important;
     font-weight: 600;
   }
 }
 
 .el-table {
   --el-table-border-color: var(--color-border-light);
-  --el-table-header-bg-color: rgba(var(--color-primary-rgb), 0.02);
-  --el-table-row-hover-bg-color: rgba(var(--color-primary-rgb), 0.03);
+  --el-table-header-bg-color: rgba(var(--color-primary-rgb), 0.03);
+  --el-table-row-hover-bg-color: rgba(var(--color-primary-rgb), 0.04);
   border-radius: var(--radius-md);
   overflow: hidden;
 }
 
 .el-card {
-  border-color: var(--color-border-light);
+  border-color: transparent;
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-card);
+  transition: all var(--transition-base);
+
+  &:hover {
+    box-shadow: var(--shadow-hover);
+    transform: translateY(-2px);
+  }
 }
 
 .el-button {
   font-family: var(--font-body);
-  font-weight: 500;
-  transition: all var(--transition-fast);
-}
-
-.el-button--primary {
-  box-shadow: 0 2px 8px rgba(var(--color-primary-rgb), 0.2);
+  font-weight: 600;
+  border-radius: var(--radius-md);
+  transition: all var(--transition-base);
 
   &:hover {
-    box-shadow: 0 4px 16px rgba(var(--color-primary-rgb), 0.3);
     transform: translateY(-1px);
   }
 
@@ -83,8 +88,63 @@
   }
 }
 
+.el-button--primary {
+  background: var(--color-primary);
+  border: none;
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(var(--color-primary-rgb), 0.3);
+
+  &:hover {
+    background: var(--color-primary-dark);
+    box-shadow: 0 6px 20px rgba(var(--color-primary-rgb), 0.4);
+    transform: translateY(-2px);
+    color: #fff;
+  }
+
+  &:active {
+    background: var(--color-primary-dark);
+    transform: translateY(0);
+    color: #fff;
+  }
+}
+
+.el-button--default {
+  &:hover {
+    border-color: var(--color-primary-light);
+    color: var(--color-primary);
+    background: rgba(var(--color-primary-rgb), 0.05);
+  }
+}
+
 .el-tag {
   font-family: var(--font-body);
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+}
+
+// 淡紫色系 tag 预设
+.el-tag--success {
+  --el-tag-bg-color: rgba(134, 239, 172, 0.15);
+  --el-tag-border-color: rgba(134, 239, 172, 0.3);
+  --el-tag-text-color: #166534;
+}
+
+.el-tag--warning {
+  --el-tag-bg-color: rgba(253, 186, 116, 0.15);
+  --el-tag-border-color: rgba(253, 186, 116, 0.3);
+  --el-tag-text-color: #92400E;
+}
+
+.el-tag--danger {
+  --el-tag-bg-color: rgba(253, 164, 175, 0.15);
+  --el-tag-border-color: rgba(253, 164, 175, 0.3);
+  --el-tag-text-color: #9F1239;
+}
+
+.el-tag--info {
+  --el-tag-bg-color: rgba(147, 197, 253, 0.15);
+  --el-tag-border-color: rgba(147, 197, 253, 0.3);
+  --el-tag-text-color: #1E40AF;
 }
 
 .el-dialog {
@@ -95,8 +155,9 @@
 .el-input__wrapper {
   border-radius: var(--radius-sm);
   box-shadow: none;
-  border: 1px solid var(--color-border);
-  transition: all var(--transition-fast);
+  border: 1.5px solid var(--color-border);
+  transition: all var(--transition-base);
+  background: var(--color-bg-secondary);
 
   &:hover {
     border-color: var(--color-primary-light);
@@ -104,7 +165,7 @@
 
   &.is-focus {
     border-color: var(--color-primary);
-    box-shadow: 0 0 0 3px rgba(var(--color-primary-rgb), 0.1);
+    box-shadow: 0 0 0 3px rgba(var(--color-primary-rgb), 0.12);
   }
 }
 
@@ -114,17 +175,105 @@
 
 .el-progress-bar__outer {
   border-radius: 10px;
+  background: rgba(var(--color-primary-rgb), 0.08);
+}
+
+.el-progress-bar__inner {
+  background: var(--color-primary);
+  border-radius: 10px;
+  transition: width var(--transition-smooth);
 }
 
 .el-badge__content {
   font-family: var(--font-body);
+  background: var(--color-primary);
+  border: 2px solid var(--color-bg-secondary);
 }
 
 .el-tabs__item {
   font-family: var(--font-heading);
-  font-weight: 500;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  transition: color var(--transition-base);
+
+  &:hover {
+    color: var(--color-primary);
+  }
+
+  &.is-active {
+    color: var(--color-primary);
+  }
+}
+
+.el-tabs__active-bar {
+  background: var(--color-primary);
+  height: 3px;
+  border-radius: 2px;
 }
 
 .el-dropdown-menu__item {
   font-family: var(--font-body);
+
+  &:hover {
+    background: rgba(var(--color-primary-rgb), 0.08);
+    color: var(--color-primary);
+  }
+}
+
+.el-slider__bar {
+  background: var(--color-primary);
+}
+
+.el-slider__button {
+  border-color: var(--color-primary);
+  box-shadow: 0 2px 6px rgba(var(--color-primary-rgb), 0.2);
+}
+
+.el-switch {
+  --el-switch-on-color: var(--color-primary);
+}
+
+.el-pagination button:hover {
+  color: var(--color-primary);
+}
+
+.el-pagination.is-background .el-pager li.is-active {
+  background: var(--color-primary);
+}
+
+.el-rate__icon {
+  color: var(--color-accent-yellow);
+}
+
+.el-empty__description p {
+  color: var(--color-text-secondary);
+}
+
+.el-notification {
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-modal);
+  border: 1px solid var(--color-border);
+}
+
+.el-message-box {
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-modal);
+}
+
+.el-radio__input.is-checked .el-radio__inner {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+.el-radio__input.is-checked + .el-radio__label {
+  color: var(--color-primary);
+}
+
+.el-checkbox__input.is-checked .el-checkbox__inner {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+.el-checkbox__input.is-checked + .el-checkbox__label {
+  color: var(--color-primary);
 }

@@ -25,3 +25,8 @@ PROGRESS.md
 
 # draw.io / Office 临时备份文件
 .*.bkp
+.~*
+
+# 后端生成的音频 / 测试文件
+backend/edge_tts_output/
+backend/test_*.wav

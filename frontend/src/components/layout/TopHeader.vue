@@ -43,9 +43,11 @@ function handleLogout() {
   align-items: center;
   justify-content: space-between;
   height: var(--header-height);
-  background: var(--color-bg-secondary);
-  border-bottom: 1px solid var(--color-border-light);
-  box-shadow: 0 1px 4px rgba(var(--color-primary-rgb), 0.04);
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1.5px solid var(--color-border);
+  box-shadow: 0 2px 12px rgba(var(--color-primary-rgb), 0.06);
   padding: 0 var(--spacing-xl);
   z-index: 10;
 }
@@ -55,7 +57,10 @@ function handleLogout() {
     font-family: var(--font-heading);
     font-size: var(--font-size-lg);
     font-weight: 700;
-    color: var(--color-primary);
+    background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
     letter-spacing: -0.5px;
   }
 }

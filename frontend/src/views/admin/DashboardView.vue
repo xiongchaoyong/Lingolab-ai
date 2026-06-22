@@ -4,10 +4,10 @@ import { ref, computed } from 'vue'
 const timeRange = ref('today')
 
 const metrics = [
-  { label: 'DAU', value: '328', change: '+12%', color: '#4F46E5' },
-  { label: 'MAU', value: '1,245', change: '+8%', color: '#059669' },
-  { label: '次日留存', value: '45%', change: '+3%', color: '#D97706' },
-  { label: '7日留存', value: '28%', change: '-2%', color: '#DC2626' },
+  { label: 'DAU', value: '328', change: '+12%', color: '#A78BFA' },
+  { label: 'MAU', value: '1,245', change: '+8%', color: '#C4B5FD' },
+  { label: '次日留存', value: '45%', change: '+3%', color: '#FDBA74' },
+  { label: '7日留存', value: '28%', change: '-2%', color: '#FDA4AF' },
 ]
 
 // 用户增长趋势
@@ -20,8 +20,8 @@ const lineOption = computed(() => ({
   series: [{
     name: '新增用户', type: 'line', smooth: true,
     data: [120, 185, 230, 280, 310, 340],
-    areaStyle: { color: 'rgba(79,70,229,0.1)' },
-    lineStyle: { color: '#4F46E5' },
+    areaStyle: { color: 'rgba(167,139,250,0.12)' },
+    lineStyle: { color: '#A78BFA' },
   }],
 }))
 

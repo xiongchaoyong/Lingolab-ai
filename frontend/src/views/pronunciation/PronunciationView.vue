@@ -178,7 +178,7 @@ async function handleRecordComplete({ blob, elapsed }) {
   try {
     // 并行：评分 + 获取标准音
     const [result] = await Promise.all([
-      scorePronunciation(blob, currentText.value),
+      scorePronunciation(blob, currentText.value, mode.value),
       fetchReferenceAudio(),
     ])
     scoreResult.value = result

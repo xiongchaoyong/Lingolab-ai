@@ -107,10 +107,10 @@ const menuList = computed(() => {
       }
 
       &.is-active {
-        background: rgba(var(--color-primary-rgb), 0.08);
-        color: var(--color-primary);
+        background: rgba(var(--color-primary-rgb), 0.12);
+        color: var(--color-primary-dark);
         font-weight: 600;
-        box-shadow: 0 2px 8px rgba(var(--color-primary-rgb), 0.08);
+        box-shadow: 0 2px 8px rgba(var(--color-primary-rgb), 0.1);
       }
     }
   }

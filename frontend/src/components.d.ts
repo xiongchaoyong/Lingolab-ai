@@ -56,6 +56,7 @@ declare module 'vue' {
     SidebarNav: typeof import('./components/layout/SidebarNav.vue')['default']
     TopHeader: typeof import('./components/layout/TopHeader.vue')['default']
     TopNavLayout: typeof import('./components/layout/TopNavLayout.vue')['default']
+    UtteranceDetailPanel: typeof import('./components/pronunciation/UtteranceDetailPanel.vue')['default']
     VoiceRecorder: typeof import('./components/common/VoiceRecorder.vue')['default']
   }
 }

@@ -1,35 +1,46 @@
 /* ===========================
-   Lingolab-ai 设计规范 — UI/UX Pro Max
-   风格: Soft UI Evolution + Vibrant Education
+   Lingolab-ai 设计规范 — 淡紫可爱风
    =========================== */
 
 :root {
-  /* 品牌色 (Language Learning App palette) */
-  --color-primary: #4F46E5;
-  --color-primary-rgb: 79, 70, 229;
-  --color-primary-light: #818CF8;
-  --color-primary-dark: #3730A3;
-  --color-success: #22C55E;
-  --color-success-rgb: 34, 197, 94;
-  --color-warning: #D97706;
-  --color-warning-rgb: 217, 119, 6;
-  --color-danger: #DC2626;
-  --color-danger-rgb: 220, 38, 38;
-  --color-info: #2563EB;
-  --color-info-rgb: 37, 99, 235;
+  /* 品牌色 (淡紫薰衣草色系) */
+  --color-primary: #A78BFA;
+  --color-primary-rgb: 167, 139, 250;
+  --color-primary-light: #C4B5FD;
+  --color-primary-lighter: #DDD6FE;
+  --color-primary-dark: #8B6FD8;
+
+  --color-secondary: #C4B5FD;
+  --color-secondary-rgb: 196, 181, 253;
+  --color-secondary-light: #DDD6FE;
+
+  --color-accent-blue: #93C5FD;
+  --color-accent-yellow: #FDE68A;
+  --color-accent-mint: #86EFAC;
+  --color-accent-peach: #FDBA74;
+
+  --color-success: #86EFAC;
+  --color-success-rgb: 134, 239, 172;
+  --color-warning: #FDBA74;
+  --color-warning-rgb: 253, 186, 116;
+  --color-danger: #FDA4AF;
+  --color-danger-rgb: 253, 164, 175;
+  --color-info: #93C5FD;
+  --color-info-rgb: 147, 197, 253;
 
   /* 中性色 */
-  --color-bg-primary: #EEF2FF;
+  --color-bg-primary: #F8F7FF;
   --color-bg-secondary: #FFFFFF;
-  --color-border: #E0E7FF;
-  --color-border-light: rgba(79, 70, 229, 0.08);
-  --color-text-primary: #312E81;
-  --color-text-secondary: #6366F1;
-  --color-text-disabled: #94A3B8;
+  --color-bg-warm: #F5F3FF;
+  --color-border: #EDE7F8;
+  --color-border-light: rgba(167, 139, 250, 0.08);
+  --color-text-primary: #3D2F5C;
+  --color-text-secondary: #7B6B9E;
+  --color-text-disabled: #C4B5D4;
 
-  /* 字体 (Modern Professional pairing) */
-  --font-heading: 'Poppins', 'PingFang SC', 'Microsoft YaHei', sans-serif;
-  --font-body: 'Open Sans', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  /* 字体 (可爱圆润感) */
+  --font-heading: 'Quicksand', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --font-body: 'Nunito', 'PingFang SC', 'Microsoft YaHei', sans-serif;
   --font-size-base: 14px;
   --font-size-sm: 12px;
   --font-size-lg: 16px;
@@ -48,25 +59,38 @@
   --spacing-xxxl: 40px;
   --spacing-huge: 48px;
 
-  /* 圆角 */
-  --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 14px;
+  /* 圆角 (适中圆润) */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
 
-  /* 阴影 (Soft UI Evolution) */
-  --shadow-sm: 0 1px 2px rgba(79, 70, 229, 0.04);
-  --shadow-card: 0 2px 8px rgba(79, 70, 229, 0.06), 0 1px 3px rgba(0, 0, 0, 0.04);
-  --shadow-hover: 0 6px 20px rgba(79, 70, 229, 0.10), 0 2px 6px rgba(0, 0, 0, 0.06);
-  --shadow-modal: 0 12px 36px rgba(79, 70, 229, 0.12), 0 4px 12px rgba(0, 0, 0, 0.08);
+  /* 阴影 (淡紫彩色阴影) */
+  --shadow-sm: 0 1px 3px rgba(167, 139, 250, 0.08);
+  --shadow-card: 0 3px 12px rgba(167, 139, 250, 0.10), 0 1px 3px rgba(167, 139, 250, 0.06);
+  --shadow-hover: 0 8px 24px rgba(167, 139, 250, 0.15), 0 2px 6px rgba(167, 139, 250, 0.08);
+  --shadow-modal: 0 16px 40px rgba(167, 139, 250, 0.18), 0 4px 12px rgba(167, 139, 250, 0.10);
 
   /* 动画 */
   --transition-fast: 150ms ease;
-  --transition-base: 200ms ease;
-  --transition-smooth: 300ms ease;
+  --transition-base: 250ms ease;
+  --transition-smooth: 350ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  --transition-bounce: 400ms cubic-bezier(0.34, 1.56, 0.64, 1);
 
   /* 布局 */
   --sidebar-width: 240px;
   --sidebar-collapsed-width: 64px;
   --header-height: 48px;
   --content-max-width: 1200px;
+}
+
+/* 辅助色 */
+:root {
+  --color-macaron-purple: #A78BFA;
+  --color-macaron-lavender: #C4B5FD;
+  --color-macaron-blue: #93C5FD;
+  --color-macaron-yellow: #FDE68A;
+  --color-macaron-mint: #86EFAC;
+  --color-macaron-peach: #FDBA74;
+  --color-macaron-rose: #FDA4AF;
+  --color-macaron-pink: #F9A8D4;
 }

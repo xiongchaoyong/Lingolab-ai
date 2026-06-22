@@ -771,13 +771,14 @@ class PronunciationService:
 
         return rhythm_score, detail, viz_data
 
-    def score(self, audio_path: str, text: str) -> Dict:
+    def score(self, audio_path: str, text: str, mode: str = "word") -> Dict:
         """
         对音频进行发音评测
 
         Args:
             audio_path: 音频文件路径（16kHz 单声道 WAV）
             text: 标准文本
+            mode: 跟读模式 word/sentence，影响综合分权重
 
         Returns:
             包含 overall, dimensions, errors, char_scores 的评测结果
@@ -841,9 +842,23 @@ class PronunciationService:
             {"label": "节奏感", "score": rhythm_score},
         ]
 
-        # 综合分 = 五维加权平均
-        active_scores = [accuracy_score, stress_score, intonation_score, linking_score, rhythm_score]
-        overall = round(sum(active_scores) / len(active_scores))
+        # 综合分 = 按模式加权平均
+        if mode == "word":
+            # 单词模式：音素准确度 50% + 重音位置 25% + 节奏感 25%
+            overall = round(
+                accuracy_score * 0.50 +
+                stress_score * 0.25 +
+                rhythm_score * 0.25
+            )
+        else:
+            # 句子模式：音素准确度 40% + 重音位置 15% + 连读表现 15% + 语调曲线 15% + 节奏感 15%
+            overall = round(
+                accuracy_score * 0.40 +
+                stress_score * 0.15 +
+                linking_score * 0.15 +
+                intonation_score * 0.15 +
+                rhythm_score * 0.15
+            )
 
         return {
             "overall": overall,
@@ -861,16 +876,16 @@ class PronunciationService:
             "rhythm_viz": rhythm_viz,
         }
 
-    def score_sync(self, audio_path: str, text: str) -> Dict:
+    def score_sync(self, audio_path: str, text: str, mode: str = "word") -> Dict:
         """同步版本的 score（供 run_in_executor 使用）"""
-        return self.score(audio_path, text)
+        return self.score(audio_path, text, mode)
 
 
-async def score_audio(audio_path: str, text: str) -> Dict:
+async def score_audio(audio_path: str, text: str, mode: str = "word") -> Dict:
     """异步接口：在线程池中运行发音评测"""
     service = get_pronunciation_service()
     loop = asyncio.get_running_loop()
-    return await loop.run_in_executor(_executor, service.score_sync, audio_path, text)
+    return await loop.run_in_executor(_executor, service.score_sync, audio_path, text, mode)
 
 
 def get_pronunciation_service() -> PronunciationService:
