@@ -4,12 +4,6 @@ import { useAuthStore } from '@/stores/auth'
 const routes = [
   // ========== 公开路由 ==========
   {
-    path: '/',
-    name: 'Introduction',
-    component: () => import('@/views/introduction/IntroductionView.vue'),
-    meta: { guest: true },
-  },
-  {
     path: '/login',
     name: 'Login',
     component: () => import('@/views/auth/LoginView.vue'),
@@ -40,10 +34,14 @@ const routes = [
     component: () => import('@/components/layout/TopNavLayout.vue'),
     children: [
       {
+        path: '',
+        name: 'Introduction',
+        component: () => import('@/views/introduction/IntroductionView.vue'),
+      },
+      {
         path: 'home',
         name: 'Home',
-        component: () => import('@/views/home/HomeView.vue'),
-        meta: { title: '首页', auth: true },
+        redirect: '/',
       },
       // 模块二：学习服务
       {
@@ -99,8 +97,10 @@ const routes = [
         meta: { title: '智能客服', auth: true },
       },
       {
-        path: 'introduction',
-        redirect: '/',
+        path: 'conversation',
+        name: 'Conversation',
+        component: () => import('@/views/conversation/VoiceCallView.vue'),
+        meta: { title: 'AI 智能对话', auth: true },
       },
     ],
   },
@@ -165,14 +165,6 @@ const routes = [
     ],
   },
 
-  // ========== 语音通话（独立全屏路由，即 AI 智能对话） ==========
-  {
-    path: '/conversation',
-    name: 'Conversation',
-    component: () => import('@/views/conversation/VoiceCallView.vue'),
-    meta: { title: 'AI 智能对话', auth: true },
-  },
-
   // ========== 404 ==========
   {
     path: '/:pathMatch(.*)*',
@@ -192,7 +184,7 @@ router.beforeEach((to, from, next) => {
 
   // 游客路由：已登录用户访问 / /login /register → 重定向到首页
   if (to.meta.guest && authStore.isLoggedIn) {
-    return next('/home')
+    return next('/')
   }
 
   // 需认证路由：未登录 → 重定向到首页（功能介绍页）
@@ -202,7 +194,7 @@ router.beforeEach((to, from, next) => {
 
   // 角色检查：教师/管理员路由
   if (to.meta.role && authStore.userInfo?.role !== to.meta.role) {
-    return next('/home')
+    return next('/')
   }
 
   next()

@@ -539,7 +539,7 @@ onUnmounted(() => {
 
 <style lang="scss" scoped>
 .voice-call-page {
-  min-height: 100vh;
+  min-height: calc(100vh - 56px);
   background: linear-gradient(180deg, #FFF5F5 0%, #F8F0FF 30%, #FFF9F0 60%, #F0F8FF 100%);
   color: #4A4A5A;
   font-family: 'PingFang SC', 'Hiragino Sans GB', sans-serif;
@@ -626,8 +626,7 @@ onUnmounted(() => {
 .call-screen {
   display: flex;
   flex-direction: column;
-  height: 100vh;
-  min-height: 100vh;
+  min-height: calc(100vh - 56px);
   background: linear-gradient(180deg, #FFF5F5 0%, #F8F0FF 25%, #FFF9F0 50%, #F0F8FF 100%);
 }
 
@@ -851,7 +850,7 @@ onUnmounted(() => {
 
 // ========== 评分报告 ==========
 .report-screen {
-  min-height: 100vh;
+  min-height: calc(100vh - 56px);
   background: linear-gradient(180deg, #FFF5F5 0%, #F8F0FF 30%, #FFF9F0 100%);
   padding: 24px 24px 32px;
   max-width: 1400px;

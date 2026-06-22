@@ -7,58 +7,63 @@
 
 ## 项目概述
 
-基于 NLP 与大语言模型的英语口语训练系统，支持发音评测、AI 对话练习、个性化学习路径等功能。
+基于 NLP 与大语言模型的英语口语训练系统，覆盖全年龄段用户，支持发音评测、AI 智能对话、个性化学习路径等 **16 个功能模块**（详见 `docs/introduction.md`）。
 
 - **行业**：在线教育 / 语言学习 / AI 教育
 - **团队规模**：3人
-- **小组成员:XCY  PL   DJQ**   
-- **当前成员:DJQ**   **
+- **小组成员**：XCY / PL / DJQ（**当前成员**）
 - **交付周期**：1-2 个月
 
 ---
 
 ## 技术栈
 
-| 层次 | 技术 | 版本要求 |
-|------|------|----------|
-| 前端 | Vue 3 + Vite + Pinia + Vue Router | Node.js >= 18 |
-| 后端 | Python + FastAPI | Python >= 3.11 |
-| 数据库 | MySQL | >= 8.0 |
-| ORM | SQLAlchemy + Alembic | 最新稳定版 |
-| AI/NLP | deepseek-v4-flash（深度求索） | 对话生成 / 语法纠错 / 推荐 / 客服 |
-| 语音识别(ASR) | WhisperX（开源） | 语音转文字 + 单词级时间对齐，为语法纠错/流利度评估提供文字稿 |
-| 发音评测 | wav2vec2（Meta） | 自监督语音特征提取 + 强制对齐，Apache 2.0 开源 |
-| 语音合成(TTS) | Edge TTS（微软） | 免费神经网络语音合成，SSML 控速 + 句级时间戳 |
-| 向量数据库 | Milvus（P2 可选） | 长期记忆、个性化推荐语义检索 |
-| 包管理 | 前端 npm，后端 pip + requirements.txt | - |
+| 层次 | 技术 | 说明 |
+|------|------|------|
+| 前端 | Vue 3.5 + Vite 8 + Pinia 3 + Vue Router 4 | Node >= 18 |
+| 后端 | Python + FastAPI + Uvicorn | Python >= 3.11 |
+| 数据库 | MySQL 8+ + SQLAlchemy + Alembic | pymysql |
+| 认证 | python-jose(JWT) + passlib(bcrypt) | 待对接 |
+| **LLM** | **阿里百炼 DashScope（qwen-plus）** | 对话生成 / 语法纠错 / 翻译 / 评分 |
+| ASR | WhisperX（small, int8） | 语音转文字 + 词级时间戳 |
+| 发音评测 | wav2vec2 + GOP + CTC 强制对齐 | 五维评分（音素/重音/连读/语调/节奏） |
+| TTS | Edge TTS（微软，免费） | 4 种音色，SSML 控速，句级时间戳 |
+| 音频处理 | librosa + soundfile + pydub + ffmpeg | 特征提取 / 转码 |
+| G2P | g2p-en | 音素→音标映射 |
+| ML 框架 | PyTorch（Apple Silicon MPS 加速） | torch + torchaudio |
 
 ---
 
-## 项目结构(后期可修改)
+## 项目结构
 
 ```
 /
-├── frontend/               # Vue 3 前端
+├── frontend/                    # Vue 3 前端
 │   ├── src/
-│   │   ├── components/     # 通用组件
-│   │   ├── views/          # 页面视图
-│   │   ├── stores/         # Pinia 状态管理
-│   │   ├── api/            # 接口请求封装
-│   │   └── router/         # 路由配置
-│   └── vite.config.js
-├── backend/                # FastAPI 后端
+│   │   ├── api/                 # Axios 封装（auth/pronunciation/conversation）
+│   │   ├── assets/styles/       # CSS 变量 + SCSS + Element Plus 覆盖
+│   │   ├── components/          # 通用（common/）+ 布局（layout/）+ 发音（pronunciation/）
+│   │   ├── router/              # 路由配置 + 导航守卫（guest/auth/role）
+│   │   ├── stores/              # Pinia（app/auth/assessment）
+│   │   └── views/               # 18 个页面（admin/assessment/auth/community/conversation/...）
+│   └── package.json
+├── backend/
 │   ├── app/
-│   │   ├── api/            # 路由层（按模块拆分）
-│   │   ├── services/       # 业务逻辑层
-│   │   ├── models/         # 数据库模型（SQLAlchemy）
-│   │   ├── schemas/        # 请求/响应 Schema（Pydantic）
-│   │   └── core/           # 配置、依赖注入、工具函数
-│   ├── alembic/            # 数据库迁移
+│   │   ├── api/                 # 路由（conversation/pronunciation）
+│   │   ├── services/            # 业务（asr/tts/llm/pronunciation）
+│   │   ├── models/              # 仅 TimestampMixin，无具体表模型
+│   │   ├── schemas/             # Pydantic（conversation/pronunciation/roleplay）
+│   │   └── core/                # 配置 config.py + database.py
 │   ├── requirements.txt
-│   └── main.py
-├── docs/                   # 接口文档、架构说明
-├── CLAUDE.md               # 本文件
-└── ai-log.md               # AI 操作日志
+│   └── main.py                  # FastAPI 入口 + 路由注册 + 模型预加载
+├── docs/                        # 文档
+│   ├── prds/                    # PRD v1.0、v1.2、model-architecture-v1.1
+│   ├── diagrams/                # .drawio + .png 架构图
+│   ├── introduction.md          # 16 模块介绍
+│   ├── TODO.md                  # 全部待办事项（按模块分组 + 优先级）
+│   └── 功能模块需求分析/         # 模块分析工作流产出
+├── CLAUDE.md
+└── ai-log.md
 ```
 
 ---
@@ -69,25 +74,45 @@
 ```bash
 cd frontend
 npm install          # 安装依赖
-npm run dev          # 启动开发服务器（默认 http://localhost:5173）
+npm run dev          # 开发服务器（默认 localhost:5173）
 npm run build        # 生产构建
-npm run lint         # 代码检查
 ```
 
 ### 后端
 ```bash
 cd backend
 pip install -r requirements.txt          # 安装依赖
-uvicorn main:app --reload                # 启动开发服务器（默认 http://localhost:8000）
-alembic upgrade head                     # 执行数据库迁移
-alembic revision --autogenerate -m "描述" # 生成迁移文件（需人工审查后再执行）
+uvicorn main:app --reload                # 开发服务器（默认 localhost:8000）
 ```
 
 ### 数据库
 ```bash
-mysql -u root -p                         # 连接数据库
-# 数据库名：english_training_dev（开发）/ english_training_test（测试）
+mysql -u root -p
+# 开发库：english_training_dev（注意：Alembic 尚未初始化，无数据表）
 ```
+
+---
+
+## 16 功能模块概述
+
+| # | 模块 | 实现状态 | 说明 |
+|---|------|----------|------|
+| 1 | 用户注册与多维度画像 | ❌ Mock | 前端伪造 JWT，后端无 `/api/auth` |
+| 2 | 英语水平智能测评 | ❌ Mock | 前端硬编码题目 + 随机评分 |
+| 3 | 个性化学习路径规划 | ❌ 未开始 | 需强化学习推荐引擎 |
+| **4** | **AI 发音评测与纠错** | **✅ 已实现** | wav2vec2 + GOP 五维加权评分 |
+| 5 | 流利度与完整性评估 | ⏳ 部分 | 已集成在对话评分中 |
+| **6** | **智能语音对话练习** | **✅ 已实现** | ASR→LLM→TTS 完整管线，SSE 流式 |
+| 7 | AI 语法纠错与润色 | ⏳ 部分 | 对话评分中已集成 LLM 文本评测 |
+| 8 | 情景角色扮演 | ⏳ Schema 已定义 | 路由未挂载 |
+| 9 | 学习资料智能推荐 | ❌ 未开始 | - |
+| 10 | 游戏化闯关学习 | ❌ 未开始 | 前端骨架页面 |
+| 11 | 学习社区与社交互动 | ❌ 未开始 | - |
+| 12 | 学习进度可视化追踪 | ❌ 未开始 | 前端骨架页面 |
+| 13 | 学习效果预测与预警 | ❌ 未开始 | - |
+| 14 | 教师端教学管理后台 | ❌ 未开始 | 前端骨架页面 |
+| 15 | 运营管理后台 | ❌ 未开始 | 前端骨架页面 |
+| 16 | 智能客服与帮助系统 | ❌ 未开始 | - |
 
 ---
 
@@ -95,27 +120,24 @@ mysql -u root -p                         # 连接数据库
 
 ### 通用
 - 代码注释使用中文，变量命名统一使用**英文**
-- 提交信息使用中文或英文均可，但格式统一：`feat: 添加发音接口`
+- 提交信息统一格式：`type: 描述`（如 `feat: 添加发音接口`）
 - Commit 类型：`feat` / `fix` / `docs` / `refactor` / `test` / `chore`
 
 ### 前端（Vue 3）
-- 组件名使用 PascalCase，如 `VoiceRecorder.vue`
-- 文件名使用 kebab-case，如 `voice-recorder.vue`
+- 组件名 PascalCase，文件名 kebab-case
 - 使用 Composition API（`<script setup>`），不使用 Options API
-- CSS 使用 scoped，不写全局样式（除 `global.css`）
-- 接口请求统一封装在 `src/api/` 下，不在组件中直接调用 axios
+- CSS 使用 scoped（除 `global.scss`）
+- 接口请求统一封装在 `src/api/`，不在组件中直接调 axios
 
 ### 后端（Python + FastAPI）
-- 变量和函数名使用 snake_case，类名使用 PascalCase
-- 路由文件按模块拆分，放在 `app/api/` 下
-- 业务逻辑放在 `services/`，路由层只做参数校验和调用 service
+- 变量/函数 snake_case，类名 PascalCase
+- 路由按模块拆分在 `app/api/`，业务逻辑在 `services/`
 - 所有接口必须有 Pydantic Schema 做请求/响应验证
-- 错误处理统一使用 FastAPI 的 `HTTPException`，不要 `try/except` 吞掉错误
+- 错误处理统一用 `HTTPException`，不吞错误
 
 ### 数据库
-- 表名使用复数 snake_case，如 `user_profiles`、`learning_records`
-- 所有表必须有 `id`（主键）、`created_at`、`updated_at` 字段
-- **数据库迁移文件必须人工审查后才能执行，不得让 AI 自主运行 `alembic upgrade`**
+- 表名用复数 snake_case，必须含 `id`（PK）、`created_at`、`updated_at`
+- **迁移文件必须人工审查后才能执行，不得让 AI 自主运行 `alembic upgrade`**
 
 ---
 
@@ -130,17 +152,18 @@ mysql -u root -p                         # 连接数据库
 
 ## 环境变量
 
-后端在 `backend/.env` 中配置（参考 `backend/.env.example`）：
+后端 `backend/.env`（参考 `.env.example`）：
 
 ```
 DATABASE_URL=mysql+pymysql://user:password@localhost:3306/english_training_dev
-OPENAI_API_KEY=
-CLAUDE_API_KEY=
-JWT_SECRET_KEY=
-DEEPSEEK_API_KEY=
+BAILIAN_API_KEY=                    # 阿里百炼 DashScope（替代 DeepSeek）
+JWT_SECRET_KEY=change-me-to-a-random-string
+HF_ENDPOINT=https://hf-mirror.com   # HuggingFace 国内镜像
+DOUBAO_APP_ID=                      # 可选，豆包 TTS
+DOUBAO_ACCESS_KEY=                  # 可选，豆包 TTS
 ```
 
-前端在 `frontend/.env.local` 中配置：
+前端 `frontend/.env.local`：
 
 ```
 VITE_API_BASE_URL=http://localhost:8000
@@ -151,59 +174,46 @@ VITE_API_BASE_URL=http://localhost:8000
 ## Git 工作流
 
 **每次开发前（Claude 自动执行，无需人工提醒）：**
-1. 切换到 `dev` 分支：`git checkout dev`
-2. 拉取 `dev` 最新代码：`git pull origin dev`
-3. 拉取 `main` 最新代码（同步上游）：`git pull origin main`
-4. 基于最新 `dev` 创建功能分支：`git checkout -b feat/功能名`
+1. `git checkout dev && git pull origin dev && git pull origin main`
+2. `git checkout -b feat/功能名`
+3. 分支命名：`feat/` / `fix/` / `refactor/` / `docs/`
 
 **开发与提交：**
-4. 小粒度提交，每次只做一件事
-5. 完成后发 PR 合入 `dev`，至少 1 人 review
-6. PR 描述必须说明：做了什么、验证了什么、AI 生成部分是否已通读
-7. 每次 PR 同步更新 `ai-log.md`
-8. `main` 分支只在里程碑节点从 `dev` 合入，打版本 tag
+- 小粒度提交，每次只做一件事
+- PR 合入 `dev`，至少 1 人 review
+- PR 描述说明：做了什么、验证了什么、AI 生成部分是否已通读
+- 每次 PR 同步更新 `ai-log.md`
 
-**分支命名规范：**
-- 新功能：`feat/功能名`（如 `feat/voice-recorder`）
-- 修复：`fix/问题描述`（如 `fix/login-error`）
-- 重构：`refactor/模块名`
-- 文档：`docs/内容描述`
-
-**仓库地址：**git@github.com:xiongchaoyong/Lingolab-ai.git   或  https://github.com/xiongchaoyong/Lingolab-ai.git
+**仓库：** git@github.com:xiongchaoyong/Lingolab-ai.git
 
 ---
 
-## 自定义技能（Skills）
+## 自定义技能
 
-项目在 `.claude/skills/` 目录下存放自定义技能，Claude Code 会自动发现并加载，团队成员均可使用：
-
-| 技能名称 | 文件 | 用途 |
-|------|------|------|
-| `requirements-clarity` | `.claude/skills/requirements-clarity/SKILL.md` | 需求澄清：通过 100 分评分系统将模糊需求转为可执行 PRD |
-| `prompt-polish` | `.claude/skills/prompt-polish/SKILL.md` | 提示词优化：将粗糙提示词转为精准 AI 提示词 |
-| `drawio-skill` | `.claude/skills/drawio-skill/SKILL.md` | AI 绘图：自然语言生成 draw.io 图表（流程图/架构图/UML/ERD/ML模型图等） |
-| `module-analysis` | `.claude/skills/module-analysis/SKILL.md` | 模块分析：将 PRD 模块拆解为子功能清单→用例图→详细规格→流程图 |
-
-使用方式：在 Claude Code 中输入 `/requirements-clarity` 或 `/prompt-polish` 调用。
+| 技能名称 | 用途 |
+|----------|------|
+| `requirements-clarity` | 需求澄清（100 分评分系统→可执行 PRD） |
+| `prompt-polish` | 提示词优化 |
+| `drawio-skill` | 自然语言生成 draw.io 图表 |
+| `module-analysis` | PRD 模块拆解→用例图→规格→流程图 |
+| **`ui-ux-pro-max`** | **UI/UX 设计智能（67 样式/96 调色板/57 字体/13 框架）** |
 
 ---
 
 ## Claude Code 使用规范
 
-- 每次任务先让 Claude 出计划，确认方案后再执行
-- **开始任何新需求前，Claude 自动执行：checkout dev → pull dev → pull main → 创建 feat 分支，无需人工提醒**
+- 每次任务先出计划，确认方案后再执行
+- 开始新需求前自动执行：checkout dev → pull dev → pull main → 创建 feat 分支
 - 任务粒度要小，一次只完成一个功能点
 - 涉及数据库、鉴权、支付等高危模块，必须人工主导
-- Claude 犯错被纠正后，立即将教训写入下方「经验教训」章节
-- CLAUDE.md 控制在 200 行以内，子模块可在对应目录下建独立 CLAUDE.md
-- **每次编码完成后，Claude 必须做三件事：① 在对话中总结做了什么；② 将总结追加写入 ai-log.md（格式：日期 + 模块名 + 变更摘要 + 新增文件清单）；③ 执行顺序：先更新 ai-log.md → 再 commit**
+- Claude 犯错被纠正后，立即将教训写入下方「经验教训」
+- 每次编码完成后，Claude 必须做三件事：① 在对话中总结做了什么；② 将总结追加写入 `ai-log.md`；③ **先更新 ai-log.md → 再 commit**
 
 ---
 
 ## 经验教训
 
-> 在此追加 Claude 犯错后的纠正记录，格式如下：
 > `- [日期] 问题描述 → 正确做法`
 
-- [2026-05-25] 项目初始化 push 后未同步更新 ai-log.md → 每次 git 操作（push、PR 等）必须同步更新 ai-log.md 记录操作摘要
+- [2026-05-25] 项目初始化 push 后未同步更新 ai-log.md → 每次 git 操作必须同步更新 ai-log.md 记录操作摘要
 - [2026-05-25] 先推送再补 log 导致反复遗漏 → 执行顺序：先更新 ai-log.md → 再 commit → 最后 push，确保 log 和变更在同一个 commit 里

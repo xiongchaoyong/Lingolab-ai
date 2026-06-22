@@ -27,8 +27,8 @@ const radarOption = computed(() => ({
   series: [{
     type: 'radar',
     data: [{ value: [78, 65, 72, 80, 60], name: '能力分布' }],
-    lineStyle: { color: '#4F46E5' },
-    areaStyle: { color: 'rgba(79,70,229,0.15)' },
+    lineStyle: { color: '#A78BFA' },
+    areaStyle: { color: 'rgba(167,139,250,0.15)' },
   }],
 }))
 </script>

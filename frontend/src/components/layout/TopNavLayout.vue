@@ -11,8 +11,12 @@ const hoveredNav = ref(null)
 
 // ========== 导航定义（按需求文档七个模块） ==========
 
+const FULLSCREEN_ROUTES = ['/conversation']
+
+const isFullscreenRoute = computed(() => FULLSCREEN_ROUTES.includes(route.path))
+
 const learnerNavs = [
-  { path: '/home', title: '首页' },
+  { path: '/', title: '首页' },
   {
     title: '学习中心',
     children: [
@@ -41,16 +45,11 @@ const learnerNavs = [
       { path: '/community', title: '社区广场' },
     ],
   },
-  {
-    title: '帮助',
-    children: [
-      { path: '/help', title: '智能客服' },
-    ],
-  },
+  { path: '/help', title: '智能客服' },
 ]
 
 const teacherNavs = [
-  { path: '/home', title: '首页' },
+  { path: '/', title: '首页' },
   {
     title: '学习中心',
     children: [
@@ -79,12 +78,7 @@ const teacherNavs = [
       { path: '/community', title: '社区广场' },
     ],
   },
-  {
-    title: '帮助',
-    children: [
-      { path: '/help', title: '智能客服' },
-    ],
-  },
+  { path: '/help', title: '智能客服' },
   {
     title: '后台管理',
     children: [
@@ -96,7 +90,7 @@ const teacherNavs = [
 ]
 
 const adminNavs = [
-  { path: '/home', title: '首页' },
+  { path: '/', title: '首页' },
   {
     title: '学习中心',
     children: [
@@ -125,12 +119,7 @@ const adminNavs = [
       { path: '/community', title: '社区广场' },
     ],
   },
-  {
-    title: '帮助',
-    children: [
-      { path: '/help', title: '智能客服' },
-    ],
-  },
+  { path: '/help', title: '智能客服' },
   {
     title: '后台管理',
     children: [
@@ -188,7 +177,7 @@ function handleLogout() {
     <!-- 顶部导航栏 -->
     <header class="tn-header">
       <div class="tn-left">
-        <h1 class="tn-logo" @click="router.push('/home')">Lingolab</h1>
+        <h1 class="tn-logo" @click="router.push('/')">Lingolab</h1>
       </div>
 
       <!-- 桌面端导航链接 -->
@@ -228,25 +217,32 @@ function handleLogout() {
       </nav>
 
       <div class="tn-right">
-        <!-- 通知 -->
-        <el-badge :value="3" :max="99" class="tn-notice">
-          <el-icon :size="20"><Bell /></el-icon>
-        </el-badge>
+        <!-- 未登录显示登录入口 -->
+        <template v-if="!authStore.isLoggedIn">
+          <el-button text @click="router.push('/login')">登录</el-button>
+          <el-button type="primary" @click="router.push('/register')">免费注册</el-button>
+        </template>
+        <template v-else>
+          <!-- 通知 -->
+          <el-badge :value="3" :max="99" class="tn-notice">
+            <el-icon :size="20"><Bell /></el-icon>
+          </el-badge>
 
-        <!-- 用户下拉 -->
-        <el-dropdown trigger="click" @command="handleLogout">
-          <span class="tn-user">
-            <el-avatar :size="32" icon="UserFilled" />
-            <span class="tn-username">{{ authStore.userInfo?.username || '用户' }}</span>
-            <el-icon><ArrowDown /></el-icon>
-          </span>
-          <template #dropdown>
-            <el-dropdown-menu>
-              <el-dropdown-item command="profile">个人设置</el-dropdown-item>
-              <el-dropdown-item command="logout" divided>退出登录</el-dropdown-item>
-            </el-dropdown-menu>
-          </template>
-        </el-dropdown>
+          <!-- 用户下拉 -->
+          <el-dropdown trigger="click" @command="handleLogout">
+            <span class="tn-user">
+              <el-avatar :size="32" icon="UserFilled" />
+              <span class="tn-username">{{ authStore.userInfo?.username || '用户' }}</span>
+              <el-icon><ArrowDown /></el-icon>
+            </span>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item command="profile">个人设置</el-dropdown-item>
+                <el-dropdown-item command="logout" divided>退出登录</el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
+        </template>
 
         <!-- 移动端汉堡菜单 -->
         <button class="tn-hamburger" @click="mobileMenuOpen = !mobileMenuOpen">
@@ -284,7 +280,7 @@ function handleLogout() {
     </transition>
 
     <!-- 内容区域 -->
-    <main class="tn-content">
+    <main :class="['tn-content', { 'tn-content--fullscreen': isFullscreenRoute }]">
       <router-view />
     </main>
   </div>
@@ -304,9 +300,11 @@ function handleLogout() {
   align-items: center;
   height: 56px;
   padding: 0 var(--spacing-xl);
-  background: var(--color-bg-secondary);
-  border-bottom: 1px solid var(--color-border-light);
-  box-shadow: 0 1px 4px rgba(var(--color-primary-rgb), 0.04);
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1.5px solid var(--color-border);
+  box-shadow: 0 2px 12px rgba(var(--color-primary-rgb), 0.06);
   position: sticky;
   top: 0;
   z-index: 100;
@@ -321,10 +319,16 @@ function handleLogout() {
   font-family: var(--font-heading);
   font-size: var(--font-size-lg);
   font-weight: 700;
-  color: var(--color-primary);
+  background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
   letter-spacing: -0.5px;
   cursor: pointer;
   margin: 0;
+  transition: opacity var(--transition-fast);
+
+  &:hover { opacity: 0.85; }
 }
 
 /* 桌面端导航 */
@@ -361,9 +365,9 @@ function handleLogout() {
   }
 
   &.active {
-    color: var(--color-primary);
+    color: var(--color-primary-dark);
     font-weight: 600;
-    background: rgba(var(--color-primary-rgb), 0.06);
+    background: rgba(var(--color-primary-rgb), 0.08);
   }
 }
 
@@ -378,12 +382,14 @@ function handleLogout() {
   top: 100%;
   left: 50%;
   transform: translateX(-50%);
-  min-width: 140px;
+  min-width: 150px;
   padding: var(--spacing-xs);
-  background: var(--color-bg-secondary);
-  border: 1px solid var(--color-border-light);
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1.5px solid var(--color-border);
   border-radius: var(--radius-md);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-hover);
   z-index: 200;
   display: flex;
   flex-direction: column;
@@ -406,13 +412,14 @@ function handleLogout() {
 
   &:hover {
     color: var(--color-primary);
-    background: rgba(var(--color-primary-rgb), 0.04);
+    background: rgba(var(--color-primary-rgb), 0.06);
+    transform: translateX(3px);
   }
 
   &.active {
     color: var(--color-primary);
     font-weight: 600;
-    background: rgba(var(--color-primary-rgb), 0.06);
+    background: linear-gradient(135deg, rgba(var(--color-primary-rgb), 0.08), rgba(var(--color-secondary-rgb), 0.08));
   }
 }
 
@@ -542,8 +549,15 @@ function handleLogout() {
   margin: 0 auto;
   width: 100%;
   background-image:
-    radial-gradient(ellipse at 20% 0%, rgba(var(--color-primary-rgb), 0.03) 0%, transparent 50%),
-    radial-gradient(ellipse at 80% 100%, rgba(var(--color-success-rgb), 0.03) 0%, transparent 50%);
+    radial-gradient(ellipse at 20% 0%, rgba(var(--color-primary-rgb), 0.04) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 100%, rgba(var(--color-secondary-rgb), 0.04) 0%, transparent 50%);
+}
+
+/* 全屏内容区 — 用于 AI 智能对话等需要铺满的页面 */
+.tn-content--fullscreen {
+  padding: 0;
+  max-width: none;
+  background: none;
 }
 
 /* 过渡动画 */
