@@ -192,6 +192,7 @@ async function hangUp() {
   // 获取评分报告
   if (sessionId.value) {
     isScoring.value = true
+    phase.value = 'report'  // 立即切换页面，显示加载状态
     try {
       scoreReport.value = await endConversation(sessionId.value)
     } catch (e) {
