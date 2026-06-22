@@ -53,12 +53,6 @@ const routes = [
         meta: { title: '发音评测', auth: true },
       },
       {
-        path: 'conversation',
-        name: 'Conversation',
-        component: () => import('@/views/conversation/ConversationView.vue'),
-        meta: { title: 'AI 对话', auth: true },
-      },
-      {
         path: 'role-play',
         name: 'RolePlay',
         component: () => import('@/views/roleplay/RolePlayView.vue'),
@@ -169,6 +163,14 @@ const routes = [
         meta: { title: '反馈管理' },
       },
     ],
+  },
+
+  // ========== 语音通话（独立全屏路由，即 AI 智能对话） ==========
+  {
+    path: '/conversation',
+    name: 'Conversation',
+    component: () => import('@/views/conversation/VoiceCallView.vue'),
+    meta: { title: 'AI 智能对话', auth: true },
   },
 
   // ========== 404 ==========

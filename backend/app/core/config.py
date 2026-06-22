@@ -7,8 +7,8 @@ class Settings(BaseSettings):
     # 数据库
     database_url: str = "mysql+pymysql://root:@localhost:3306/english_training_dev"
 
-    # AI
-    deepseek_api_key: str = ""
+    # AI（阿里百炼 DashScope）
+    bailian_api_key: str = ""
     hf_endpoint: str = "https://hf-mirror.com"
 
     # JWT

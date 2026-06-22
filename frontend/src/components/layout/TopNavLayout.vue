@@ -17,7 +17,7 @@ const learnerNavs = [
     title: '学习中心',
     children: [
       { path: '/pronunciation', title: '发音评测' },
-      { path: '/conversation', title: 'AI 对话' },
+      { path: '/conversation', title: 'AI 智能对话' },
       { path: '/role-play', title: '角色扮演' },
     ],
   },
@@ -55,7 +55,7 @@ const teacherNavs = [
     title: '学习中心',
     children: [
       { path: '/pronunciation', title: '发音评测' },
-      { path: '/conversation', title: 'AI 对话' },
+      { path: '/conversation', title: 'AI 智能对话' },
       { path: '/role-play', title: '角色扮演' },
     ],
   },
@@ -101,7 +101,7 @@ const adminNavs = [
     title: '学习中心',
     children: [
       { path: '/pronunciation', title: '发音评测' },
-      { path: '/conversation', title: 'AI 对话' },
+      { path: '/conversation', title: 'AI 智能对话' },
       { path: '/role-play', title: '角色扮演' },
     ],
   },
