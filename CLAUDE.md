@@ -5,6 +5,12 @@
 
 ---
 
+## ⚠️ 编码前必读
+
+**在进行任何代码编写前，必须先读取 `docs/ai-collaboration-standards.md`**，严格遵循其中的项目结构、前端/后端模式、命名规范和协作流程。所有 AI 生成的代码必须符合该规范。
+
+---
+
 ## 项目概述
 
 基于 NLP 与大语言模型的英语口语训练系统，覆盖全年龄段用户，支持发音评测、AI 智能对话、个性化学习路径等 **16 个功能模块**（详见 `docs/introduction.md`）。
@@ -61,6 +67,7 @@
 │   ├── diagrams/                # .drawio + .png 架构图
 │   ├── introduction.md          # 16 模块介绍
 │   ├── TODO.md                  # 全部待办事项（按模块分组 + 优先级）
+│   ├── ai-collaboration-standards.md  # AI 协作开发规范（前端/后端/工作流/提示词模板）
 │   └── 功能模块需求分析/         # 模块分析工作流产出
 ├── CLAUDE.md
 └── ai-log.md
