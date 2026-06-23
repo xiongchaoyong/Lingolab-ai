@@ -61,6 +61,7 @@
 │   ├── diagrams/                # .drawio + .png 架构图
 │   ├── introduction.md          # 16 模块介绍
 │   ├── TODO.md                  # 全部待办事项（按模块分组 + 优先级）
+│   ├── ai-collaboration-standards.md  # AI 协作开发规范（前端/后端/工作流/提示词模板）
 │   └── 功能模块需求分析/         # 模块分析工作流产出
 ├── CLAUDE.md
 └── ai-log.md
