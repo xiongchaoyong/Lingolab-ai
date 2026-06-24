@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { startAssessmentApi, submitAssessmentApi } from '@/api/assessment'
+import { useAuthStore } from '@/stores/auth'
 
 const TYPE_LABELS = {
   listening: '听力理解',
@@ -101,6 +102,12 @@ export const useAssessmentStore = defineStore('assessment', () => {
       dimensionScores: res.dimension_scores,
       weakness: res.weakness,
       duration: res.duration,
+    }
+
+    // 同步更新 authStore，标记测评已完成
+    const authStore = useAuthStore()
+    if (authStore.userInfo) {
+      authStore.userInfo.assessment_completed = true
     }
 
     isCompleted.value = true

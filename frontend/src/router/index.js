@@ -188,13 +188,18 @@ const router = createRouter({
 router.beforeEach((to, from, next) => {
   const authStore = useAuthStore()
 
-  // 游客路由：已登录用户访问 / /login /register → 重定向到首页
+  // 游客路由：已登录用户访问 /login /register → 重定向到首页
   if (to.meta.guest && authStore.isLoggedIn) {
     return next('/')
   }
 
   // 需认证路由：未登录 → 重定向到首页（功能介绍页）
   if (to.meta.auth && !authStore.isLoggedIn) {
+    return next('/')
+  }
+
+  // 已完成测评的用户不允许再次测评
+  if (to.path === '/assessment' && authStore.userInfo?.assessment_completed) {
     return next('/')
   }
 

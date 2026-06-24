@@ -37,8 +37,7 @@ function handleGoHome() {
 
 onMounted(() => {
   if (!store.report) {
-    // 如果没有报告数据，生成一份
-    store.completeAssessment()
+    router.push('/')
   }
 })
 </script>
