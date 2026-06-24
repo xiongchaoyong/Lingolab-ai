@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import { loginApi, registerApi, getProfileApi, updateProfileApi } from '@/api/auth'
 
 export const useAuthStore = defineStore('auth', () => {
   // ---- state ----
@@ -21,37 +22,35 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function login(username, password) {
-    // TODO: 对接后端 API
-    // const res = await authApi.login({ username, password })
-    // setToken(res.token)
-    // setUserInfo(res.user)
-
-    // 前端阶段：模拟登录
-    setToken('mock-jwt-token')
+    const res = await loginApi({ username, password })
+    setToken(res.token)
     setUserInfo({
-      id: 1,
-      username,
+      id: res.user_id,
+      username: res.username,
       role: 'learner',
-      age_group: '大学生',
-      cefr_level: null,
+      assessment_completed: res.assessment_completed,
     })
+    return res
   }
 
   async function register(formData) {
-    // TODO: 对接后端 API
-    // const res = await authApi.register(formData)
-    // setToken(res.token)
-    // setUserInfo(res.user)
-
-    // 前端阶段：模拟注册
-    setToken('mock-jwt-token')
-    setUserInfo({
-      id: 1,
+    const res = await registerApi({
       username: formData.username,
-      role: 'learner',
-      age_group: formData.age_group,
+      email: formData.email,
+      password: formData.password,
+      age: formData.age,
       learning_goal: formData.learning_goal,
+      interests: formData.interests,
     })
+    setToken(res.token)
+    setUserInfo({
+      id: res.user_id,
+      username: res.username,
+      role: 'learner',
+      age_group: res.age_group,
+      assessment_completed: false,
+    })
+    return res
   }
 
   function logout() {
@@ -61,7 +60,30 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function fetchProfile() {
-    // TODO: 对接后端 API
+    const res = await getProfileApi()
+    setUserInfo({
+      id: res.user_id,
+      username: res.username,
+      email: res.email,
+      age: res.age,
+      age_group: res.age_group,
+      learning_goal: res.learning_goal,
+      interests: res.interests,
+      level_final: res.level_final,
+      assessment_completed: res.assessment_completed,
+      role: res.role,
+    })
+    return res
+  }
+
+  async function updateProfile(data) {
+    const res = await updateProfileApi(data)
+    // 更新本地 userInfo 中的可修改字段
+    if (userInfo.value) {
+      userInfo.value.learning_goal = res.learning_goal
+      userInfo.value.interests = res.interests
+    }
+    return res
   }
 
   return {
@@ -75,5 +97,6 @@ export const useAuthStore = defineStore('auth', () => {
     register,
     logout,
     fetchProfile,
+    updateProfile,
   }
 })

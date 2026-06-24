@@ -8,9 +8,11 @@ const authStore = useAuthStore()
 
 const formRef = ref(null)
 const loading = ref(false)
+const errorMsg = ref('')
 
 const form = reactive({
   username: '',
+  email: '',
   password: '',
   confirmPassword: '',
   age: null,
@@ -53,6 +55,10 @@ const rules = {
     { min: 4, max: 20, message: '4-20 个字符，字母数字下划线', trigger: 'blur' },
     { pattern: /^[a-zA-Z0-9_]+$/, message: '只允许字母、数字、下划线', trigger: 'blur' },
   ],
+  email: [
+    { required: true, message: '请输入邮箱', trigger: 'blur' },
+    { type: 'email', message: '请输入正确的邮箱格式', trigger: 'blur' },
+  ],
   password: [
     { required: true, message: '请输入密码', trigger: 'blur' },
     { min: 8, max: 32, message: '8-32 个字符，需包含字母和数字', trigger: 'blur' },
@@ -84,12 +90,16 @@ async function handleRegister() {
   if (!valid) return
 
   loading.value = true
+  errorMsg.value = ''
   try {
     await authStore.register({
       ...form,
       age_group: getAgeGroupLabel(form.age),
     })
     router.push('/assessment')
+  } catch (e) {
+    const detail = e?.response?.data?.detail
+    errorMsg.value = typeof detail === 'string' ? detail : '注册失败，请稍后重试'
   } finally {
     loading.value = false
   }
@@ -101,6 +111,8 @@ async function handleRegister() {
     <div class="immersive-card" style="max-width: 520px;">
       <h2 class="register-title">创建账号</h2>
       <p class="register-subtitle">填写信息，开启你的英语口语训练之旅</p>
+
+      <el-alert v-if="errorMsg" :title="errorMsg" type="error" show-icon :closable="false" style="margin-bottom: 16px;" />
 
       <el-form
         ref="formRef"
@@ -115,6 +127,14 @@ async function handleRegister() {
               <el-input v-model="form.username" placeholder="4-20个字符" />
             </el-form-item>
           </el-col>
+          <el-col :span="12">
+            <el-form-item label="邮箱" prop="email">
+              <el-input v-model="form.email" placeholder="请输入邮箱地址" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+
+        <el-row :gutter="16">
           <el-col :span="12">
             <el-form-item label="年龄" prop="age">
               <el-input-number

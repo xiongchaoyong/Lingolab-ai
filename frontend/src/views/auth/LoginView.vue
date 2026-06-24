@@ -2,16 +2,18 @@
 import { reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { User, Lock } from '@element-plus/icons-vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
 
 const formRef = ref(null)
 const loading = ref(false)
+const errorMsg = ref('')
 
 const form = reactive({
-  username: 'demo_user',
-  password: 'demo123456',
+  username: '',
+  password: '',
 })
 
 const rules = {
@@ -30,9 +32,13 @@ async function handleLogin() {
   if (!valid) return
 
   loading.value = true
+  errorMsg.value = ''
   try {
-    await authStore.login(form.username, form.password)
-    router.push('/home')
+    const res = await authStore.login(form.username, form.password)
+    router.push(res.redirect || '/home')
+  } catch (e) {
+    const detail = e?.response?.data?.detail
+    errorMsg.value = typeof detail === 'string' ? detail : '登录失败，请稍后重试'
   } finally {
     loading.value = false
   }
@@ -44,6 +50,8 @@ async function handleLogin() {
     <div class="immersive-card">
       <h2 class="login-title">登录 Lingolab</h2>
       <p class="login-subtitle">AI 驱动的英语口语训练平台</p>
+
+      <el-alert v-if="errorMsg" :title="errorMsg" type="error" show-icon :closable="false" style="margin-bottom: 16px;" />
 
       <el-form
         ref="formRef"

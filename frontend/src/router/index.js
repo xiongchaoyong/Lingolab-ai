@@ -27,6 +27,12 @@ const routes = [
     component: () => import('@/views/assessment/AssessmentResult.vue'),
     meta: { auth: true },
   },
+  {
+    path: '/profile',
+    name: 'Profile',
+    component: () => import('@/views/auth/ProfileView.vue'),
+    meta: { auth: true },
+  },
 
   // ========== 主布局路由（顶部导航） ==========
   {

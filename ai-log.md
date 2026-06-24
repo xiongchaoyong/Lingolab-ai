@@ -113,4 +113,11 @@
 
 | 时间  | 操作     | 描述                                                         | 成员 |      |
 | ----- | -------- | :----------------------------------------------------------- | :--: | :--: |
-| 15:00 | 开发规范 | 基于模块2开发经验提炼AI协作开发规范(ai-collaboration-standards.md)，涵盖项目结构/前端Vue3模式/后端FastAPI模式/前后端协作/开发工作流+AI提示词模板，供小组成员统一遵循 | XCY | ✅ |：新增LLM服务(chat_roleplay/chat_roleplay_stream/score_roleplay四维评分：角色贴合度/场景礼仪/专业术语/应对能力)+3个内置场景Prompt(interviewee/waiter/guide)、新建api/roleplay.py+schema；淡紫可爱风UI改版(品牌色#A78BFA、Quicksand+Nunito字体、马卡龙辅助色系)+路由扁平化(Introduction合并进TopNavLayout、/home重定向到/)+CLAUDE.md同步更新 | XCY | ✅ |
+| 15:00 | 开发规范 | 基于模块2开发经验提炼AI协作开发规范(ai-collaboration-standards.md)，涵盖项目结构/前端Vue3模式/后端FastAPI模式/前后端协作/开发工作流+AI提示词模板，供小组成员统一遵循 | XCY | ✅ |
+
+## 2026-06-24
+
+| 时间  | 操作     | 描述                                                         | 成员 |      |
+| ----- | -------- | :----------------------------------------------------------- | :--: | :--: |
+| 08:30 | 用户认证 | 实现模块1-3.2.1~3.2.3 用户注册/登录/个人中心：后端新建UserProfile模型+auth Pydantic Schema+JWT安全工具+auth路由(注册/登录/查个人资料/更新个人资料含乐观锁)、前端重写auth store调用真实API+LoginView移除Mock数据+RegisterView增加email字段+新建ProfileView个人资料页、路由注册/profile | XCY | ✅ |
+| 09:00 | 水平测评 | 实现模块1-3.2.4 英语水平智能测评：后端新建AssessmentQuestion/AssessmentRecord模型+assessment Schema+assessment路由(POST /start返回10题按维度抽取、POST /submit客观题判分+口语题默认60分+CEFR定级+写入记录+更新user_profiles)、数据库种子数据10道题、前端新建api/assessment.js+重写assessment store对接真实API(snake_case→camelCase映射)+AssessmentView适配异步流程(移除逐题即时判对错) | XCY | ✅ |
