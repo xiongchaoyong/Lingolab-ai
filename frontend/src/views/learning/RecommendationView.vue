@@ -1,42 +1,59 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, onMounted } from 'vue'
+import {
+  getRecommendationsApi,
+  dislikeRecommendationApi,
+  refreshRecommendationsApi,
+} from '@/api/recommendation'
 
-// Mock 推荐数据池
-const MATERIAL_POOL = [
-  // 视频
-  { id: 1, type: 'video', title: 'Master English TH Sound', category: '发音', level: 'B1', duration: '4min', icon: 'VideoCamera' },
-  { id: 2, type: 'video', title: 'Speak Naturally in 30 Days', category: '流利度', level: 'B2', duration: '8min', icon: 'VideoCamera' },
-  { id: 3, type: 'video', title: 'English Pronunciation Secrets', category: '发音', level: 'A2', duration: '6min', icon: 'VideoCamera' },
-  { id: 4, type: 'video', title: 'Business English Conversations', category: '商务', level: 'B2', duration: '10min', icon: 'VideoCamera' },
-  // 文章
-  { id: 10, type: 'article', title: 'The History of English Language', category: '阅读', level: 'B1', duration: '350词', icon: 'Document' },
-  { id: 11, type: 'article', title: 'Tips for Job Interviews in English', category: '语法', level: 'B2', duration: '280词', icon: 'Document' },
-  { id: 12, type: 'article', title: 'How to Improve Your Accent', category: '发音', level: 'A2', duration: '420词', icon: 'Document' },
-  { id: 13, type: 'article', title: 'Common English Grammar Mistakes', category: '语法', level: 'B1', duration: '310词', icon: 'Document' },
-  // 音频
-  { id: 20, type: 'audio', title: 'Ordering at a Restaurant', category: '听力', level: 'A2', duration: '5min', icon: 'Headset' },
-  { id: 21, type: 'audio', title: 'Daily English Conversations', category: '对话', level: 'B1', duration: '6min', icon: 'Headset' },
-  { id: 22, type: 'audio', title: 'Weather Forecast Listening', category: '听力', level: 'A1', duration: '3min', icon: 'Headset' },
-  { id: 23, type: 'audio', title: 'Academic Lecture: Climate Change', category: '学术', level: 'C1', duration: '8min', icon: 'Headset' },
-]
-
-const recommendations = ref(getRandomBatch())
+const recommendations = ref({ videos: [], articles: [], audios: [] })
 const dislikedIds = ref(new Set())
+const generatedAt = ref('')
+const loading = ref(false)
 
-function getRandomBatch() {
-  const videos = MATERIAL_POOL.filter(m => m.type === 'video').sort(() => Math.random() - 0.5).slice(0, 2)
-  const articles = MATERIAL_POOL.filter(m => m.type === 'article').sort(() => Math.random() - 0.5).slice(0, 2)
-  const audios = MATERIAL_POOL.filter(m => m.type === 'audio').sort(() => Math.random() - 0.5).slice(0, 2)
-  return { videos, articles, audios }
+async function fetchRecommendations() {
+  loading.value = true
+  try {
+    const res = await getRecommendationsApi()
+    recommendations.value = {
+      videos: res.videos || [],
+      articles: res.articles || [],
+      audios: res.audios || [],
+    }
+    generatedAt.value = res.generated_at || ''
+    dislikedIds.value = new Set()
+  } catch {
+    // 错误已在拦截器处理
+  } finally {
+    loading.value = false
+  }
 }
 
-function refreshAll() {
-  recommendations.value = getRandomBatch()
-  dislikedIds.value = new Set()
+async function refreshAll() {
+  loading.value = true
+  try {
+    const res = await refreshRecommendationsApi()
+    recommendations.value = {
+      videos: res.videos || [],
+      articles: res.articles || [],
+      audios: res.audios || [],
+    }
+    generatedAt.value = res.generated_at || ''
+    dislikedIds.value = new Set()
+  } catch {
+    // 错误已在拦截器处理
+  } finally {
+    loading.value = false
+  }
 }
 
-function handleDislike(material) {
-  dislikedIds.value.add(material.id)
+async function handleDislike(material) {
+  try {
+    await dislikeRecommendationApi(material.id)
+    dislikedIds.value.add(material.id)
+  } catch {
+    // 错误已在拦截器处理
+  }
 }
 
 function isDisliked(id) {
@@ -44,20 +61,37 @@ function isDisliked(id) {
 }
 
 const typeMeta = {
-  video: { label: '视频推荐', icon: 'VideoCamera' },
-  article: { label: '文章推荐', icon: 'Document' },
-  audio: { label: '音频推荐', icon: 'Headset' },
+  videos: { label: '视频推荐', icon: 'VideoCamera' },
+  articles: { label: '文章推荐', icon: 'Document' },
+  audios: { label: '音频推荐', icon: 'Headset' },
 }
+
+function getMaterialIcon(type) {
+  if (type === 'video') return 'VideoCamera'
+  if (type === 'article') return 'Document'
+  return 'Headset'
+}
+
+function getLevelType(level) {
+  if (!level) return 'info'
+  if (level.startsWith('C')) return 'danger'
+  if (level.startsWith('B')) return 'warning'
+  return 'success'
+}
+
+onMounted(() => {
+  fetchRecommendations()
+})
 </script>
 
 <template>
-  <div class="content-card">
+  <div class="content-card" v-loading="loading">
     <div class="page-header">
       <div>
         <h2 class="page-title">为你推荐</h2>
         <p class="page-subtitle">基于你的学习短板和兴趣，每日精选 6 条学习资料</p>
       </div>
-      <el-button @click="refreshAll" :icon="Refresh" type="primary" plain>换一批</el-button>
+      <el-button @click="refreshAll" :icon="Refresh" type="primary" plain :loading="loading">换一批</el-button>
     </div>
 
     <!-- 三类资料 -->
@@ -67,24 +101,30 @@ const typeMeta = {
           <component :is="typeMeta[typeKey]?.icon" />
         </el-icon>
         <span class="section-label">{{ typeMeta[typeKey]?.label }}</span>
+        <span class="section-count">{{ items.length }} 条</span>
       </div>
+
+      <el-empty v-if="items.length === 0" description="暂无推荐" :image-size="40" />
 
       <el-row :gutter="16">
         <el-col :span="12" v-for="item in items" :key="item.id">
           <div class="material-card" :class="{ disliked: isDisliked(item.id) }">
             <div class="material-icon">
               <el-icon :size="24">
-                <component :is="item.icon" />
+                <component :is="getMaterialIcon(item.type)" />
               </el-icon>
             </div>
             <div class="material-body">
               <h4 class="material-title">{{ item.title }}</h4>
               <div class="material-tags">
-                <el-tag size="small" effect="plain">{{ item.category }}</el-tag>
-                <el-tag size="small" effect="plain" :type="item.level.startsWith('C') ? 'danger' : item.level.startsWith('B') ? 'warning' : 'success'">
-                  {{ item.level }}
+                <el-tag v-if="item.tag" size="small" effect="plain">{{ item.tag }}</el-tag>
+                <el-tag size="small" effect="plain" :type="getLevelType(item.difficulty)">
+                  {{ item.difficulty }}
                 </el-tag>
                 <span class="material-duration">{{ item.duration }}</span>
+              </div>
+              <div class="material-score" v-if="item.score">
+                推荐分：{{ item.score }}
               </div>
               <div class="material-actions" v-if="!isDisliked(item.id)">
                 <el-button size="small" text type="primary">查看</el-button>

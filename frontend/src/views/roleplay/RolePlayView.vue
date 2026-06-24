@@ -1,23 +1,17 @@
 <script setup>
 import { ref, computed, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { ArrowLeft, InfoFilled } from '@element-plus/icons-vue'
-import { streamStartRoleplay, streamSpeakRoleplay, ttsRoleplay, endRoleplay } from '@/api/roleplay'
-import DimensionBars from '@/components/common/DimensionBars.vue'
+import { ArrowLeft } from '@element-plus/icons-vue'
+import { streamStartRoleplay, streamSpeakRoleplay, ttsStreamUrl, ttsCachedUrl, endRoleplay } from '@/api/roleplay'
+import UtteranceDetailPanel from '@/components/pronunciation/UtteranceDetailPanel.vue'
 
 const router = useRouter()
 
 // ========== 角色配置 ==========
 const ROLES = [
-  { id: 'interviewee', title: '面试者', aiRole: '面试官', desc: '英文工作面试模拟',
-    emoji: '💼', color: '#A78BFA',
-    topics: '自我介绍/项目经历/职业规划/优缺点' },
-  { id: 'waiter', title: '服务员', aiRole: '顾客', desc: '餐厅服务场景',
-    emoji: '🍽️', color: '#86EFAC',
-    topics: '迎宾/推荐菜品/处理忌口/结账' },
-  { id: 'guide', title: '导游', aiRole: '游客', desc: '景点导览场景',
-    emoji: '🗺️', color: '#93C5FD',
-    topics: '景点介绍/交通指引/餐饮推荐' },
+  { id: 'interviewee', title: '面试者', subtitle: 'AI 扮演面试官，模拟英文工作面试', emoji: '💼', color: '#A78BFA' },
+  { id: 'waiter', title: '服务员', subtitle: 'AI 扮演顾客，练习餐厅服务场景', emoji: '🍽️', color: '#5AD8A6' },
+  { id: 'guide', title: '导游', subtitle: 'AI 扮演游客，练习景点导览场景', emoji: '🗺️', color: '#5B8FF9' },
 ]
 
 // ========== 状态 ==========
@@ -30,12 +24,64 @@ const userSubtitle = ref('')
 const isConnecting = ref(false)
 const scoreReport = ref(null)
 const isScoring = ref(false)
+const grammarCorrection = ref(null)  // 当前轮语法纠错结果
 
-// 消息列表（用于显示对话记录）
-const messages = ref([])
+// 语法错误类型颜色映射
+const ERROR_TYPE_COLORS = {
+  tense: '#E6A23C',
+  subject_verb_agreement: '#F56C6C',
+  article: '#909399',
+  preposition: '#67C23A',
+  word_order: '#409EFF',
+  plural: '#E6A23C',
+  word_choice: '#9B59B6',
+  other: '#909399',
+}
+
+const ERROR_TYPE_LABELS = {
+  tense: '时态',
+  subject_verb_agreement: '主谓一致',
+  article: '冠词',
+  preposition: '介词',
+  word_order: '语序',
+  plural: '复数',
+  word_choice: '用词',
+  other: '其他',
+}
+
+// 报告数据计算属性
+const hasDetailedReport = computed(() => {
+  return scoreReport.value?.utterances?.length > 0
+})
+
+const aggregatedErrors = computed(() => {
+  if (!scoreReport.value?.utterances) return []
+  const errorMap = new Map()
+  for (const utt of scoreReport.value.utterances) {
+    for (const err of utt.errors || []) {
+      const key = err.phoneme
+      if (!errorMap.has(key) || errorMap.get(key).score > err.score) {
+        errorMap.set(key, err)
+      }
+    }
+  }
+  return [...errorMap.values()].sort((a, b) => a.score - b.score)
+})
+
+const expandedUtterance = ref(null)
+function toggleUtterance(index) {
+  expandedUtterance.value = expandedUtterance.value === index ? null : index
+}
 
 // 音频相关
+let audioContext = null
+let analyser = null
+let mediaRecorder = null
+let audioChunks = []
+let silenceTimer = null
 let currentAudio = null
+const SILENCE_THRESHOLD = 0.02
+const SILENCE_DURATION = 1500
 
 // ========== 角色选择 ==========
 async function selectRole(role) {
@@ -44,8 +90,8 @@ async function selectRole(role) {
   callState.value = 'idle'
   subtitle.value = ''
   userSubtitle.value = ''
-  messages.value = []
 
+  // 开始角色扮演
   isConnecting.value = true
   streamStartRoleplay(role.id, 'B1', {
     onToken(text) {
@@ -55,8 +101,8 @@ async function selectRole(role) {
       isConnecting.value = false
       sessionId.value = data.session_id
       subtitle.value = data.full_text
-      messages.value.push({ role: 'ai', text: data.full_text })
-      speakAndListen(data.full_text)
+      // 使用预取 TTS URL 播放（后台已并行启动 Edge TTS）
+      speakAndListen(data.full_text, data.tts_url ? ttsCachedUrl(data.tts_url) : null)
     },
     onError() {
       isConnecting.value = false
@@ -65,370 +111,528 @@ async function selectRole(role) {
   })
 }
 
-// ========== AI 说话 + 自动听 ==========
-async function speakAndListen(text) {
+// ========== AI 说话 → 自动听 ==========
+async function speakAndListen(text, ttsUrl) {
   callState.value = 'ai_speaking'
   try {
-    const ttsData = await ttsRoleplay(text)
-    const blob = base64ToBlob(ttsData.audio_base64, 'audio/mpeg')
-    const url = URL.createObjectURL(blob)
+    const url = ttsUrl || ttsStreamUrl(text)
     currentAudio = new Audio(url)
     currentAudio.onended = () => {
-      URL.revokeObjectURL(url)
+      // AI 说完 → 自动开始听
       startListening()
     }
     currentAudio.onerror = () => {
+      // 播放失败，直接开始听
       startListening()
     }
     await currentAudio.play()
   } catch (e) {
+    // TTS 失败，直接开始听
     startListening()
   }
 }
 
-// ========== 录音 ==========
-let mediaRecorder = null
-let audioChunks = []
-let stream = null
-let silenceTimer = null
-let audioContext = null
-let analyser = null
-const SILENCE_THRESHOLD = 0.02
-const SILENCE_DURATION = 1500
-
+// ========== VAD 录音 ==========
 async function startListening() {
   callState.value = 'listening'
   userSubtitle.value = ''
+  grammarCorrection.value = null
   audioChunks = []
 
   try {
-    stream = await navigator.mediaDevices.getUserMedia({
-      audio: { sampleRate: 16000, channelCount: 1 }
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: { sampleRate: 16000, channelCount: 1 },
     })
-  } catch (e) {
-    callState.value = 'idle'
-    return
-  }
 
-  mediaRecorder = new MediaRecorder(stream)
-  audioChunks = []
-
-  mediaRecorder.ondataavailable = (e) => {
-    if (e.data.size > 0) audioChunks.push(e.data)
-  }
-
-  mediaRecorder.onstop = async () => {
-    stream.getTracks().forEach(t => t.stop())
-    clearTimeout(silenceTimer)
-    const blob = new Blob(audioChunks, { type: mediaRecorder.mimeType || 'audio/webm' })
-    await handleUserSpeech(blob)
-  }
-
-  mediaRecorder.start()
-
-  // 音量检测 + 静音自动停止
-  try {
-    audioContext = new (window.AudioContext || window.webkitAudioContext)()
+    audioContext = new AudioContext()
     const source = audioContext.createMediaStreamSource(stream)
     analyser = audioContext.createAnalyser()
     analyser.fftSize = 256
     source.connect(analyser)
-    checkSilence()
-  } catch (e) {
-    // 音量检测失败，等待手动停止
-  }
-}
 
-function checkSilence() {
-  if (callState.value !== 'listening') return
-  if (!analyser) return
-
-  const dataArray = new Uint8Array(analyser.frequencyBinCount)
-  analyser.getByteTimeDomainData(dataArray)
-  let sum = 0
-  for (let i = 0; i < dataArray.length; i++) {
-    sum += Math.abs(dataArray[i] - 128)
-  }
-  const avg = sum / dataArray.length / 128
-
-  if (avg < SILENCE_THRESHOLD) {
-    if (!silenceTimer) {
-      silenceTimer = setTimeout(() => {
-        if (mediaRecorder?.state === 'recording') {
-          mediaRecorder.stop()
-        }
-      }, SILENCE_DURATION)
+    mediaRecorder = new MediaRecorder(stream)
+    mediaRecorder.ondataavailable = (e) => {
+      if (e.data.size > 0) audioChunks.push(e.data)
     }
-  } else {
-    clearTimeout(silenceTimer)
-    silenceTimer = null
-  }
+    mediaRecorder.onstop = () => {
+      stream.getTracks().forEach((t) => t.stop())
+      audioContext.close()
+      processUserAudio()
+    }
+    mediaRecorder.start()
 
-  requestAnimationFrame(checkSilence)
+    // VAD 检测循环
+    const dataArray = new Uint8Array(analyser.frequencyBinCount)
+    let silenceStart = null
+
+    function checkVolume() {
+      if (callState.value !== 'listening') return
+      analyser.getByteTimeDomainData(dataArray)
+      let sum = 0
+      for (let i = 0; i < dataArray.length; i++) {
+        const v = (dataArray[i] - 128) / 128
+        sum += v * v
+      }
+      const rms = Math.sqrt(sum / dataArray.length)
+
+      if (rms < SILENCE_THRESHOLD) {
+        if (!silenceStart) silenceStart = Date.now()
+        else if (Date.now() - silenceStart > SILENCE_DURATION) {
+          if (mediaRecorder?.state === 'recording') {
+            mediaRecorder.stop()
+          }
+          return
+        }
+      } else {
+        silenceStart = null
+      }
+      requestAnimationFrame(checkVolume)
+    }
+    requestAnimationFrame(checkVolume)
+  } catch (e) {
+    console.error('麦克风访问失败:', e)
+    callState.value = 'idle'
+  }
 }
 
-// ========== 处理用户语音 ==========
+async function processUserAudio() {
+  if (audioChunks.length === 0) {
+    // 用户没说话，重新开始听
+    startListening()
+    return
+  }
 
-async function handleUserSpeech(audioBlob) {
   callState.value = 'thinking'
-  subtitle.value = ''
-  userSubtitle.value = ''
+  const audioBlob = new Blob(audioChunks, { type: 'audio/webm' })
 
   streamSpeakRoleplay(sessionId.value, selectedRole.value.id, audioBlob, {
     onAsr(text) {
       userSubtitle.value = text
-      messages.value.push({ role: 'user', text })
+    },
+    onGrammar(data) {
+      grammarCorrection.value = data
     },
     onToken(text) {
       subtitle.value += text
     },
     onDone(data) {
-      const fullText = data.full_text
-      subtitle.value = fullText
-      messages.value.push({ role: 'ai', text: fullText })
-
+      subtitle.value = data.full_text
       if (data.conversation_complete) {
-        setTimeout(() => endRoleplaySession(), 500)
+        // 对话达到最大轮次，自动结束评分
+        setTimeout(() => hangUp(), 500)
       } else {
-        speakAndListen(fullText)
+        // 使用预取 TTS URL 播放（后台已并行启动 Edge TTS）
+        speakAndListen(data.full_text, data.tts_url ? ttsCachedUrl(data.tts_url) : null)
       }
     },
     onError() {
-      callState.value = 'idle'
+      subtitle.value = 'Sorry, I had trouble understanding that.'
+      startListening()
     },
   })
 }
 
-// ========== 结束对话 ==========
-async function endRoleplaySession() {
-  if (isScoring.value) return
-  isScoring.value = true
-  callState.value = 'idle'
-  subtitle.value = '正在评测中...'
-
-  try {
-    const result = await endRoleplay(sessionId.value)
-    scoreReport.value = {
-      overall: result.overall,
-      dimensions: result.dimensions || [],
-      suggestions: result.suggestions || '',
-      utterances: result.utterances || [],
-      transcript: result.transcript || [],
-      pronunciation: result.pronunciation || [],
-      dimension_details: result.dimension_details || [],
-      scoring_methodology: result.scoring_methodology || '',
-    }
-    phase.value = 'report'
-  } catch (e) {
-    subtitle.value = '评测失败，请重试'
-  } finally {
-    isScoring.value = false
+// ========== 挂断 ==========
+async function hangUp() {
+  if (mediaRecorder?.state === 'recording') {
+    mediaRecorder.stop()
   }
-}
-
-function manualEnd() {
   if (currentAudio) {
     currentAudio.pause()
     currentAudio = null
   }
-  if (mediaRecorder?.state === 'recording') {
-    mediaRecorder.stop()
+  if (silenceTimer) clearTimeout(silenceTimer)
+
+  // 获取评分报告
+  if (sessionId.value) {
+    isScoring.value = true
+    phase.value = 'report'
+    try {
+      scoreReport.value = await endRoleplay(sessionId.value)
+    } catch (e) {
+      scoreReport.value = {
+        overall: 0,
+        pronunciation: [],
+        dimensions: [],
+        dimension_details: [],
+        suggestions: '评分服务暂时异常，请稍后重试',
+        utterances: [],
+        transcript: [],
+      }
+    }
+    isScoring.value = false
+    phase.value = 'report'
+  } else {
+    phase.value = 'select'
+    resetCall()
   }
-  stream?.getTracks().forEach(t => t.stop())
-  endRoleplaySession()
+}
+
+function resetCall() {
+  selectedRole.value = null
+  callState.value = 'idle'
+  subtitle.value = ''
+  userSubtitle.value = ''
+  scoreReport.value = null
+  sessionId.value = ''
+}
+
+function backToRoles() {
+  phase.value = 'select'
+  resetCall()
+}
+
+function goBack() {
+  router.push('/home')
 }
 
 // ========== 工具函数 ==========
-function base64ToBlob(base64, mimeType) {
-  const byteChars = atob(base64)
-  const byteArrays = []
-  for (let offset = 0; offset < byteChars.length; offset += 512) {
-    const slice = byteChars.slice(offset, offset + 512)
-    const byteNumbers = new Array(slice.length)
-    for (let i = 0; i < slice.length; i++) {
-      byteNumbers[i] = slice.charCodeAt(i)
-    }
-    byteArrays.push(new Uint8Array(byteNumbers))
-  }
-  return new Blob(byteArrays, { type: mimeType })
+function dimScoreColor(score) {
+  if (score >= 80) return '#5AD8A6'
+  if (score >= 60) return '#F6BD16'
+  return '#FF6B8A'
 }
 
-// ========== 评分维度颜色 ==========
 function dimBarColor(score) {
-  if (score >= 80) return 'var(--color-success)'
-  if (score >= 60) return 'var(--color-warning)'
-  return 'var(--color-danger)'
+  if (score >= 80) return 'linear-gradient(90deg, #5AD8A6, #3EC790)'
+  if (score >= 60) return 'linear-gradient(90deg, #F6BD16, #F09B00)'
+  return 'linear-gradient(90deg, #FF6B8A, #FF8E9E)'
 }
 
-// ========== 清理 ==========
 onUnmounted(() => {
-  if (currentAudio) { currentAudio.pause(); currentAudio = null }
-  if (mediaRecorder?.state === 'recording') mediaRecorder.stop()
-  stream?.getTracks().forEach(t => t.stop())
+  hangUp()
 })
 </script>
 
 <template>
   <div class="roleplay-page">
-    <!-- ========== 阶段1: 角色选择 ========== -->
+    <!-- 角色选择 -->
     <template v-if="phase === 'select'">
       <div class="rp-select-header">
         <div class="header-mascot">🎭</div>
         <h2>情景角色扮演</h2>
-        <p class="select-subtitle">选择一个角色，AI 扮演对方与你进行真实语音对话</p>
+        <p class="select-subtitle">选一个角色，和 AI 进行真实语音对话吧~</p>
       </div>
-
-      <div class="role-grid">
+      <div class="rp-role-grid">
         <div
           v-for="role in ROLES"
           :key="role.id"
-          class="role-card"
-          :style="{ '--role-color': role.color }"
+          class="rp-role-card"
+          :style="{ '--accent': role.color }"
           @click="selectRole(role)"
         >
-          <div class="role-emoji">{{ role.emoji }}</div>
-          <h3>{{ role.title }}</h3>
-          <div class="role-ai">AI 扮演：{{ role.aiRole }}</div>
-          <p class="role-desc">{{ role.desc }}</p>
-          <div class="role-tags">
-            <span v-for="topic in role.topics.split('/')" :key="topic" class="tag">{{ topic }}</span>
-          </div>
+          <div class="rrc-emoji">{{ role.emoji }}</div>
+          <h4>{{ role.title }}</h4>
+          <p>{{ role.subtitle }}</p>
         </div>
+      </div>
+      <div class="select-footer">
+        <el-button text @click="goBack" class="back-btn">
+          <el-icon><ArrowLeft /></el-icon> 返回首页
+        </el-button>
       </div>
     </template>
 
-    <!-- ========== 阶段2: 通话界面 ========== -->
-    <template v-if="phase === 'calling'">
+    <!-- 通话界面 -->
+    <template v-else-if="phase === 'calling'">
       <div class="call-screen">
-        <!-- 顶部：角色信息 + 退出 -->
+        <!-- 顶部角色标签 -->
         <div class="call-top">
-          <button class="back-btn" @click="manualEnd">
-            <el-icon><ArrowLeft /></el-icon>
-            <span>结束</span>
-          </button>
           <div class="call-role-pill">
-            <span>{{ selectedRole.emoji }}</span>
-            <span>{{ selectedRole.title }} ← → {{ selectedRole.aiRole }}</span>
+            <span class="pill-emoji">{{ selectedRole?.emoji }}</span>
+            {{ selectedRole?.title }}
           </div>
         </div>
 
-        <!-- 中间：头像 + 状态 -->
+        <!-- 中间状态区 -->
         <div class="call-center">
-          <div v-if="isConnecting" class="connecting-hint">正在连接 AI 角色...</div>
-
-          <div v-if="!isConnecting" class="mascot-container">
-            <div class="mascot-ring" :class="callState"></div>
-            <div class="mascot-avatar">{{ selectedRole.emoji }}</div>
-          </div>
-
-          <!-- AI 字幕 -->
-          <div v-if="subtitle && !isConnecting" class="subtitle-box ai">
-            <div class="subtitle-label">{{ selectedRole.aiRole }}</div>
-            <div class="subtitle-text">{{ subtitle }}</div>
-          </div>
-
-          <!-- 用户字幕 -->
-          <div v-if="userSubtitle" class="subtitle-box user">
-            <div class="subtitle-label">{{ selectedRole.title }}（你）</div>
-            <div class="subtitle-text">{{ userSubtitle }}</div>
-          </div>
-
-          <!-- 状态文字 -->
-          <div v-if="!isConnecting" class="call-status">
-            <template v-if="callState === 'ai_speaking'">AI 角色正在说话...</template>
-            <template v-else-if="callState === 'listening'">正在听你说话...</template>
-            <template v-else-if="callState === 'thinking'">AI 角色思考中...</template>
-            <template v-else-if="callState === 'idle'">点击下方按钮对话</template>
-          </div>
-        </div>
-
-        <!-- 底部：录音按钮 -->
-        <div class="call-bottom">
-          <div v-if="!isConnecting" class="record-area">
-            <button
-              :class="['record-btn', callState]"
-              @click="callState === 'listening' ? null : null"
-              :disabled="callState !== 'listening'"
-            >
-              <div v-if="callState === 'listening'" class="recording-indicator">
-                <span class="rec-dot"></span>
-                <span>录音中...</span>
-              </div>
-              <el-icon v-else :size="32">
-                <Microphone />
-              </el-icon>
-            </button>
-            <p class="record-hint">
-              <template v-if="callState === 'listening'">安静1.5秒后自动发送</template>
-              <template v-else-if="callState === 'ai_speaking'">请等待 AI 说完</template>
-              <template v-else-if="callState === 'thinking'">AI 正在回复中</template>
-              <template v-else>准备中...</template>
-            </p>
-          </div>
-        </div>
-      </div>
-    </template>
-
-    <!-- ========== 阶段3: 评分报告 ========== -->
-    <template v-if="phase === 'report' && scoreReport">
-      <div class="report-screen">
-        <!-- 头部 -->
-        <div class="report-header">
-          <div class="report-mascot">{{ selectedRole.emoji }}</div>
-          <h2>{{ selectedRole.title }}角色扮演报告</h2>
-          <div class="report-role-info">
-            {{ selectedRole.title }} ← → {{ selectedRole.aiRole }}
-          </div>
-        </div>
-
-        <!-- 综合分 -->
-        <div class="report-overall">
-          <div class="overall-circle" :style="{ borderColor: dimBarColor(scoreReport.overall) }">
-            <span class="overall-num">{{ Math.round(scoreReport.overall) }}</span>
-            <span class="overall-label">综合分</span>
-          </div>
-        </div>
-
-        <!-- 角色维度 -->
-        <div class="report-section">
-          <h3 class="section-title">角色表现评分</h3>
-          <DimensionBars :dimensions="scoreReport.dimensions" />
-        </div>
-
-        <!-- 发音维度 -->
-        <div v-if="scoreReport.pronunciation && scoreReport.pronunciation.length > 0" class="report-section">
-          <h3 class="section-title">发音评测</h3>
-          <DimensionBars :dimensions="scoreReport.pronunciation" />
-        </div>
-
-        <!-- 综合建议 -->
-        <div v-if="scoreReport.suggestions" class="report-section">
-          <h3 class="section-title">改进建议</h3>
-          <div class="suggestions-text">{{ scoreReport.suggestions }}</div>
-        </div>
-
-        <!-- 对话记录 -->
-        <div v-if="scoreReport.transcript && scoreReport.transcript.length > 0" class="report-section">
-          <h3 class="section-title">对话记录</h3>
-          <div class="transcript-list">
-            <div v-for="(msg, i) in scoreReport.transcript" :key="i" :class="['transcript-item', msg.role]">
-              <span class="transcript-role">{{ msg.role === 'ai' ? selectedRole.aiRole : selectedRole.title }}</span>
-              <span class="transcript-text">{{ msg.text }}</span>
+          <!-- 可爱头像 + 波纹 -->
+          <div class="mascot-container" :class="callState">
+            <div class="ripple-ring r1"></div>
+            <div class="ripple-ring r2"></div>
+            <div class="ripple-ring r3"></div>
+            <div class="mascot-avatar">
+              <span class="mascot-face">{{ selectedRole?.emoji }}</span>
             </div>
           </div>
+
+          <div class="call-state-label" :class="callState">
+            <template v-if="isConnecting">正在连接...</template>
+            <template v-else-if="callState === 'ai_speaking'">
+              <span class="state-dot speaking"></span> AI 正在说话
+            </template>
+            <template v-else-if="callState === 'listening'">
+              <span class="state-dot listening"></span> 正在聆听...
+            </template>
+            <template v-else-if="callState === 'thinking'">
+              <span class="state-dot thinking"></span> 思考中...
+            </template>
+            <template v-else>准备就绪</template>
+          </div>
         </div>
 
-        <!-- 按钮 -->
-        <div class="report-actions">
-          <el-button @click="router.push('/role-play')">返回角色选择</el-button>
-          <el-button type="primary" @click="selectRole(selectedRole)">再来一次</el-button>
+        <!-- 底部字幕区 -->
+        <div class="call-subtitles">
+          <div v-if="userSubtitle" class="subtitle user-subtitle">
+            <span class="subtitle-avatar">😊</span>
+            <span class="subtitle-text">{{ userSubtitle }}</span>
+          </div>
+          <!-- 语法纠错卡片 -->
+          <div v-if="grammarCorrection?.errors?.length" class="grammar-correction-card">
+            <div class="gc-header" @click="grammarCorrection = { ...grammarCorrection, _collapsed: !grammarCorrection._collapsed }">
+              <span class="gc-icon">📝</span>
+              <span class="gc-count">{{ grammarCorrection.errors.length }} 个语法错误</span>
+              <span class="gc-arrow" :class="{ expanded: !grammarCorrection._collapsed }">▶</span>
+            </div>
+            <div class="gc-body" v-show="!grammarCorrection._collapsed">
+              <div class="gc-corrected" v-if="grammarCorrection.corrected_text !== grammarCorrection.original_text">
+                <span class="gc-label">修正：</span>
+                <span class="gc-corrected-text">{{ grammarCorrection.corrected_text }}</span>
+              </div>
+              <div v-for="(err, i) in grammarCorrection.errors" :key="i" class="gc-error-item">
+                <span class="gc-error-original">{{ err.original }}</span>
+                <span class="gc-error-arrow">→</span>
+                <span class="gc-error-correction">{{ err.correction }}</span>
+                <span
+                  class="gc-error-type"
+                  :style="{ background: ERROR_TYPE_COLORS[err.error_type] || '#909399' }"
+                >{{ ERROR_TYPE_LABELS[err.error_type] || err.error_type }}</span>
+                <span class="gc-error-explain">{{ err.explanation }}</span>
+              </div>
+            </div>
+          </div>
+          <div v-if="subtitle" class="subtitle ai-subtitle">
+            <span class="subtitle-avatar">{{ selectedRole?.emoji }}</span>
+            <span class="subtitle-text">{{ subtitle }}</span>
+          </div>
         </div>
+
+        <!-- 挂断按钮 -->
+        <div class="call-actions">
+          <button class="hangup-btn" @click="hangUp">
+            <span class="hangup-icon">📞</span>
+          </button>
+          <p class="hangup-label">点击挂断</p>
+        </div>
+      </div>
+    </template>
+
+    <!-- 评分报告 -->
+    <template v-else-if="phase === 'report'">
+      <div class="report-screen">
+        <!-- 加载中 -->
+        <template v-if="isScoring || !scoreReport">
+          <div class="report-header">
+            <div class="report-mascot">🌟</div>
+            <h2>角色扮演报告</h2>
+          </div>
+          <div class="report-loading">
+            <div class="loading-spinner"></div>
+            <p>正在生成报告...</p>
+          </div>
+        </template>
+
+        <!-- 报告内容 -->
+        <template v-else>
+          <!-- 顶部：标题 + 综合分 + 方法论 -->
+          <div class="report-top">
+            <div class="report-header">
+              <div class="report-mascot">🌟</div>
+              <h2>角色扮演报告</h2>
+              <p class="report-role">{{ selectedRole?.emoji }} {{ selectedRole?.title }} 角色</p>
+            </div>
+
+            <div class="overall-area">
+              <div class="overall-circle" :style="{ '--score': scoreReport.overall }">
+                <span class="overall-num">{{ scoreReport.overall }}</span>
+                <span class="overall-unit">分</span>
+                <span class="overall-level">
+                  {{ scoreReport.overall >= 80 ? '🎉 优秀' : scoreReport.overall >= 60 ? '👍 良好' : '💪 加油' }}
+                </span>
+              </div>
+              <div class="methodology-card" v-if="scoreReport.scoring_methodology">
+                <div class="methodology-title">📐 评分计算方式</div>
+                <pre class="methodology-text">{{ scoreReport.scoring_methodology }}</pre>
+              </div>
+            </div>
+          </div>
+
+          <!-- 主体：双列网格 -->
+          <div class="report-main">
+            <!-- 左列：语音评测 -->
+            <section class="report-card" v-if="scoreReport.pronunciation?.length">
+              <div class="card-title">
+                <span class="card-icon">🎤</span> 语音评测
+              </div>
+              <div class="dimension-list">
+                <div v-for="dim in scoreReport.pronunciation" :key="dim.label" class="dimension-item">
+                  <div class="dim-header">
+                    <span class="dim-label">{{ dim.label }}</span>
+                    <span class="dim-score" :style="{ color: dimScoreColor(dim.score) }">{{ dim.score }}</span>
+                  </div>
+                  <div class="dim-bar-bg">
+                    <div class="dim-bar-fill" :style="{ width: dim.score + '%', background: dimBarColor(dim.score) }"></div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="error-section" v-if="aggregatedErrors.length > 0">
+                <div class="error-title">⚠️ 问题音素</div>
+                <div v-for="err in aggregatedErrors" :key="err.phoneme" class="error-item">
+                  <el-tag type="danger" size="small">{{ err.phoneme }}</el-tag>
+                  <span class="error-actual">{{ err.actual }}</span>
+                  <span class="error-tip-text">{{ err.tip }}</span>
+                </div>
+              </div>
+            </section>
+
+            <!-- 右列：角色表现评测 -->
+            <section class="report-card" v-if="scoreReport.dimension_details?.length">
+              <div class="card-title">
+                <span class="card-icon">🎭</span> 角色表现评测（LLM）
+              </div>
+              <div class="text-dim-cards">
+                <div v-for="dim in scoreReport.dimension_details" :key="dim.label" class="text-dim-card">
+                  <div class="tdc-header">
+                    <span class="tdc-label">{{ dim.label }}</span>
+                    <span class="tdc-score" :style="{ color: dimScoreColor(dim.score) }">{{ dim.score }}</span>
+                  </div>
+                  <div class="dim-bar-bg" style="margin-bottom: 8px;">
+                    <div class="dim-bar-fill" :style="{ width: dim.score + '%', background: dimBarColor(dim.score) }"></div>
+                  </div>
+                  <div class="tdc-feedback" v-if="dim.feedback">{{ dim.feedback }}</div>
+                  <div class="tdc-tags">
+                    <span v-if="dim.strengths" class="tdc-tag good">✅ {{ dim.strengths }}</span>
+                    <span v-if="dim.weaknesses" class="tdc-tag improve">📌 {{ dim.weaknesses }}</span>
+                  </div>
+                </div>
+              </div>
+            </section>
+          </div>
+
+          <!-- 流利度评估（SRS 3.3.3） -->
+          <section class="report-card report-card--full" v-if="scoreReport.fluency?.rounds?.length">
+            <div class="card-title">
+              <span class="card-icon">🌊</span> 流利度评估
+              <span class="fluency-badge" :class="'grade-' + scoreReport.fluency.grade">
+                {{ scoreReport.fluency.grade }}
+              </span>
+              <span class="fluency-overall">综合 {{ scoreReport.fluency.overall }} 分</span>
+            </div>
+
+            <div class="fluency-rounds">
+              <div
+                v-for="round in scoreReport.fluency.rounds"
+                :key="round.round"
+                class="fluency-round-card"
+                :class="{ 'best-round': round.round === scoreReport.fluency.best_round }"
+              >
+                <div class="fr-header">
+                  <span class="fr-label">第 {{ round.round }} 轮</span>
+                  <span v-if="round.round === scoreReport.fluency.best_round" class="fr-best">⭐ 最佳</span>
+                  <span class="fr-total">{{ round.total }} 分</span>
+                </div>
+                <div class="fr-text">{{ round.text?.slice(0, 80) }}{{ round.text?.length > 80 ? '...' : '' }}</div>
+                <div class="fr-dims">
+                  <div class="fr-dim">
+                    <span class="fd-label">语速</span>
+                    <span class="fd-value" :style="{ color: dimScoreColor(round.wpm?.score) }">{{ round.wpm?.score }}/25</span>
+                    <span class="fd-detail">{{ round.wpm?.value }} wpm</span>
+                  </div>
+                  <div class="fr-dim">
+                    <span class="fd-label">停顿</span>
+                    <span class="fd-value" :style="{ color: dimScoreColor(round.pause_frequency?.score * 5) }">{{ round.pause_frequency?.score }}/20</span>
+                    <span class="fd-detail">{{ round.pause_frequency?.pauses_per_min }}次/分</span>
+                  </div>
+                  <div class="fr-dim">
+                    <span class="fd-label">重复</span>
+                    <span class="fd-value" :style="{ color: dimScoreColor(round.repetition?.score * 5) }">{{ round.repetition?.score }}/20</span>
+                    <span class="fd-detail">{{ (round.repetition?.rate * 100).toFixed(0) }}%</span>
+                  </div>
+                  <div class="fr-dim">
+                    <span class="fd-label">语法</span>
+                    <span class="fd-value" :style="{ color: dimScoreColor(round.grammar?.score * 5) }">{{ round.grammar?.score || '—' }}/20</span>
+                    <span class="fd-detail" v-if="round.grammar?.errors?.length">{{ round.grammar.errors.length }} 个错误</span>
+                  </div>
+                  <div class="fr-dim">
+                    <span class="fd-label">相关性</span>
+                    <span class="fd-value" :style="{ color: dimScoreColor(round.relevance?.score / 15 * 100) }">{{ round.relevance?.score || '—' }}/15</span>
+                    <span class="fd-detail" v-if="round.relevance?.note">{{ round.relevance.note }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="fluency-suggestions" v-if="scoreReport.fluency.suggestions">
+              💡 {{ scoreReport.fluency.suggestions }}
+            </div>
+          </section>
+
+          <!-- 逐句发音分析（全宽） -->
+          <section class="report-card report-card--full" v-if="hasDetailedReport">
+            <div class="card-title">
+              <span class="card-icon">📋</span> 逐句发音分析
+            </div>
+            <div class="utterance-grid">
+              <div
+                v-for="(utt, idx) in scoreReport.utterances"
+                :key="idx"
+                class="utterance-item"
+                :class="{ expanded: expandedUtterance === idx }"
+              >
+                <div class="utterance-header" @click="toggleUtterance(idx)">
+                  <span class="utterance-num">#{{ idx + 1 }}</span>
+                  <span class="utterance-text-preview">{{ utt.text?.slice(0, 60) }}{{ utt.text?.length > 60 ? '...' : '' }}</span>
+                  <span class="utterance-score" :style="{ color: dimScoreColor(utt.overall) }">{{ utt.overall }}</span>
+                  <span class="utterance-arrow" :class="{ expanded: expandedUtterance === idx }">▶</span>
+                </div>
+                <div class="utterance-detail-wrap" v-show="expandedUtterance === idx">
+                  <UtteranceDetailPanel :pronunciation-data="utt" :text="utt.text" />
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- 底部双列：对话记录 + 建议 -->
+          <div class="report-bottom">
+            <section class="report-card" v-if="scoreReport.transcript?.length">
+              <div class="card-title">
+                <span class="card-icon">💬</span> 对话记录
+              </div>
+              <div class="transcript-list">
+                <div v-for="(msg, idx) in scoreReport.transcript" :key="idx" class="transcript-msg" :class="msg.role">
+                  <div class="transcript-role">{{ msg.role === 'user' ? '😊 你' : selectedRole?.emoji + ' AI' }}</div>
+                  <div class="transcript-bubble">{{ msg.text }}</div>
+                </div>
+              </div>
+            </section>
+
+            <section class="report-card" v-if="scoreReport.suggestions">
+              <div class="card-title">
+                <span class="card-icon">💡</span> 改进建议
+              </div>
+              <div class="suggestions-content">
+                <p>{{ scoreReport.suggestions }}</p>
+              </div>
+            </section>
+          </div>
+
+          <!-- 操作按钮 -->
+          <div class="report-actions">
+            <button class="retry-btn" @click="selectRole(selectedRole)">
+              <span>🔄</span> 再来一次
+            </button>
+            <button class="back-btn" @click="backToRoles">
+              <span>🏠</span> 返回角色选择
+            </button>
+          </div>
+        </template>
       </div>
     </template>
   </div>
 </template>
 
-<style scoped>
+<style lang="scss" scoped>
 .roleplay-page {
   min-height: calc(100vh - 56px);
   background: linear-gradient(180deg, #FFF5F5 0%, #F8F0FF 30%, #FFF9F0 60%, #F0F8FF 100%);
@@ -436,25 +640,26 @@ onUnmounted(() => {
   font-family: 'PingFang SC', 'Hiragino Sans GB', sans-serif;
 }
 
-/* ========== 角色选择 ========== */
+// ========== 角色选择 ==========
 .rp-select-header {
   text-align: center;
   padding: 48px 20px 0;
-}
-.header-mascot {
-  font-size: 56px;
-  animation: bounce 2s ease-in-out infinite;
-  display: inline-block;
-}
-.rp-select-header h2 {
-  font-size: 26px;
-  font-weight: 700;
-  margin: 12px 0 8px;
-  color: #3D3D5C;
-}
-.select-subtitle {
-  color: #999;
-  font-size: 15px;
+
+  .header-mascot {
+    font-size: 56px;
+    animation: bounce 2s ease-in-out infinite;
+    display: inline-block;
+  }
+  h2 {
+    font-size: 26px;
+    font-weight: 700;
+    margin: 12px 0 8px;
+    color: #3D3D5C;
+  }
+  .select-subtitle {
+    color: #999;
+    font-size: 15px;
+  }
 }
 
 @keyframes bounce {
@@ -462,65 +667,57 @@ onUnmounted(() => {
   50% { transform: translateY(-8px); }
 }
 
-.role-grid {
+.rp-role-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 20px;
-  max-width: 960px;
-  margin: 32px auto;
-  padding: 0 20px;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px;
+  padding: 28px 20px;
+  max-width: 440px;
+  margin: 0 auto;
 }
 
-.role-card {
-  background: rgba(255,255,255,0.85);
-  backdrop-filter: blur(8px);
-  border: 1.5px solid var(--color-border);
-  border-top: 4px solid var(--role-color);
-  border-radius: 16px;
-  padding: 28px 20px;
+.rp-role-card {
+  background: #fff;
+  border: 2px solid #F0E8FF;
+  border-radius: 20px;
+  padding: 24px 16px;
   text-align: center;
   cursor: pointer;
-  transition: all 0.25s ease;
-}
-.role-card:hover {
-  transform: translateY(-6px);
-  box-shadow: 0 12px 32px rgba(0,0,0,0.08);
-}
-.role-emoji {
-  font-size: 40px;
-  margin-bottom: 8px;
-}
-.role-card h3 {
-  margin: 8px 0 4px;
-  font-size: 18px;
-  color: #3D3D5C;
-}
-.role-ai {
-  font-size: 13px;
-  color: var(--role-color);
-  font-weight: 600;
-  margin-bottom: 8px;
-}
-.role-desc {
-  font-size: 14px;
-  color: #666;
-  margin-bottom: 12px;
-}
-.role-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  justify-content: center;
-}
-.tag {
-  font-size: 11px;
-  padding: 2px 8px;
-  border-radius: 10px;
-  background: rgba(0,0,0,0.04);
-  color: #888;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+
+  &:hover {
+    border-color: var(--accent);
+    transform: translateY(-3px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  }
+
+  .rrc-emoji {
+    font-size: 40px;
+    margin-bottom: 10px;
+  }
+  h4 {
+    font-size: 15px;
+    font-weight: 600;
+    margin-bottom: 4px;
+    color: #3D3D5C;
+  }
+  p {
+    font-size: 12px;
+    color: #aaa;
+  }
 }
 
-/* ========== 通话界面 ========== */
+.select-footer {
+  text-align: center;
+  padding-bottom: 40px;
+  .back-btn {
+    color: #999;
+    font-size: 14px;
+  }
+}
+
+// ========== 通话界面 ==========
 .call-screen {
   display: flex;
   flex-direction: column;
@@ -529,28 +726,9 @@ onUnmounted(() => {
 }
 
 .call-top {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 20px 20px 0;
-  position: relative;
+  text-align: center;
+  padding: 40px 20px 0;
 }
-.back-btn {
-  position: absolute;
-  left: 20px;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  border: none;
-  background: rgba(0,0,0,0.04);
-  padding: 6px 12px;
-  border-radius: 20px;
-  cursor: pointer;
-  color: #666;
-  font-size: 13px;
-  transition: background 0.2s;
-}
-.back-btn:hover { background: rgba(0,0,0,0.08); }
 
 .call-role-pill {
   display: inline-flex;
@@ -559,9 +737,12 @@ onUnmounted(() => {
   font-size: 14px;
   font-weight: 500;
   color: #7C6FF7;
-  background: rgba(124,111,247,0.08);
+  background: rgba(124, 111, 247, 0.08);
   padding: 8px 18px;
   border-radius: 24px;
+  .pill-emoji {
+    font-size: 16px;
+  }
 }
 
 .call-center {
@@ -570,20 +751,10 @@ onUnmounted(() => {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 24px;
-  padding: 20px;
+  gap: 28px;
 }
 
-.connecting-hint {
-  font-size: 16px;
-  color: #999;
-  animation: pulse-text 1.5s ease-in-out infinite;
-}
-@keyframes pulse-text {
-  0%, 100% { opacity: 0.5; }
-  50% { opacity: 1; }
-}
-
+// 可爱头像 + 波纹
 .mascot-container {
   position: relative;
   width: 140px;
@@ -591,214 +762,628 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-}
-.mascot-ring {
-  position: absolute;
-  width: 100%;
-  height: 100%;
-  border-radius: 50%;
-  border: 3px solid transparent;
-  transition: all 0.3s;
-}
-.mascot-ring.ai_speaking {
-  border-color: #7C6FF7;
-  box-shadow: 0 0 20px rgba(124,111,247,0.3);
-  animation: ring-pulse 1.5s ease-in-out infinite;
-}
-.mascot-ring.listening {
-  border-color: #5AD8A6;
-  box-shadow: 0 0 20px rgba(90,216,166,0.3);
-  animation: ring-pulse 0.8s ease-in-out infinite;
-}
-.mascot-ring.thinking {
-  border-color: #F6BD16;
-  box-shadow: 0 0 20px rgba(246,189,22,0.3);
-  animation: ring-pulse 1s ease-in-out infinite;
-}
-@keyframes ring-pulse {
-  0%, 100% { transform: scale(1); opacity: 0.6; }
-  50% { transform: scale(1.08); opacity: 1; }
-}
-.mascot-avatar {
-  font-size: 60px;
-  z-index: 1;
-  filter: drop-shadow(0 4px 8px rgba(0,0,0,0.1));
+
+  .ripple-ring {
+    position: absolute;
+    border-radius: 50%;
+    border: 2.5px solid rgba(255, 107, 138, 0.15);
+    animation: none;
+  }
+  .r1 { width: 100%; height: 100%; }
+  .r2 { width: 78%; height: 78%; }
+  .r3 { width: 56%; height: 56%; }
+
+  &.ai_speaking .ripple-ring {
+    border-color: rgba(255, 107, 138, 0.25);
+    animation: ripple 1.6s ease-out infinite;
+  }
+  &.ai_speaking .r2 { animation-delay: 0.35s; }
+  &.ai_speaking .r3 { animation-delay: 0.7s; }
+
+  &.listening .ripple-ring {
+    border-color: rgba(91, 143, 249, 0.3);
+    animation: ripple 1.3s ease-out infinite;
+  }
+  &.listening .r2 { animation-delay: 0.25s; }
+  &.listening .r3 { animation-delay: 0.5s; }
+
+  &.thinking .ripple-ring {
+    border-color: rgba(246, 189, 22, 0.3);
+    animation: ripple 0.9s ease-out infinite;
+  }
+  &.thinking .r2 { animation-delay: 0.2s; }
+  &.thinking .r3 { animation-delay: 0.4s; }
+
+  .mascot-avatar {
+    width: 74px;
+    height: 74px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #FFE0E8, #FFD6E0);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1;
+    box-shadow: 0 4px 16px rgba(255, 107, 138, 0.15);
+
+    .mascot-face {
+      font-size: 38px;
+      animation: wiggle 3s ease-in-out infinite;
+    }
+  }
 }
 
-.subtitle-box {
-  max-width: 520px;
-  width: 100%;
-  text-align: center;
-}
-.subtitle-label {
-  font-size: 12px;
-  font-weight: 600;
-  margin-bottom: 4px;
-}
-.subtitle-box.ai .subtitle-label { color: #7C6FF7; }
-.subtitle-box.user .subtitle-label { color: #5AD8A6; }
-.subtitle-text {
-  font-size: 18px;
-  line-height: 1.5;
-  color: #3D3D5C;
-  font-weight: 500;
+@keyframes ripple {
+  0% { transform: scale(0.8); opacity: 0.5; }
+  100% { transform: scale(1.7); opacity: 0; }
 }
 
-.call-status {
-  font-size: 14px;
+@keyframes wiggle {
+  0%, 100% { transform: rotate(0); }
+  25% { transform: rotate(5deg); }
+  75% { transform: rotate(-5deg); }
+}
+
+.call-state-label {
+  font-size: 16px;
   color: #999;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  .state-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+
+    &.speaking {
+      background: #FF6B8A;
+      animation: pulse-dot 0.8s ease-in-out infinite;
+    }
+    &.listening {
+      background: #5B8FF9;
+      animation: pulse-dot 0.8s ease-in-out infinite;
+    }
+    &.thinking {
+      background: #F6BD16;
+      animation: pulse-dot 0.5s ease-in-out infinite;
+    }
+  }
 }
 
-.call-bottom {
-  padding: 20px;
-  display: flex;
-  justify-content: center;
+@keyframes pulse-dot {
+  0%, 100% { opacity: 0.4; transform: scale(0.8); }
+  50% { opacity: 1; transform: scale(1.2); }
 }
-.record-area {
+
+// 字幕
+.call-subtitles {
+  padding: 0 24px 20px;
+  max-width: 520px;
+  margin: 0 auto;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.subtitle {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  font-size: 14px;
+  line-height: 1.5;
+  max-width: 85%;
+
+  .subtitle-avatar {
+    font-size: 22px;
+    flex-shrink: 0;
+    line-height: 1;
+  }
+  .subtitle-text {
+    color: #4A4A5A;
+  }
+}
+
+.user-subtitle {
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(91, 143, 249, 0.1);
+  align-self: flex-end;
+  border-bottom-right-radius: 6px;
+}
+
+.ai-subtitle {
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(255, 107, 138, 0.1);
+  align-self: flex-start;
+  border-bottom-left-radius: 6px;
+}
+
+// 挂断
+.call-actions {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
+  padding: 0 20px 44px;
 }
-.record-btn {
-  width: 72px;
-  height: 72px;
+
+.hangup-btn {
+  width: 60px;
+  height: 60px;
   border-radius: 50%;
   border: none;
+  background: linear-gradient(135deg, #FF6B8A, #FF8E9E);
+  color: #fff;
+  cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  cursor: pointer;
-  transition: all 0.3s;
+  box-shadow: 0 4px 16px rgba(255, 107, 138, 0.3);
+  transition: all 0.25s;
+
+  .hangup-icon {
+    font-size: 24px;
+  }
+
+  &:hover {
+    transform: scale(1.08);
+    box-shadow: 0 6px 24px rgba(255, 107, 138, 0.4);
+  }
+  &:active {
+    transform: scale(0.95);
+  }
 }
-.record-btn.listening {
-  background: #5AD8A6;
-  color: #fff;
-  box-shadow: 0 4px 16px rgba(90,216,166,0.4);
-  animation: pulse-record 1s ease-in-out infinite;
+
+.hangup-label {
+  font-size: 12px;
+  color: #bbb;
+  margin-top: 8px;
 }
-@keyframes pulse-record {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(90,216,166,0.4); }
-  50% { box-shadow: 0 0 0 16px rgba(90,216,166,0); }
+
+// 语法纠错卡片
+.grammar-correction-card {
+  background: #FFFBEB;
+  border: 1px solid #FDE68A;
+  border-radius: 12px;
+  padding: 0;
+  max-width: 85%;
+  align-self: flex-end;
+  overflow: hidden;
+  animation: gcSlideIn 0.3s ease;
 }
-.record-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+
+@keyframes gcSlideIn {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
 }
-.recording-indicator {
+
+.gc-header {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 14px;
-}
-.rec-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #fff;
-  animation: blink 0.5s ease-in-out infinite;
-}
-@keyframes blink {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.3; }
-}
-.record-hint {
-  font-size: 13px;
-  color: #999;
+  padding: 8px 12px;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s;
+  &:hover { background: #FFF7D6; }
+  .gc-icon { font-size: 14px; }
+  .gc-count { font-size: 12px; font-weight: 600; color: #92400E; flex: 1; }
+  .gc-arrow {
+    font-size: 8px; color: #B45309;
+    transition: transform 0.2s;
+    &.expanded { transform: rotate(90deg); }
+  }
 }
 
-/* ========== 评分报告 ========== */
+.gc-body {
+  padding: 0 12px 10px;
+  border-top: 1px solid #FDE68A;
+}
+
+.gc-corrected {
+  display: flex;
+  gap: 6px;
+  padding: 8px 0;
+  margin-bottom: 4px;
+  border-bottom: 1px dashed #FDE68A;
+  .gc-label { font-size: 11px; color: #92400E; font-weight: 600; flex-shrink: 0; }
+  .gc-corrected-text { font-size: 12px; color: #4A4A5A; line-height: 1.5; }
+}
+
+.gc-error-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 0;
+  flex-wrap: wrap;
+  & + & { border-top: 1px solid #FEF3C7; }
+  .gc-error-original {
+    font-size: 12px; color: #DC2626; text-decoration: line-through;
+    background: #FEE2E2; padding: 1px 6px; border-radius: 4px;
+  }
+  .gc-error-arrow { font-size: 10px; color: #999; }
+  .gc-error-correction {
+    font-size: 12px; color: #059669; font-weight: 600;
+    background: #D1FAE5; padding: 1px 6px; border-radius: 4px;
+  }
+  .gc-error-type {
+    font-size: 10px; color: #fff; padding: 1px 6px; border-radius: 8px;
+    font-weight: 500; flex-shrink: 0;
+  }
+  .gc-error-explain {
+    font-size: 11px; color: #999; width: 100%; margin-top: 2px;
+    padding-left: 2px;
+  }
+}
+
+// ========== 评分报告 ==========
 .report-screen {
   min-height: calc(100vh - 56px);
   background: linear-gradient(180deg, #FFF5F5 0%, #F8F0FF 30%, #FFF9F0 100%);
   padding: 24px 24px 32px;
-  max-width: 800px;
+  max-width: 1400px;
   margin: 0 auto;
 }
 
 .report-header {
   text-align: center;
-  margin-bottom: 20px;
+  margin-bottom: 16px;
+  .report-mascot { font-size: 40px; margin-bottom: 4px; }
+  h2 { font-size: 22px; font-weight: 700; color: #3D3D5C; margin: 0; }
+  .report-role { font-size: 13px; color: #999; margin-top: 4px; }
 }
-.report-mascot { font-size: 40px; margin-bottom: 4px; }
-.report-header h2 { font-size: 22px; font-weight: 700; color: #3D3D5C; margin: 0; }
-.report-role-info { font-size: 13px; color: #999; margin-top: 4px; }
 
-.report-overall {
+// 顶部：综合分 + 方法论
+.report-top {
   display: flex;
-  justify-content: center;
-  margin-bottom: 24px;
+  align-items: center;
+  gap: 24px;
+  margin-bottom: 20px;
+  padding: 20px 28px;
+  background: #fff;
+  border-radius: 20px;
+  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.04);
 }
+
+.overall-area {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  flex: 1;
+}
+
 .overall-circle {
-  width: 120px;
-  height: 120px;
+  width: 110px;
+  height: 110px;
   border-radius: 50%;
-  border: 6px solid;
+  background: #fff;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: rgba(255,255,255,0.8);
+  flex-shrink: 0;
+  .overall-num { font-size: 38px; font-weight: 800; color: #3D3D5C; line-height: 1; }
+  .overall-unit { font-size: 12px; color: #999; margin-top: 2px; }
+  .overall-level { font-size: 12px; font-weight: 600; margin-top: 2px; color: #FF6B8A; }
 }
-.overall-num { font-size: 38px; font-weight: 800; color: #3D3D5C; line-height: 1; }
-.overall-label { font-size: 12px; color: #999; margin-top: 2px; }
 
-.report-section {
-  background: rgba(255,255,255,0.85);
-  backdrop-filter: blur(8px);
-  border-radius: 16px;
-  padding: 20px;
+.methodology-card {
+  flex: 1;
+  padding: 14px 18px;
+  background: #F8F0FF;
+  border-radius: 14px;
+  .methodology-title { font-size: 13px; font-weight: 600; color: #7C6FF7; margin-bottom: 6px; }
+  .methodology-text {
+    font-size: 12px; color: #666; line-height: 1.7;
+    white-space: pre-wrap; font-family: inherit; margin: 0;
+  }
+}
+
+// 主体双列
+.report-main {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
   margin-bottom: 16px;
 }
-.section-title {
-  font-size: 15px;
-  font-weight: 600;
+
+// 底部双列
+.report-bottom {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+// 通用卡片
+.report-card {
+  background: #fff;
+  border-radius: 20px;
+  padding: 20px 28px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+
+  &--full {
+    grid-column: 1 / -1;
+    margin-bottom: 16px;
+  }
+}
+
+.card-title {
+  font-size: 16px;
+  font-weight: 700;
   color: #3D3D5C;
-  margin: 0 0 14px;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  .card-icon { font-size: 18px; }
 }
 
-.suggestions-text {
-  font-size: 14px;
-  line-height: 1.7;
-  color: #555;
-  white-space: pre-wrap;
+// 维度列表
+.dimension-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
+.dimension-item {
+  .dim-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 4px;
+    .dim-label { font-size: 13px; color: #666; }
+    .dim-score { font-size: 14px; font-weight: 700; }
+  }
+  .dim-bar-bg {
+    height: 7px;
+    border-radius: 4px;
+    background: #F0E8FF;
+    overflow: hidden;
+  }
+  .dim-bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.6s ease;
+  }
+}
+
+// 错误音素
+.error-section {
+  margin-top: 16px;
+  .error-title { font-size: 13px; font-weight: 600; color: #3D3D5C; margin-bottom: 8px; }
+}
+
+.error-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: rgba(255, 107, 138, 0.04);
+  border-radius: 8px;
+  margin-bottom: 6px;
+  .error-actual { font-size: 12px; color: #FF6B8A; font-family: monospace; }
+  .error-tip-text { font-size: 11px; color: #999; flex: 1; }
+}
+
+// 文本维度卡片
+.text-dim-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.text-dim-card {
+  padding: 14px;
+  background: #FAFAFF;
+  border-radius: 14px;
+  border: 1px solid #F0E8FF;
+  .tdc-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+  }
+  .tdc-label { font-size: 14px; font-weight: 600; color: #3D3D5C; }
+  .tdc-score { font-size: 22px; font-weight: 800; }
+  .tdc-feedback { font-size: 12px; color: #666; line-height: 1.5; margin-bottom: 6px; }
+  .tdc-tags { display: flex; flex-direction: column; gap: 3px; }
+  .tdc-tag { font-size: 11px; &.good { color: #5AD8A6; } &.improve { color: #FF6B8A; } }
+}
+
+// 逐句网格
+.utterance-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+  gap: 10px;
+}
+
+.utterance-item {
+  border: 1px solid #F0E8FF;
+  border-radius: 12px;
+  overflow: hidden;
+  &.expanded { grid-column: 1 / -1; }
+}
+
+.utterance-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  cursor: pointer;
+  transition: background 0.2s;
+  &:hover { background: #FAFAFF; }
+  .utterance-num {
+    font-size: 11px; font-weight: 600; color: #7C6FF7;
+    background: rgba(124, 111, 247, 0.08);
+    padding: 2px 8px; border-radius: 8px; flex-shrink: 0;
+  }
+  .utterance-text-preview {
+    font-size: 13px; color: #666;
+    flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .utterance-score { font-size: 15px; font-weight: 700; flex-shrink: 0; }
+  .utterance-arrow {
+    font-size: 10px; color: #ccc; flex-shrink: 0;
+    transition: transform 0.25s;
+    &.expanded { transform: rotate(90deg); }
+  }
+}
+
+.utterance-detail-wrap {
+  border-top: 1px solid #F0E8FF;
+  padding: 0 16px 8px;
+}
+
+// 对话记录
 .transcript-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
   max-height: 300px;
   overflow-y: auto;
 }
-.transcript-item {
-  display: flex;
-  gap: 8px;
-  font-size: 13px;
-  padding: 8px 12px;
-  border-radius: 8px;
-  background: rgba(0,0,0,0.02);
-}
-.transcript-role {
-  flex-shrink: 0;
-  font-weight: 600;
-  color: #7C6FF7;
-  min-width: 50px;
-}
-.transcript-item.user .transcript-role { color: #5AD8A6; }
-.transcript-text { color: #555; line-height: 1.5; }
 
+.transcript-msg {
+  display: flex;
+  flex-direction: column;
+  max-width: 90%;
+  &.user { align-self: flex-end; }
+  &.ai { align-self: flex-start; }
+  .transcript-role { font-size: 10px; color: #999; margin-bottom: 2px; padding: 0 4px; }
+  &.user .transcript-role { text-align: right; }
+  .transcript-bubble {
+    padding: 8px 12px; border-radius: 12px; font-size: 12px; line-height: 1.5; color: #4A4A5A;
+  }
+  &.user .transcript-bubble { background: #F0F0FF; border-bottom-right-radius: 4px; }
+  &.ai .transcript-bubble { background: #FFF0F3; border-bottom-left-radius: 4px; }
+}
+
+// 建议
+.suggestions-content {
+  p { font-size: 13px; color: #666; line-height: 1.7; margin: 0; }
+}
+
+// ========== 流利度评估 ==========
+.fluency-badge {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  margin-left: 8px;
+  &.grade-优秀 { background: #E8F8F0; color: #3EC790; }
+  &.grade-良好 { background: #E8F0FF; color: #5B8DEF; }
+  &.grade-中等 { background: #FFF8E8; color: #F0A030; }
+  &.grade-初级 { background: #FFF0E8; color: #F08040; }
+  &.grade-入门 { background: #FFE8E8; color: #E05050; }
+}
+.fluency-overall {
+  font-size: 13px;
+  color: #888;
+  margin-left: auto;
+}
+.fluency-rounds {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 12px;
+}
+.fluency-round-card {
+  background: #FAFBFC;
+  border: 1px solid #EBEEF5;
+  border-radius: 10px;
+  padding: 12px 16px;
+  &.best-round {
+    border-color: #F6BD16;
+    background: #FFFDF5;
+  }
+}
+.fr-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.fr-label { font-size: 13px; font-weight: 600; color: #555; }
+.fr-best { font-size: 11px; color: #F0A030; }
+.fr-total { font-size: 14px; font-weight: 700; color: #4A4A5A; margin-left: auto; }
+.fr-text {
+  font-size: 12px;
+  color: #999;
+  margin-bottom: 10px;
+  font-style: italic;
+  line-height: 1.5;
+}
+.fr-dims {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.fr-dim {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: #fff;
+  border-radius: 8px;
+  padding: 8px 12px;
+  min-width: 70px;
+  border: 1px solid #F0F0F0;
+}
+.fd-label { font-size: 11px; color: #999; margin-bottom: 2px; }
+.fd-value { font-size: 15px; font-weight: 700; }
+.fd-detail { font-size: 10px; color: #bbb; margin-top: 2px; }
+.fluency-suggestions {
+  margin-top: 14px;
+  padding: 12px;
+  background: #F0F8FF;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #5B8DEF;
+  line-height: 1.6;
+}
+
+// 加载
+.report-loading {
+  text-align: center;
+  padding: 80px 20px;
+  .loading-spinner {
+    width: 40px; height: 40px;
+    border: 3px solid #F0E8FF;
+    border-top-color: #FF6B8A;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin: 0 auto 16px;
+  }
+  p { color: #999; font-size: 14px; }
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+// 按钮
 .report-actions {
   display: flex;
   gap: 12px;
   justify-content: center;
-  margin-top: 24px;
-}
-
-@media (max-width: 768px) {
-  .role-grid {
-    grid-template-columns: 1fr;
-    max-width: 400px;
+  padding-top: 8px;
+  .retry-btn, .back-btn {
+    display: flex; align-items: center; gap: 6px;
+    padding: 10px 22px; border-radius: 22px; border: none;
+    font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.2s;
+    span { font-size: 16px; }
+  }
+  .retry-btn {
+    background: linear-gradient(135deg, #FF6B8A, #FF8E9E);
+    color: #fff; box-shadow: 0 4px 12px rgba(255, 107, 138, 0.3);
+    &:hover { transform: translateY(-2px); }
+  }
+  .back-btn {
+    background: #fff; color: #666;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    &:hover { transform: translateY(-2px); }
   }
 }
 </style>

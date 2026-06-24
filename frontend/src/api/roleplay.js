@@ -22,7 +22,7 @@ export async function streamStartRoleplay(role, cefrLevel, callbacks) {
  * @param {string} sessionId
  * @param {string} role
  * @param {Blob} audioBlob
- * @param {object} callbacks - { onToken(text), onAsr(text), onDone(data), onError(err) }
+ * @param {object} callbacks - { onToken(text), onAsr(text), onGrammar(data), onDone(data), onError(err) }
  */
 export async function streamSpeakRoleplay(sessionId, role, audioBlob, callbacks) {
   const form = new FormData()
@@ -67,6 +67,9 @@ async function readSSEStream(resp, callbacks) {
               break
             case 'error':
               callbacks.onError?.(data.message)
+              break
+            case 'grammar':
+              callbacks.onGrammar?.(data.data)
               break
           }
         } catch (e) {
@@ -118,6 +121,26 @@ export function endRoleplay(sessionId) {
   return request.post('/api/roleplay/end', form, {
     timeout: 120000,
   })
+}
+
+/**
+ * 流式 TTS — 返回音频流 URL，浏览器可直接作为 <audio> src 播放
+ * @param {string} text
+ * @param {string} voice
+ * @returns {string} 音频流 URL
+ */
+export function ttsStreamUrl(text, voice = 'en-US-JennyNeural') {
+  const params = new URLSearchParams({ text, voice })
+  return `${API_BASE}/api/roleplay/tts/stream?${params.toString()}`
+}
+
+/**
+ * 获取预取的 TTS 缓存音频 URL
+ * @param {string} path - 后端返回的相对路径，如 /api/roleplay/tts/cached/xxx/0
+ * @returns {string} 完整 URL
+ */
+export function ttsCachedUrl(path) {
+  return `${API_BASE}${path}`
 }
 
 /**

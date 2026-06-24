@@ -19,6 +19,17 @@ async def lifespan(app: FastAPI):
     """应用生命周期：启动时预加载模型，关闭时释放资源"""
     logger.info("正在启动服务...")
 
+    # 预加载知识图谱（NetworkX 内存图）
+    try:
+        from app.core.database import SessionLocal
+        from app.services.knowledge_graph import kg_service
+        db = SessionLocal()
+        kg_service.load_from_db(db)
+        db.close()
+        logger.info("知识图谱加载完成")
+    except Exception as e:
+        logger.warning(f"知识图谱加载失败: {e}")
+
     # 预加载发音评测模型（wav2vec2 + G2P）
     try:
         from app.services.pronunciation import get_pronunciation_service
@@ -58,7 +69,17 @@ def health_check():
 from app.api.pronunciation import router as pronunciation_router
 from app.api.conversation import router as conversation_router
 from app.api.roleplay import router as roleplay_router
+from app.api.auth import router as auth_router
+from app.api.assessment import router as assessment_router
+from app.api.learning_path import router as learning_path_router
+from app.api.recommendation import router as recommendation_router
+from app.api.grammar import router as grammar_router
 
 app.include_router(pronunciation_router, prefix="/api/pronunciation", tags=["发音评测"])
 app.include_router(conversation_router, prefix="/api/conversation", tags=["语音对话"])
 app.include_router(roleplay_router, prefix="/api/roleplay", tags=["角色扮演"])
+app.include_router(auth_router, prefix="/api/auth", tags=["用户认证"])
+app.include_router(assessment_router, prefix="/api/assessment", tags=["水平测评"])
+app.include_router(learning_path_router, prefix="/api/learning-path", tags=["学习路径"])
+app.include_router(recommendation_router, prefix="/api/recommendations", tags=["资料推荐"])
+app.include_router(grammar_router, prefix="/api/grammar", tags=["语法纠错"])

@@ -27,6 +27,12 @@ const routes = [
     component: () => import('@/views/assessment/AssessmentResult.vue'),
     meta: { auth: true },
   },
+  {
+    path: '/profile',
+    name: 'Profile',
+    component: () => import('@/views/auth/ProfileView.vue'),
+    meta: { auth: true },
+  },
 
   // ========== 主布局路由（顶部导航） ==========
   {
@@ -55,6 +61,12 @@ const routes = [
         name: 'RolePlay',
         component: () => import('@/views/roleplay/RolePlayView.vue'),
         meta: { title: '角色扮演', auth: true },
+      },
+      {
+        path: 'grammar',
+        name: 'Grammar',
+        component: () => import('@/views/grammar/GrammarView.vue'),
+        meta: { title: '语法纠错', auth: true },
       },
       // 模块三：个性化推荐
       {
@@ -182,7 +194,7 @@ const router = createRouter({
 router.beforeEach((to, from, next) => {
   const authStore = useAuthStore()
 
-  // 游客路由：已登录用户访问 / /login /register → 重定向到首页
+  // 游客路由：已登录用户访问 /login /register → 重定向到首页
   if (to.meta.guest && authStore.isLoggedIn) {
     return next('/')
   }
@@ -190,6 +202,19 @@ router.beforeEach((to, from, next) => {
   // 需认证路由：未登录 → 重定向到首页（功能介绍页）
   if (to.meta.auth && !authStore.isLoggedIn) {
     return next('/')
+  }
+
+  // 已完成测评的用户不允许再次测评
+  if (to.path === '/assessment' && authStore.userInfo?.assessment_completed) {
+    return next('/')
+  }
+
+  // 未完成测评 → 强制跳转测评页（豁免路径除外）
+  const assessmentExempt = ['/assessment', '/assessment/result', '/profile', '/login', '/register']
+  if (to.meta.auth && authStore.isLoggedIn &&
+      authStore.userInfo && !authStore.userInfo.assessment_completed &&
+      !assessmentExempt.includes(to.path)) {
+    return next('/assessment')
   }
 
   // 角色检查：教师/管理员路由

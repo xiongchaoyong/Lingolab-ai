@@ -23,6 +23,7 @@ const learnerNavs = [
       { path: '/pronunciation', title: '发音评测' },
       { path: '/conversation', title: 'AI 智能对话' },
       { path: '/role-play', title: '角色扮演' },
+      { path: '/grammar', title: '语法纠错' },
     ],
   },
   {
@@ -56,6 +57,7 @@ const teacherNavs = [
       { path: '/pronunciation', title: '发音评测' },
       { path: '/conversation', title: 'AI 智能对话' },
       { path: '/role-play', title: '角色扮演' },
+      { path: '/grammar', title: '语法纠错' },
     ],
   },
   {
@@ -97,6 +99,7 @@ const adminNavs = [
       { path: '/pronunciation', title: '发音评测' },
       { path: '/conversation', title: 'AI 智能对话' },
       { path: '/role-play', title: '角色扮演' },
+      { path: '/grammar', title: '语法纠错' },
     ],
   },
   {

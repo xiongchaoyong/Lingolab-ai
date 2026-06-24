@@ -6,7 +6,7 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL || ''
  * 流式开始新对话 — SSE 逐 token 返回
  * @param {string} scene
  * @param {string} cefrLevel
- * @param {object} callbacks - { onToken(text), onAsr(text), onDone(data), onError(err) }
+ * @param {object} callbacks - { onToken(text), onAsr(text), onGrammar(data), onDone(data), onError(err) }
  */
 export async function streamStartConversation(scene, cefrLevel, callbacks) {
   const resp = await fetch(`${API_BASE}/api/conversation/stream/start`, {
@@ -22,7 +22,7 @@ export async function streamStartConversation(scene, cefrLevel, callbacks) {
  * @param {string} sessionId
  * @param {string} scene
  * @param {Blob} audioBlob
- * @param {object} callbacks - { onToken(text), onAsr(text), onDone(data), onError(err) }
+ * @param {object} callbacks - { onToken(text), onAsr(text), onGrammar(data), onDone(data), onError(err) }
  */
 export async function streamSpeakConversation(sessionId, scene, audioBlob, callbacks) {
   const form = new FormData()
@@ -67,6 +67,9 @@ async function readSSEStream(resp, callbacks) {
               break
             case 'error':
               callbacks.onError?.(data.message)
+              break
+            case 'grammar':
+              callbacks.onGrammar?.(data.data)
               break
           }
         } catch (e) {
@@ -118,6 +121,26 @@ export function endConversation(sessionId) {
   return request.post('/api/conversation/end', form, {
     timeout: 120000,  // 评分耗时较长（wav2vec2 + LLM），2分钟超时
   })
+}
+
+/**
+ * 流式 TTS — 返回音频流 URL，浏览器可直接作为 <audio> src 播放
+ * @param {string} text - 要合成的文本
+ * @param {string} voice - 音色
+ * @returns {string} 音频流 URL
+ */
+export function ttsStreamUrl(text, voice = 'en-US-JennyNeural') {
+  const params = new URLSearchParams({ text, voice })
+  return `${API_BASE}/api/conversation/tts/stream?${params.toString()}`
+}
+
+/**
+ * 获取预取的 TTS 缓存音频 URL
+ * @param {string} path - 后端返回的相对路径，如 /api/conversation/tts/cached/xxx/0
+ * @returns {string} 完整 URL
+ */
+export function ttsCachedUrl(path) {
+  return `${API_BASE}${path}`
 }
 
 /**

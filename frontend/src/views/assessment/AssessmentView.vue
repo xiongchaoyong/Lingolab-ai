@@ -1,6 +1,7 @@
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
 import { useAssessmentStore } from '@/stores/assessment'
 import VoiceRecorder from '@/components/common/VoiceRecorder.vue'
 
@@ -8,17 +9,23 @@ const router = useRouter()
 const store = useAssessmentStore()
 
 const selectedOption = ref(null)
-const showResult = ref(false)
-const isCorrect = ref(false)
 const timerSeconds = ref(0)
+const voiceRecorderRef = ref(null)
 let timer = null
 
-onMounted(() => {
-  store.startAssessment()
+onMounted(async () => {
+  await store.startAssessment()
   startTimer()
 })
 
 onUnmounted(() => clearInterval(timer))
+
+// 测评完成后跳转结果页
+watch(() => store.isCompleted, (val) => {
+  if (val) {
+    router.push('/assessment/result')
+  }
+})
 
 function startTimer() {
   const elapsed = store.startTime ? Math.floor((Date.now() - store.startTime) / 1000) : 0
@@ -33,36 +40,33 @@ const formattedTime = computed(() => {
 })
 
 const estimatedTime = computed(() => {
-  const remain = store.totalQuestions - store.currentIndex
+  const remain = store.totalQuestions - store.answeredCount
   const m = Math.floor(remain * 1.0)
   return `预计剩余 ${m} 分钟`
 })
 
 // 客观题 — 提交答案
-function handleSubmitOption() {
-  if (!selectedOption.value && !store.isSpeakingQuestion) return
-  store.saveAnswer(selectedOption.value)
-  const correct = store.currentQuestion.answer
-  isCorrect.value = selectedOption.value === correct
-  showResult.value = true
-}
-
-// 口语题 — 录音完成
-function handleSpeakingComplete() {
-  store.saveAnswer('spoken_answer')
-  isCorrect.value = true // 口语不判对错
-  showResult.value = true
-}
-
-// 下一题
-function handleNext() {
-  showResult.value = false
+async function handleSubmitOption() {
+  if (!selectedOption.value || store.isScoring) return
+  const answer = selectedOption.value
   selectedOption.value = null
-  if (store.isLastQuestion) {
-    store.completeAssessment()
-    router.push('/assessment/result')
-  } else {
-    store.nextQuestion()
+  try {
+    await store.submitAndAdvance(answer)
+  } catch (e) {
+    console.error('提交答案失败:', e)
+    ElMessage.error('提交失败，请检查网络后重试')
+  }
+}
+
+// 口语题 — 录音完成（携带音频 blob）
+async function handleSpeakingComplete(recording) {
+  try {
+    await store.submitAndAdvance('', recording.blob, recording.mimeType)
+    // 录音完成后重置 recorder 状态
+    voiceRecorderRef.value?.reset()
+  } catch (e) {
+    console.error('口语提交失败:', e)
+    ElMessage.error('评分失败，请检查网络后重试')
   }
 }
 
@@ -73,9 +77,13 @@ function handleExit() {
 }
 
 // 提前结束（口语跳过）
-function handleSkip() {
-  store.saveAnswer('skipped')
-  handleNext()
+async function handleSkip() {
+  if (store.isScoring) return
+  try {
+    await store.submitAndAdvance('')
+  } catch (e) {
+    console.error('跳过失败:', e)
+  }
 }
 </script>
 
@@ -87,7 +95,7 @@ function handleSkip() {
         <el-icon><ArrowLeft /></el-icon> 退出
       </el-button>
       <span class="question-progress">
-        第 {{ store.currentIndex + 1 }} / {{ store.totalQuestions }} 题
+        第 {{ store.answeredCount + 1 }} / {{ store.totalQuestions }} 题
       </span>
       <span class="timer">{{ formattedTime }}</span>
     </div>
@@ -118,7 +126,6 @@ function handleSkip() {
         <el-radio-group
           v-model="selectedOption"
           class="options-group"
-          :disabled="showResult"
         >
           <div
             v-for="opt in store.currentQuestion?.options"
@@ -126,8 +133,6 @@ function handleSkip() {
             class="option-item"
             :class="{
               'is-selected': selectedOption === opt[0],
-              'is-correct': showResult && opt[0] === store.currentQuestion?.answer,
-              'is-wrong': showResult && selectedOption === opt[0] && opt[0] !== store.currentQuestion?.answer,
             }"
           >
             <el-radio :label="opt[0]" :value="opt[0]" size="large">
@@ -135,68 +140,52 @@ function handleSkip() {
             </el-radio>
           </div>
         </el-radio-group>
-
-        <!-- 结果显示 -->
-        <div v-if="showResult" class="result-feedback" :class="isCorrect ? 'correct' : 'wrong'">
-          <el-icon :size="20">
-            <CircleCheckFilled v-if="isCorrect" />
-            <CircleCloseFilled v-else />
-          </el-icon>
-          <span>{{ isCorrect ? '回答正确！' : `正确答案是 ${store.currentQuestion?.answer}` }}</span>
-        </div>
       </template>
 
       <!-- 口语题 -->
       <template v-else>
         <div class="speaking-area">
-          <p class="speaking-prompt">
-            <el-icon><InfoFilled /></el-icon>
-            请用英语自由表达，录音时长 30-60 秒
+          <p v-if="store.isScoring" class="scoring-notice">
+            <el-icon class="is-loading"><Loading /></el-icon>
+            评分中，请稍候...
           </p>
+          <template v-else>
+            <p class="speaking-prompt">
+              <el-icon><InfoFilled /></el-icon>
+              请用英语自由表达，录音时长 30-60 秒
+            </p>
 
-          <VoiceRecorder
-            v-if="!showResult"
-            :prep-time="15"
-            :max-duration="45"
-            @complete="handleSpeakingComplete"
-          />
-
-          <div v-if="showResult" class="result-feedback correct">
-            <el-icon :size="20"><CircleCheckFilled /></el-icon>
-            <span>录音已提交，AI 正在评分...</span>
-          </div>
+            <VoiceRecorder
+              ref="voiceRecorderRef"
+              :prep-time="3"
+              :max-duration="45"
+              @complete="handleSpeakingComplete"
+            />
+          </template>
         </div>
       </template>
     </div>
 
     <!-- 底部操作栏 -->
     <div class="assessment-footer">
-      <template v-if="!showResult">
-        <el-button
-          v-if="!store.isSpeakingQuestion"
-          type="primary"
-          size="large"
-          :disabled="!selectedOption"
-          @click="handleSubmitOption"
-        >
-          确认答案
-        </el-button>
-        <el-button
-          v-if="store.isSpeakingQuestion"
-          text
-          type="info"
-          size="small"
-          @click="handleSkip"
-        >
-          跳过此题
-        </el-button>
-      </template>
-      <template v-else>
-        <el-button type="primary" size="large" @click="handleNext">
-          {{ store.isLastQuestion ? '查看测评结果' : '下一题' }}
-          <el-icon><ArrowRight /></el-icon>
-        </el-button>
-      </template>
+      <el-button
+        v-if="!store.isSpeakingQuestion"
+        type="primary"
+        size="large"
+        :disabled="!selectedOption || store.isScoring"
+        @click="handleSubmitOption"
+      >
+        确认答案
+      </el-button>
+      <el-button
+        v-if="store.isSpeakingQuestion && !store.isScoring"
+        text
+        type="info"
+        size="small"
+        @click="handleSkip"
+      >
+        跳过此题
+      </el-button>
 
       <p class="time-estimate">{{ estimatedTime }}</p>
     </div>
@@ -282,39 +271,8 @@ function handleSkip() {
     background: rgba(var(--color-primary-rgb), 0.05);
   }
 
-  &.is-correct {
-    border-color: var(--color-success);
-    background: rgba(var(--color-success-rgb), 0.08);
-  }
-
-  &.is-wrong {
-    border-color: var(--color-danger);
-    background: rgba(var(--color-danger-rgb), 0.08);
-  }
-
   :deep(.el-radio) {
     width: 100%;
-  }
-}
-
-// 结果反馈
-.result-feedback {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-sm);
-  margin-top: var(--spacing-xl);
-  padding: var(--spacing-md) var(--spacing-lg);
-  border-radius: var(--radius-md);
-  font-weight: 600;
-
-  &.correct {
-    background: rgba(var(--color-success-rgb), 0.1);
-    color: var(--color-success);
-  }
-
-  &.wrong {
-    background: rgba(var(--color-danger-rgb), 0.1);
-    color: var(--color-danger);
   }
 }
 
@@ -332,6 +290,16 @@ function handleSkip() {
     gap: var(--spacing-sm);
     color: var(--color-text-secondary);
     font-size: var(--font-size-sm);
+  }
+
+  .scoring-notice {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    color: var(--color-primary);
+    font-size: var(--font-size-md);
+    font-weight: 500;
+    padding: var(--spacing-xxl);
   }
 }
 

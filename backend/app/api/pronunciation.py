@@ -6,11 +6,16 @@ import tempfile
 import subprocess
 import logging
 
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Depends
 from fastapi.responses import StreamingResponse
+from sqlalchemy.orm import Session
 
+from app.core.database import get_db
+from app.core.security import get_current_user
+from app.models.user import UserProfile
 from app.schemas.pronunciation import PronunciationResponse
 from app.services.pronunciation import score_audio
+from app.services.profile_updater import profile_updater
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -33,6 +38,8 @@ async def pronunciation_score(
     audio: UploadFile = File(..., description="学习者录音文件（任意格式，后端自动转 WAV）"),
     text: str = Form(..., description="跟读的标准文本"),
     mode: str = Form(default="word", description="跟读模式：word/sentence"),
+    current_user: UserProfile = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
     """
     发音评测接口
@@ -74,6 +81,17 @@ async def pronunciation_score(
 
         # 执行发音评测
         result = await score_audio(converted_path, text, mode)
+
+        # 持久化分数到用户画像
+        try:
+            profile_updater.ingest_pronunciation_scores(
+                current_user.id, result.get("dimensions", []), source_id=0, db=db
+            )
+            db.commit()
+            logger.info(f"用户 {current_user.username} 发音分数已持久化")
+        except Exception as e:
+            logger.warning(f"持久化发音分数失败: {e}")
+
         return PronunciationResponse(**result)
 
     except subprocess.CalledProcessError as e:

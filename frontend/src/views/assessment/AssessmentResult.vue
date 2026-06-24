@@ -1,4 +1,5 @@
 <script setup>
+import { computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAssessmentStore } from '@/stores/assessment'
 import DimensionBars from '@/components/common/DimensionBars.vue'
@@ -37,8 +38,7 @@ function handleGoHome() {
 
 onMounted(() => {
   if (!store.report) {
-    // 如果没有报告数据，生成一份
-    store.completeAssessment()
+    router.push('/')
   }
 })
 </script>

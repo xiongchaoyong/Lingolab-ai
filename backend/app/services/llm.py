@@ -520,6 +520,225 @@ class LLMService:
             }
 
 
+async def score_fluency(
+            self,
+            user_utterances: list[dict],
+            cefr_level: str = "B1",
+            scene_context: str = "",
+        ) -> list[dict]:
+            """
+            流利度 LLM 评估 — 对每轮用户发言评估语法正确性和内容相关性
+
+            Args:
+                user_utterances: [{"round": 1, "text": "...", "context": "..."}, ...]
+                cefr_level: 用户 CEFR 等级
+                scene_context: 场景描述
+
+            Returns:
+                [{"round": 1, "grammar": {"score": 16, "errors": [...], "max": 20},
+                  "relevance": {"score": 12, "max": 15}}, ...]
+            """
+            if not user_utterances:
+                return []
+
+            # 构建对话文本
+            utterances_text = ""
+            for u in user_utterances:
+                utterances_text += (
+                    f"Round {u['round']}: \"{u['text']}\"\n"
+                    f"  Context: {u.get('context', 'N/A')}\n\n"
+                )
+
+            prompt = (
+                f"You are evaluating a student's English speaking fluency in a conversation.\n"
+                f"Student CEFR level: {cefr_level}\n"
+                f"Scene: {scene_context}\n\n"
+                f"Student utterances:\n{utterances_text}\n"
+                f"For EACH round, evaluate 2 dimensions:\n"
+                f"1. grammar_correctness (0-20): Check for grammar errors "
+                f"(tense, subject-verb agreement, articles, prepositions, word order, singular/plural).\n"
+                f"2. content_relevance (0-15): How relevant is the response to the conversation context?\n\n"
+                f"Return ONLY a JSON object (no markdown, no code fences):\n"
+                f'{{"rounds": [\n'
+                f'  {{"round": 1, "grammar": {{"score": 16, "errors": ["error description"], "max": 20}}, '
+                f'"relevance": {{"score": 12, "max": 15, "note": "brief note"}}}},\n'
+                f'  ...\n'
+                f'], "overall_suggestions": "brief Chinese fluency improvement advice"}}'
+            )
+
+            try:
+                async with httpx.AsyncClient(timeout=15.0) as client:
+                    resp = await client.post(
+                        BAILIAN_API_URL,
+                        headers={
+                            "Authorization": f"Bearer {self.api_key}",
+                            "Content-Type": "application/json",
+                        },
+                        json={
+                            "model": self.model,
+                            "messages": [{"role": "user", "content": prompt}],
+                            "max_tokens": 800,
+                            "temperature": 0.3,
+                        },
+                    )
+                    resp.raise_for_status()
+                    data = resp.json()
+                    content = data["choices"][0]["message"]["content"].strip()
+                    content = content.replace("```json", "").replace("```", "").strip()
+                    result = json.loads(content)
+                    logger.info(
+                        f"流利度 LLM 评估完成: {len(result.get('rounds', []))} 轮"
+                    )
+                    return result
+
+            except Exception as e:
+                logger.error(f"流利度 LLM 评估失败: {e}")
+                # 返回默认值
+                fallback = []
+                for u in user_utterances:
+                    fallback.append({
+                        "round": u["round"],
+                        "grammar": {"score": 15, "errors": [], "max": 20},
+                        "relevance": {"score": 10, "max": 15, "note": "评估暂不可用"},
+                    })
+                return {"rounds": fallback, "overall_suggestions": "继续练习，多说多练！"}
+
+
+async def correct_grammar(self, text: str, cefr_level: str = "B1") -> dict:
+        """
+        语法纠错与润色 — 独立纠错功能
+
+        Args:
+            text: 用户输入的英文文本
+            cefr_level: CEFR 等级
+
+        Returns:
+            {
+                "corrected_text": "修正后的文本",
+                "errors": [{"original", "correction", "error_type", "explanation"}, ...],
+                "polished_version": "更地道的表达",
+                "suggestions": ["建议1", "建议2", ...],
+            }
+        """
+        level_instruction = CEFR_DIFFICULTY.get(cefr_level, CEFR_DIFFICULTY["B1"])
+
+        prompt = (
+            f"You are an expert English grammar tutor helping a {cefr_level} level student.\n"
+            f"Student's level instruction: {level_instruction}\n\n"
+            f"Analyze the following text for grammar errors:\n\n"
+            f'"{text}"\n\n'
+            f"Identify ALL grammar errors. Error types: tense, subject_verb_agreement, article, "
+            f"preposition, word_order, plural, word_choice, other.\n\n"
+            f"Provide:\n"
+            f"1. corrected_text: The text with ALL grammar errors fixed (minimal changes only)\n"
+            f"2. errors: Array of each error found, with original phrase, correction, error_type, "
+            f"and a Chinese explanation of why it's wrong\n"
+            f"3. polished_version: A more natural/idiomatic way to express the same idea "
+            f"(may rephrase the sentence, not just fix errors)\n"
+            f"4. suggestions: 2-4 specific improvement tips in Chinese\n\n"
+            f"Return ONLY a JSON object (no markdown, no code fences):\n"
+            f'{{"corrected_text": "...", "errors": ['
+            f'{{"original": "goed", "correction": "went", "error_type": "tense", '
+            f'"explanation": "go 的过去式是不规则变化，应为 went"}}'
+            f'], "polished_version": "...", "suggestions": ["建议1", "建议2"]}}'
+        )
+
+        try:
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                resp = await client.post(
+                    BAILIAN_API_URL,
+                    headers={
+                        "Authorization": f"Bearer {self.api_key}",
+                        "Content-Type": "application/json",
+                    },
+                    json={
+                        "model": self.model,
+                        "messages": [{"role": "user", "content": prompt}],
+                        "max_tokens": 800,
+                        "temperature": 0.3,
+                    },
+                )
+                resp.raise_for_status()
+                data = resp.json()
+                content = data["choices"][0]["message"]["content"].strip()
+                content = content.replace("```json", "").replace("```", "").strip()
+                result = json.loads(content)
+                logger.info(f"语法纠错完成: {len(result.get('errors', []))} 个错误")
+                return result
+
+        except Exception as e:
+            logger.error(f"语法纠错失败: {e}")
+            return {
+                "corrected_text": text,
+                "errors": [],
+                "polished_version": text,
+                "suggestions": ["语法纠错服务暂时不可用，请稍后重试"],
+            }
+
+
+async def score_speaking(self, transcript: str, cefr_level: str = "B1") -> dict:
+        """
+        口语题评分 — 四维度评估用户口语回答（0-25 分/维度，总分 0-100）
+
+        Args:
+            transcript: WhisperX 转写文本
+            cefr_level: 当前难度 CEFR 等级
+
+        Returns:
+            {
+                "content_relevance": 20, "grammar": 18, "vocabulary": 17, "coherence": 19,
+                "total": 74, "feedback": "简要中文评语"
+            }
+        """
+        prompt = (
+            f"You are an English speaking assessment expert. Evaluate the student's spoken answer "
+            f"on 4 dimensions, 0-25 points each (total 0-100). The student's CEFR level is {cefr_level}.\n\n"
+            f"Student's answer:\n\"{transcript}\"\n\n"
+            f"Scoring guidelines:\n"
+            f"1. content_relevance (0-25): Is the answer on-topic and sufficiently developed?\n"
+            f"2. grammar (0-25): Grammatical accuracy for the CEFR level\n"
+            f"3. vocabulary (0-25): Vocabulary range and appropriateness\n"
+            f"4. coherence (0-25): Logical flow and structure of the response\n\n"
+            f"Return ONLY a JSON object (no markdown, no code fences):\n"
+            f'{{"content_relevance": 20, "grammar": 18, "vocabulary": 17, "coherence": 19,'
+            f'"total": 74, "feedback": "brief Chinese feedback on the speaking performance"}}'
+        )
+
+        try:
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                resp = await client.post(
+                    BAILIAN_API_URL,
+                    headers={
+                        "Authorization": f"Bearer {self.api_key}",
+                        "Content-Type": "application/json",
+                    },
+                    json={
+                        "model": self.model,
+                        "messages": [{"role": "user", "content": prompt}],
+                        "max_tokens": 500,
+                        "temperature": 0.3,
+                    },
+                )
+                resp.raise_for_status()
+                data = resp.json()
+                content = data["choices"][0]["message"]["content"].strip()
+                content = content.replace("```json", "").replace("```", "").strip()
+                result = json.loads(content)
+                logger.info(f"口语评分完成: total={result.get('total')}")
+                return result
+
+        except Exception as e:
+            logger.error(f"口语评分失败: {e}")
+            return {
+                "content_relevance": 15,
+                "grammar": 15,
+                "vocabulary": 15,
+                "coherence": 15,
+                "total": 60,
+                "feedback": "口语评分服务暂时不可用，已使用默认评分",
+            }
+
+
 # 全局单例
 _llm_instance = None
 
