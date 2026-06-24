@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { startAssessmentApi, submitAssessmentApi } from '@/api/assessment'
+import { startAssessmentApi, answerQuestionApi, completeAssessmentApi } from '@/api/assessment'
 import { useAuthStore } from '@/stores/auth'
 
 const TYPE_LABELS = {
@@ -18,19 +18,19 @@ const DIFFICULTY_COLORS = {
 
 export const useAssessmentStore = defineStore('assessment', () => {
   const sessionId = ref(null)
-  const questions = ref([])
-  const currentIndex = ref(0)
-  const answers = ref({})
+  const currentQuestion = ref(null)
+  const answeredCount = ref(0)
+  const totalQuestions = ref(10)
+  const currentDifficulty = ref('B1')
   const startTime = ref(null)
   const isCompleted = ref(false)
   const report = ref(null)
+  const isScoring = ref(false)
 
   // ------- getters -------
-  const currentQuestion = computed(() => questions.value[currentIndex.value] || null)
-  const totalQuestions = computed(() => questions.value.length)
-  const progress = computed(() => ((currentIndex.value) / totalQuestions.value) * 100)
+  const progress = computed(() => (answeredCount.value / totalQuestions.value) * 100)
   const isSpeakingQuestion = computed(() => currentQuestion.value?.type === 'speaking')
-  const isLastQuestion = computed(() => currentIndex.value >= totalQuestions.value - 1)
+  const isLastQuestion = computed(() => answeredCount.value >= totalQuestions.value - 1)
 
   const typeLabel = computed(() => TYPE_LABELS[currentQuestion.value?.type] || '')
   const difficultyColor = computed(() => DIFFICULTY_COLORS[currentQuestion.value?.difficulty] || 'info')
@@ -42,60 +42,60 @@ export const useAssessmentStore = defineStore('assessment', () => {
     if (saved) {
       try {
         const data = JSON.parse(saved)
-        sessionId.value = data.sessionId
-        questions.value = data.questions || []
-        currentIndex.value = data.currentIndex || 0
-        answers.value = data.answers || {}
-        startTime.value = data.startTime || Date.now()
-        if (questions.value.length > 0) return
+        if (data.sessionId && data.currentQuestion) {
+          sessionId.value = data.sessionId
+          currentQuestion.value = data.currentQuestion
+          answeredCount.value = data.answeredCount || 0
+          totalQuestions.value = data.totalQuestions || 10
+          currentDifficulty.value = data.currentDifficulty || 'B1'
+          startTime.value = data.startTime || Date.now()
+          return
+        }
       } catch {}
     }
 
-    // 从后端获取题目
+    // 从后端获取第一题
     const res = await startAssessmentApi()
     sessionId.value = res.session_id
-    questions.value = res.questions
-    currentIndex.value = 0
-    answers.value = {}
+    currentQuestion.value = res.question
+    totalQuestions.value = res.total_questions
+    currentDifficulty.value = res.current_difficulty
+    answeredCount.value = 0
     startTime.value = Date.now()
     isCompleted.value = false
     saveProgress()
   }
 
-  function saveAnswer(answer) {
-    answers.value[currentQuestion.value.id] = answer
-    saveProgress()
-  }
+  async function submitAndAdvance(answer, audioBlob = null, mimeType = null) {
+    isScoring.value = true
+    try {
+      const res = await answerQuestionApi(
+        sessionId.value,
+        currentQuestion.value.id,
+        answer,
+        audioBlob,
+        mimeType,
+      )
 
-  function nextQuestion() {
-    if (isLastQuestion.value) {
-      completeAssessment()
-      return
+      answeredCount.value++
+      currentDifficulty.value = res.current_difficulty
+
+      if (res.complete) {
+        // 全部答完 → 调用 complete 获取报告
+        await finishAssessment()
+        return
+      }
+
+      currentQuestion.value = res.next_question
+      saveProgress()
+    } finally {
+      isScoring.value = false
     }
-    currentIndex.value++
-    saveProgress()
   }
 
-  function saveProgress() {
-    localStorage.setItem('assessment_progress', JSON.stringify({
-      sessionId: sessionId.value,
-      questions: questions.value,
-      currentIndex: currentIndex.value,
-      answers: answers.value,
-      startTime: startTime.value,
-    }))
-  }
+  async function finishAssessment() {
+    const res = await completeAssessmentApi(sessionId.value)
 
-  async function completeAssessment() {
-    // 构建提交格式: [{question_id, answer}, ...]
-    const answerList = questions.value.map(q => ({
-      question_id: q.id,
-      answer: answers.value[q.id] || null,
-    }))
-
-    const res = await submitAssessmentApi(sessionId.value, answerList)
-
-    // 映射后端 snake_case → 前端 camelCase
     report.value = {
       overall: res.overall,
       cefrLevel: res.cefr_level,
@@ -114,20 +114,35 @@ export const useAssessmentStore = defineStore('assessment', () => {
     localStorage.removeItem('assessment_progress')
   }
 
+  function saveProgress() {
+    localStorage.setItem('assessment_progress', JSON.stringify({
+      sessionId: sessionId.value,
+      currentQuestion: currentQuestion.value,
+      answeredCount: answeredCount.value,
+      totalQuestions: totalQuestions.value,
+      currentDifficulty: currentDifficulty.value,
+      startTime: startTime.value,
+    }))
+  }
+
   function resetAssessment() {
     sessionId.value = null
-    currentIndex.value = 0
-    answers.value = {}
+    currentQuestion.value = null
+    answeredCount.value = 0
+    totalQuestions.value = 10
+    currentDifficulty.value = 'B1'
     startTime.value = null
     isCompleted.value = false
     report.value = null
+    isScoring.value = false
     localStorage.removeItem('assessment_progress')
   }
 
   return {
-    sessionId, questions, currentIndex, answers, startTime, isCompleted, report,
-    currentQuestion, totalQuestions, progress, isSpeakingQuestion, isLastQuestion,
+    sessionId, currentQuestion, answeredCount, totalQuestions, currentDifficulty,
+    startTime, isCompleted, report, isScoring,
+    progress, isSpeakingQuestion, isLastQuestion,
     typeLabel, difficultyColor,
-    startAssessment, saveAnswer, nextQuestion, completeAssessment, resetAssessment,
+    startAssessment, submitAndAdvance, finishAssessment, resetAssessment, saveProgress,
   }
 })

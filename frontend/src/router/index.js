@@ -62,6 +62,12 @@ const routes = [
         component: () => import('@/views/roleplay/RolePlayView.vue'),
         meta: { title: '角色扮演', auth: true },
       },
+      {
+        path: 'grammar',
+        name: 'Grammar',
+        component: () => import('@/views/grammar/GrammarView.vue'),
+        meta: { title: '语法纠错', auth: true },
+      },
       // 模块三：个性化推荐
       {
         path: 'learning-path',
@@ -201,6 +207,14 @@ router.beforeEach((to, from, next) => {
   // 已完成测评的用户不允许再次测评
   if (to.path === '/assessment' && authStore.userInfo?.assessment_completed) {
     return next('/')
+  }
+
+  // 未完成测评 → 强制跳转测评页（豁免路径除外）
+  const assessmentExempt = ['/assessment', '/assessment/result', '/profile', '/login', '/register']
+  if (to.meta.auth && authStore.isLoggedIn &&
+      authStore.userInfo && !authStore.userInfo.assessment_completed &&
+      !assessmentExempt.includes(to.path)) {
+    return next('/assessment')
   }
 
   // 角色检查：教师/管理员路由

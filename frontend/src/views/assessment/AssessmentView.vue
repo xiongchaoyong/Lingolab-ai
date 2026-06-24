@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useAssessmentStore } from '@/stores/assessment'
@@ -10,6 +10,7 @@ const store = useAssessmentStore()
 
 const selectedOption = ref(null)
 const timerSeconds = ref(0)
+const voiceRecorderRef = ref(null)
 let timer = null
 
 onMounted(async () => {
@@ -18,6 +19,13 @@ onMounted(async () => {
 })
 
 onUnmounted(() => clearInterval(timer))
+
+// 测评完成后跳转结果页
+watch(() => store.isCompleted, (val) => {
+  if (val) {
+    router.push('/assessment/result')
+  }
+})
 
 function startTimer() {
   const elapsed = store.startTime ? Math.floor((Date.now() - store.startTime) / 1000) : 0
@@ -32,37 +40,33 @@ const formattedTime = computed(() => {
 })
 
 const estimatedTime = computed(() => {
-  const remain = store.totalQuestions - store.currentIndex
+  const remain = store.totalQuestions - store.answeredCount
   const m = Math.floor(remain * 1.0)
   return `预计剩余 ${m} 分钟`
 })
 
 // 客观题 — 提交答案
-function handleSubmitOption() {
-  if (!selectedOption.value && !store.isSpeakingQuestion) return
-  store.saveAnswer(selectedOption.value)
-  handleNext()
-}
-
-// 口语题 — 录音完成
-function handleSpeakingComplete() {
-  store.saveAnswer('spoken_answer')
-  handleNext()
-}
-
-// 下一题
-async function handleNext() {
+async function handleSubmitOption() {
+  if (!selectedOption.value || store.isScoring) return
+  const answer = selectedOption.value
   selectedOption.value = null
-  if (store.isLastQuestion) {
-    try {
-      await store.completeAssessment()
-      router.push('/assessment/result')
-    } catch (e) {
-      console.error('提交测评失败:', e)
-      ElMessage.error('提交失败，请检查网络后重试')
-    }
-  } else {
-    store.nextQuestion()
+  try {
+    await store.submitAndAdvance(answer)
+  } catch (e) {
+    console.error('提交答案失败:', e)
+    ElMessage.error('提交失败，请检查网络后重试')
+  }
+}
+
+// 口语题 — 录音完成（携带音频 blob）
+async function handleSpeakingComplete(recording) {
+  try {
+    await store.submitAndAdvance('', recording.blob, recording.mimeType)
+    // 录音完成后重置 recorder 状态
+    voiceRecorderRef.value?.reset()
+  } catch (e) {
+    console.error('口语提交失败:', e)
+    ElMessage.error('评分失败，请检查网络后重试')
   }
 }
 
@@ -73,9 +77,13 @@ function handleExit() {
 }
 
 // 提前结束（口语跳过）
-function handleSkip() {
-  store.saveAnswer('skipped')
-  handleNext()
+async function handleSkip() {
+  if (store.isScoring) return
+  try {
+    await store.submitAndAdvance('')
+  } catch (e) {
+    console.error('跳过失败:', e)
+  }
 }
 </script>
 
@@ -87,7 +95,7 @@ function handleSkip() {
         <el-icon><ArrowLeft /></el-icon> 退出
       </el-button>
       <span class="question-progress">
-        第 {{ store.currentIndex + 1 }} / {{ store.totalQuestions }} 题
+        第 {{ store.answeredCount + 1 }} / {{ store.totalQuestions }} 题
       </span>
       <span class="timer">{{ formattedTime }}</span>
     </div>
@@ -137,16 +145,23 @@ function handleSkip() {
       <!-- 口语题 -->
       <template v-else>
         <div class="speaking-area">
-          <p class="speaking-prompt">
-            <el-icon><InfoFilled /></el-icon>
-            请用英语自由表达，录音时长 30-60 秒
+          <p v-if="store.isScoring" class="scoring-notice">
+            <el-icon class="is-loading"><Loading /></el-icon>
+            评分中，请稍候...
           </p>
+          <template v-else>
+            <p class="speaking-prompt">
+              <el-icon><InfoFilled /></el-icon>
+              请用英语自由表达，录音时长 30-60 秒
+            </p>
 
-          <VoiceRecorder
-            :prep-time="3"
-            :max-duration="45"
-            @complete="handleSpeakingComplete"
-          />
+            <VoiceRecorder
+              ref="voiceRecorderRef"
+              :prep-time="3"
+              :max-duration="45"
+              @complete="handleSpeakingComplete"
+            />
+          </template>
         </div>
       </template>
     </div>
@@ -157,13 +172,13 @@ function handleSkip() {
         v-if="!store.isSpeakingQuestion"
         type="primary"
         size="large"
-        :disabled="!selectedOption"
+        :disabled="!selectedOption || store.isScoring"
         @click="handleSubmitOption"
       >
         确认答案
       </el-button>
       <el-button
-        v-if="store.isSpeakingQuestion"
+        v-if="store.isSpeakingQuestion && !store.isScoring"
         text
         type="info"
         size="small"
@@ -275,6 +290,16 @@ function handleSkip() {
     gap: var(--spacing-sm);
     color: var(--color-text-secondary);
     font-size: var(--font-size-sm);
+  }
+
+  .scoring-notice {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    color: var(--color-primary);
+    font-size: var(--font-size-md);
+    font-weight: 500;
+    padding: var(--spacing-xxl);
   }
 }
 

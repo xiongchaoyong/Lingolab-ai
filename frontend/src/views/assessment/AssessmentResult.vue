@@ -1,4 +1,5 @@
 <script setup>
+import { computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAssessmentStore } from '@/stores/assessment'
 import DimensionBars from '@/components/common/DimensionBars.vue'

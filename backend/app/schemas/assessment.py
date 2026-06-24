@@ -14,9 +14,18 @@ class QuestionItem(BaseModel):
 
 
 class AssessmentStartResponse(BaseModel):
-    """测评开始响应"""
+    """测评开始响应 — 自适应难度，返回第一题"""
     session_id: str = Field(..., description="测评会话 UUID")
-    questions: List[QuestionItem] = Field(..., description="10 道题目")
+    question: QuestionItem = Field(..., description="第一道题目")
+    total_questions: int = Field(..., description="总题数")
+    current_difficulty: str = Field(..., description="当前难度 CEFR 等级")
+
+
+class AssessmentAnswerResponse(BaseModel):
+    """逐题提交响应 — 返回下一题或完成信号"""
+    complete: bool = Field(..., description="是否已完成全部题目")
+    next_question: Optional[QuestionItem] = Field(default=None, description="下一道题目（complete=true 时为 null）")
+    current_difficulty: str = Field(..., description="当前自适应难度 CEFR 等级")
 
 
 class AnswerItem(BaseModel):

@@ -7,12 +7,17 @@ import uuid
 import tempfile
 import subprocess
 import logging
+import asyncio
 
 import json
 
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Depends, Query
 from fastapi.responses import StreamingResponse
+from sqlalchemy.orm import Session
 
+from app.core.database import get_db
+from app.core.security import get_current_user
+from app.models.user import UserProfile
 from app.schemas.conversation import (
     ConversationStartRequest,
     ConversationStartResponse,
@@ -23,6 +28,8 @@ from app.services.asr import get_asr_service
 from app.services.llm import get_llm_service
 from app.services.tts import synthesize_speech
 from app.services.pronunciation import score_audio
+from app.services.fluency import assess_algorithmic, aggregate_fluency
+from app.services.audio_utils import convert_to_wav
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -31,18 +38,6 @@ logger = logging.getLogger(__name__)
 _sessions: dict[str, dict] = {}
 
 MAX_CONVERSATION_ROUNDS = 6
-
-
-def _convert_to_wav(input_path: str) -> str:
-    """将任意音频格式转为 16kHz 单声道 WAV"""
-    output_path = input_path + "_converted.wav"
-    subprocess.run(
-        ["ffmpeg", "-y", "-i", input_path,
-         "-ac", "1", "-ar", "16000", "-sample_fmt", "s16",
-         output_path],
-        check=True, capture_output=True,
-    )
-    return output_path
 
 
 async def _tts_to_base64(text: str, voice: str = "en-US-JennyNeural") -> str:
@@ -69,6 +64,8 @@ async def conversation_start(req: ConversationStartRequest):
         "history": [],
         "round": 0,
         "user_audios": [],  # (wav_path, asr_text) 用于发音评分
+        "fluency_scores": [],  # 每轮流利度算法评分
+        "tts_cache": {},  # TTS 预取缓存 {round_key: {"chunks": [...], "done": bool}}
     }
 
     # 生成 AI 开场白（不同场景使用不同的开场提示）
@@ -133,7 +130,7 @@ async def conversation_speak(
             tmp_path = tmp.name
 
         # 转码
-        converted_path = _convert_to_wav(tmp_path)
+        converted_path = convert_to_wav(tmp_path)
 
         # ASR 转写
         asr = get_asr_service()
@@ -152,6 +149,21 @@ async def conversation_speak(
         # 记录用户消息
         session["history"].append({"role": "user", "text": user_text})
         session["round"] += 1
+
+        # 算法流利度计算（维度1-3，静默存储）
+        try:
+            words = asr_result.get("words", [])
+            audio_duration = asr_result.get("segments", [{}])[-1].get("end", 5.0) if asr_result.get("segments") else 5.0
+            fluency_algo = assess_algorithmic(user_text, words, audio_duration)
+            session["fluency_scores"].append({
+                "text": user_text,
+                "wpm": fluency_algo["wpm"],
+                "pause_frequency": fluency_algo["pause_frequency"],
+                "repetition": fluency_algo["repetition"],
+            })
+            logger.debug(f"流利度算法评分: overall={fluency_algo['overall']}/65")
+        except Exception as e:
+            logger.warning(f"流利度算法计算失败: {e}")
 
         # LLM 生成回复
         llm = get_llm_service()
@@ -207,6 +219,8 @@ async def conversation_stream_start(req: ConversationStartRequest):
         "history": [],
         "round": 0,
         "user_audios": [],  # (wav_path, asr_text) 用于发音评分
+        "fluency_scores": [],  # 每轮流利度算法评分
+        "tts_cache": {},  # TTS 预取缓存
     }
 
     scene_openers = {
@@ -226,7 +240,29 @@ async def conversation_stream_start(req: ConversationStartRequest):
                 full_text += token
                 yield f"data: {json.dumps({'type': 'token', 'content': token})}\n\n"
             _sessions[session_id]["history"].append({"role": "ai", "text": full_text})
-            yield f"data: {json.dumps({'type': 'done', 'session_id': session_id, 'full_text': full_text})}\n\n"
+
+            # TTS 预取：后台启动 Edge TTS 调用，缓存音频块
+            round_key = "0"
+            chunks = []
+            cache_entry = {"chunks": chunks, "done": False}
+            _sessions[session_id]["tts_cache"][round_key] = cache_entry
+
+            async def prefetch_tts():
+                try:
+                    import edge_tts
+                    communicate = edge_tts.Communicate(full_text, "en-US-JennyNeural")
+                    async for chunk in communicate.stream():
+                        if chunk["type"] == "audio":
+                            chunks.append(chunk["data"])
+                except Exception as e:
+                    logger.error(f"TTS 预取失败: {e}")
+                finally:
+                    cache_entry["done"] = True
+
+            asyncio.create_task(prefetch_tts())
+
+            tts_url = f"/api/conversation/tts/cached/{session_id}/{round_key}"
+            yield f"data: {json.dumps({'type': 'done', 'session_id': session_id, 'full_text': full_text, 'tts_url': tts_url})}\n\n"
         except Exception as e:
             logger.error(f"流式 start 失败: {e}")
             yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
@@ -266,7 +302,7 @@ async def conversation_stream_speak(
             content = await audio.read()
             tmp.write(content)
             tmp_path = tmp.name
-        converted_path = _convert_to_wav(tmp_path)
+        converted_path = convert_to_wav(tmp_path)
     except Exception:
         for path in (tmp_path, converted_path):
             try:
@@ -296,8 +332,26 @@ async def conversation_stream_speak(
             session["history"].append({"role": "user", "text": user_text})
             session["round"] += 1
 
-            # 流式 LLM
+            # 算法流利度计算（维度1-3，静默存储）
+            try:
+                words = asr_result.get("words", [])
+                segments = asr_result.get("segments", [])
+                audio_duration = segments[-1].get("end", 5.0) if segments else 5.0
+                fluency_algo = assess_algorithmic(user_text, words, audio_duration)
+                session["fluency_scores"].append({
+                    "text": user_text,
+                    "wpm": fluency_algo["wpm"],
+                    "pause_frequency": fluency_algo["pause_frequency"],
+                    "repetition": fluency_algo["repetition"],
+                })
+            except Exception as e:
+                logger.warning(f"流利度算法计算失败: {e}")
+
+            # 语法纠错（后台并行，与 LLM 回复同时进行，不增加延迟）
             llm = get_llm_service()
+            grammar_task = asyncio.create_task(llm.correct_grammar(user_text, cefr_level))
+
+            # 流式 LLM
             full_text = ""
             async for token in llm.chat_stream(
                 scene, user_text, session["history"][:-1], cefr_level
@@ -307,7 +361,37 @@ async def conversation_stream_speak(
 
             session["history"].append({"role": "ai", "text": full_text})
             conversation_complete = session["round"] >= MAX_CONVERSATION_ROUNDS
-            yield f"data: {json.dumps({'type': 'done', 'full_text': full_text, 'conversation_complete': conversation_complete})}\n\n"
+
+            # 等待语法纠错结果（后台已并行执行）
+            try:
+                grammar_result = await grammar_task
+                if grammar_result.get("errors"):
+                    yield f"data: {json.dumps({'type': 'grammar', 'data': grammar_result})}\n\n"
+            except Exception as e:
+                logger.warning(f"语法纠错失败: {e}")
+
+            # TTS 预取：后台启动 Edge TTS 调用，缓存音频块
+            round_key = str(session["round"])
+            chunks = []
+            cache_entry = {"chunks": chunks, "done": False}
+            session["tts_cache"][round_key] = cache_entry
+
+            async def prefetch_tts():
+                try:
+                    import edge_tts
+                    communicate = edge_tts.Communicate(full_text, "en-US-JennyNeural")
+                    async for chunk in communicate.stream():
+                        if chunk["type"] == "audio":
+                            chunks.append(chunk["data"])
+                except Exception as e:
+                    logger.error(f"TTS 预取失败: {e}")
+                finally:
+                    cache_entry["done"] = True
+
+            asyncio.create_task(prefetch_tts())
+
+            tts_url = f"/api/conversation/tts/cached/{session_id}/{round_key}"
+            yield f"data: {json.dumps({'type': 'done', 'full_text': full_text, 'conversation_complete': conversation_complete, 'tts_url': tts_url})}\n\n"
 
         except Exception as e:
             logger.error(f"流式 speak 失败: {e}")
@@ -349,9 +433,85 @@ async def conversation_tts(
         raise HTTPException(status_code=500, detail=f"语音合成失败: {str(e)}")
 
 
+@router.get("/tts/stream")
+async def conversation_tts_stream(
+    text: str = Query(..., description="要合成的文本"),
+    voice: str = Query(default="en-US-JennyNeural", description="Edge TTS 音色"),
+):
+    """
+    流式文本转语音 — 直接返回 MP3 音频流
+
+    浏览器可直接作为 <audio> 的 src 使用，边下载边播放。
+    """
+    if not text or not text.strip():
+        raise HTTPException(status_code=422, detail="文本不能为空")
+
+    text = text.strip()
+    if len(text) > 500:
+        raise HTTPException(status_code=422, detail="文本过长")
+
+    async def generate():
+        try:
+            import edge_tts
+            communicate = edge_tts.Communicate(text, voice)
+            async for chunk in communicate.stream():
+                if chunk["type"] == "audio":
+                    yield chunk["data"]
+        except Exception as e:
+            logger.error(f"流式 TTS 失败: {e}")
+
+    return StreamingResponse(
+        generate(),
+        media_type="audio/mpeg",
+        headers={
+            "Content-Disposition": "inline",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
+
+
+@router.get("/tts/cached/{session_id}/{round_key}")
+async def conversation_tts_cached(session_id: str, round_key: str):
+    """
+    获取预取的 TTS 音频缓存 — 后台 Edge TTS 调用完成后流式返回
+
+    与 /tts/stream 不同，此端点不发起新的 TTS 调用，
+    而是返回 SSE 流式对话期间后台预取的音频缓存。
+    """
+    session = _sessions.get(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="会话不存在或已过期")
+
+    cache = session.get("tts_cache", {}).get(round_key)
+    if not cache:
+        raise HTTPException(status_code=404, detail="TTS 缓存不存在")
+
+    async def generate():
+        idx = 0
+        while True:
+            # 返回已缓存但未发送的 chunk
+            while idx < len(cache["chunks"]):
+                yield cache["chunks"][idx]
+                idx += 1
+            if cache["done"]:
+                break
+            await asyncio.sleep(0.05)  # 等待后台任务写入更多 chunk
+
+    return StreamingResponse(
+        generate(),
+        media_type="audio/mpeg",
+        headers={
+            "Content-Disposition": "inline",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
+
+
 @router.post("/end", response_model=ConversationEndResponse)
 async def conversation_end(
     session_id: str = Form(..., description="会话 ID"),
+    current_user: UserProfile = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
     """
     结束对话并评分 — 双层评分体系
@@ -376,6 +536,7 @@ async def conversation_end(
     overall = 0
     suggestions = ""
     scoring_methodology = ""
+    fluency_report = None
 
     # 统计用户实际发言次数
     user_messages = [h for h in history if h["role"] == "user"]
@@ -482,6 +643,50 @@ async def conversation_end(
             "文本评测（LLM 评估）：语法正确率、词汇丰富度、对话参与度"
         )
 
+        # 5. 流利度评估（SRS 3.3.3）
+        fluency_scores = session.get("fluency_scores", [])
+        if fluency_scores and len(user_messages) >= 1:
+            try:
+                # 构建 LLM 评估的输入
+                llm_utterances = []
+                for i, fs in enumerate(fluency_scores):
+                    # 获取上下文（前一轮 AI 消息）
+                    context = ""
+                    for j in range(len(history)):
+                        if history[j].get("role") == "user" and history[j]["text"] == fs["text"]:
+                            if j > 0 and history[j - 1]["role"] == "ai":
+                                context = history[j - 1]["text"]
+                            break
+                    llm_utterances.append({
+                        "round": i + 1,
+                        "text": fs["text"],
+                        "context": context,
+                    })
+
+                # LLM 评估维度 4-5
+                llm = get_llm_service()
+                fluency_llm_result = await llm.score_fluency(
+                    llm_utterances, cefr_level, session.get("scene", "")
+                )
+
+                # 合并算法 + LLM 结果
+                llm_rounds = fluency_llm_result.get("rounds", [])
+                for i, fs in enumerate(fluency_scores):
+                    if i < len(llm_rounds):
+                        fs["llm"] = {
+                            "grammar": llm_rounds[i].get("grammar", {"score": 15, "errors": [], "max": 20}),
+                            "relevance": llm_rounds[i].get("relevance", {"score": 10, "max": 15, "note": ""}),
+                        }
+
+                fluency_report = aggregate_fluency(fluency_scores)
+                fluency_report["suggestions"] = fluency_llm_result.get("overall_suggestions", "")
+                logger.info(f"流利度评估完成: overall={fluency_report['overall']}/100, grade={fluency_report['grade']}")
+            except Exception as e:
+                logger.warning(f"流利度 LLM 评估失败，仅返回算法评分: {e}")
+                # 仅返回算法评分
+                fluency_report = aggregate_fluency(fluency_scores)
+                fluency_report["suggestions"] = "流利度评估仅供参考，多说多练！"
+
     except Exception as e:
         logger.error(f"对话评分失败: {e}")
         pronunciation = []
@@ -505,6 +710,18 @@ async def conversation_end(
         if session_id in _sessions:
             del _sessions[session_id]
 
+    # 持久化对话分数到用户画像
+    try:
+        from app.services.profile_updater import profile_updater
+        profile_updater.ingest_conversation_scores(
+            current_user.id, pronunciation, text_dimensions,
+            source_id=0, db=db,
+        )
+        db.commit()
+        logger.info(f"用户 {current_user.username} 对话分数已持久化")
+    except Exception as e:
+        logger.warning(f"持久化对话分数失败: {e}")
+
     return ConversationEndResponse(
         overall=overall,
         pronunciation=pronunciation,
@@ -514,4 +731,5 @@ async def conversation_end(
         transcript=history,
         text_dimension_details=text_dimension_details,
         scoring_methodology=scoring_methodology,
+        fluency=fluency_report,
     )

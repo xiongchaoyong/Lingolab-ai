@@ -2,7 +2,7 @@
 import { ref, computed, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ArrowLeft } from '@element-plus/icons-vue'
-import { streamStartRoleplay, streamSpeakRoleplay, ttsRoleplay, endRoleplay } from '@/api/roleplay'
+import { streamStartRoleplay, streamSpeakRoleplay, ttsStreamUrl, ttsCachedUrl, endRoleplay } from '@/api/roleplay'
 import UtteranceDetailPanel from '@/components/pronunciation/UtteranceDetailPanel.vue'
 
 const router = useRouter()
@@ -24,6 +24,30 @@ const userSubtitle = ref('')
 const isConnecting = ref(false)
 const scoreReport = ref(null)
 const isScoring = ref(false)
+const grammarCorrection = ref(null)  // 当前轮语法纠错结果
+
+// 语法错误类型颜色映射
+const ERROR_TYPE_COLORS = {
+  tense: '#E6A23C',
+  subject_verb_agreement: '#F56C6C',
+  article: '#909399',
+  preposition: '#67C23A',
+  word_order: '#409EFF',
+  plural: '#E6A23C',
+  word_choice: '#9B59B6',
+  other: '#909399',
+}
+
+const ERROR_TYPE_LABELS = {
+  tense: '时态',
+  subject_verb_agreement: '主谓一致',
+  article: '冠词',
+  preposition: '介词',
+  word_order: '语序',
+  plural: '复数',
+  word_choice: '用词',
+  other: '其他',
+}
 
 // 报告数据计算属性
 const hasDetailedReport = computed(() => {
@@ -77,8 +101,8 @@ async function selectRole(role) {
       isConnecting.value = false
       sessionId.value = data.session_id
       subtitle.value = data.full_text
-      // 生成 TTS 并播放
-      speakAndListen(data.full_text)
+      // 使用预取 TTS URL 播放（后台已并行启动 Edge TTS）
+      speakAndListen(data.full_text, data.tts_url ? ttsCachedUrl(data.tts_url) : null)
     },
     onError() {
       isConnecting.value = false
@@ -88,15 +112,12 @@ async function selectRole(role) {
 }
 
 // ========== AI 说话 → 自动听 ==========
-async function speakAndListen(text) {
+async function speakAndListen(text, ttsUrl) {
   callState.value = 'ai_speaking'
   try {
-    const ttsData = await ttsRoleplay(text)
-    const blob = base64ToBlob(ttsData.audio_base64, 'audio/mpeg')
-    const url = URL.createObjectURL(blob)
+    const url = ttsUrl || ttsStreamUrl(text)
     currentAudio = new Audio(url)
     currentAudio.onended = () => {
-      URL.revokeObjectURL(url)
       // AI 说完 → 自动开始听
       startListening()
     }
@@ -115,6 +136,7 @@ async function speakAndListen(text) {
 async function startListening() {
   callState.value = 'listening'
   userSubtitle.value = ''
+  grammarCorrection.value = null
   audioChunks = []
 
   try {
@@ -187,6 +209,9 @@ async function processUserAudio() {
     onAsr(text) {
       userSubtitle.value = text
     },
+    onGrammar(data) {
+      grammarCorrection.value = data
+    },
     onToken(text) {
       subtitle.value += text
     },
@@ -196,8 +221,8 @@ async function processUserAudio() {
         // 对话达到最大轮次，自动结束评分
         setTimeout(() => hangUp(), 500)
       } else {
-        // AI 回复 → 播放语音
-        speakAndListen(data.full_text)
+        // 使用预取 TTS URL 播放（后台已并行启动 Edge TTS）
+        speakAndListen(data.full_text, data.tts_url ? ttsCachedUrl(data.tts_url) : null)
       }
     },
     onError() {
@@ -262,20 +287,6 @@ function goBack() {
 }
 
 // ========== 工具函数 ==========
-function base64ToBlob(base64, mimeType) {
-  const byteChars = atob(base64)
-  const byteArrays = []
-  for (let offset = 0; offset < byteChars.length; offset += 512) {
-    const slice = byteChars.slice(offset, offset + 512)
-    const byteNumbers = new Array(slice.length)
-    for (let i = 0; i < slice.length; i++) {
-      byteNumbers[i] = slice.charCodeAt(i)
-    }
-    byteArrays.push(new Uint8Array(byteNumbers))
-  }
-  return new Blob(byteArrays, { type: mimeType })
-}
-
 function dimScoreColor(score) {
   if (score >= 80) return '#5AD8A6'
   if (score >= 60) return '#F6BD16'
@@ -365,6 +376,30 @@ onUnmounted(() => {
           <div v-if="userSubtitle" class="subtitle user-subtitle">
             <span class="subtitle-avatar">😊</span>
             <span class="subtitle-text">{{ userSubtitle }}</span>
+          </div>
+          <!-- 语法纠错卡片 -->
+          <div v-if="grammarCorrection?.errors?.length" class="grammar-correction-card">
+            <div class="gc-header" @click="grammarCorrection = { ...grammarCorrection, _collapsed: !grammarCorrection._collapsed }">
+              <span class="gc-icon">📝</span>
+              <span class="gc-count">{{ grammarCorrection.errors.length }} 个语法错误</span>
+              <span class="gc-arrow" :class="{ expanded: !grammarCorrection._collapsed }">▶</span>
+            </div>
+            <div class="gc-body" v-show="!grammarCorrection._collapsed">
+              <div class="gc-corrected" v-if="grammarCorrection.corrected_text !== grammarCorrection.original_text">
+                <span class="gc-label">修正：</span>
+                <span class="gc-corrected-text">{{ grammarCorrection.corrected_text }}</span>
+              </div>
+              <div v-for="(err, i) in grammarCorrection.errors" :key="i" class="gc-error-item">
+                <span class="gc-error-original">{{ err.original }}</span>
+                <span class="gc-error-arrow">→</span>
+                <span class="gc-error-correction">{{ err.correction }}</span>
+                <span
+                  class="gc-error-type"
+                  :style="{ background: ERROR_TYPE_COLORS[err.error_type] || '#909399' }"
+                >{{ ERROR_TYPE_LABELS[err.error_type] || err.error_type }}</span>
+                <span class="gc-error-explain">{{ err.explanation }}</span>
+              </div>
+            </div>
           </div>
           <div v-if="subtitle" class="subtitle ai-subtitle">
             <span class="subtitle-avatar">{{ selectedRole?.emoji }}</span>
@@ -474,6 +509,64 @@ onUnmounted(() => {
               </div>
             </section>
           </div>
+
+          <!-- 流利度评估（SRS 3.3.3） -->
+          <section class="report-card report-card--full" v-if="scoreReport.fluency?.rounds?.length">
+            <div class="card-title">
+              <span class="card-icon">🌊</span> 流利度评估
+              <span class="fluency-badge" :class="'grade-' + scoreReport.fluency.grade">
+                {{ scoreReport.fluency.grade }}
+              </span>
+              <span class="fluency-overall">综合 {{ scoreReport.fluency.overall }} 分</span>
+            </div>
+
+            <div class="fluency-rounds">
+              <div
+                v-for="round in scoreReport.fluency.rounds"
+                :key="round.round"
+                class="fluency-round-card"
+                :class="{ 'best-round': round.round === scoreReport.fluency.best_round }"
+              >
+                <div class="fr-header">
+                  <span class="fr-label">第 {{ round.round }} 轮</span>
+                  <span v-if="round.round === scoreReport.fluency.best_round" class="fr-best">⭐ 最佳</span>
+                  <span class="fr-total">{{ round.total }} 分</span>
+                </div>
+                <div class="fr-text">{{ round.text?.slice(0, 80) }}{{ round.text?.length > 80 ? '...' : '' }}</div>
+                <div class="fr-dims">
+                  <div class="fr-dim">
+                    <span class="fd-label">语速</span>
+                    <span class="fd-value" :style="{ color: dimScoreColor(round.wpm?.score) }">{{ round.wpm?.score }}/25</span>
+                    <span class="fd-detail">{{ round.wpm?.value }} wpm</span>
+                  </div>
+                  <div class="fr-dim">
+                    <span class="fd-label">停顿</span>
+                    <span class="fd-value" :style="{ color: dimScoreColor(round.pause_frequency?.score * 5) }">{{ round.pause_frequency?.score }}/20</span>
+                    <span class="fd-detail">{{ round.pause_frequency?.pauses_per_min }}次/分</span>
+                  </div>
+                  <div class="fr-dim">
+                    <span class="fd-label">重复</span>
+                    <span class="fd-value" :style="{ color: dimScoreColor(round.repetition?.score * 5) }">{{ round.repetition?.score }}/20</span>
+                    <span class="fd-detail">{{ (round.repetition?.rate * 100).toFixed(0) }}%</span>
+                  </div>
+                  <div class="fr-dim">
+                    <span class="fd-label">语法</span>
+                    <span class="fd-value" :style="{ color: dimScoreColor(round.grammar?.score * 5) }">{{ round.grammar?.score || '—' }}/20</span>
+                    <span class="fd-detail" v-if="round.grammar?.errors?.length">{{ round.grammar.errors.length }} 个错误</span>
+                  </div>
+                  <div class="fr-dim">
+                    <span class="fd-label">相关性</span>
+                    <span class="fd-value" :style="{ color: dimScoreColor(round.relevance?.score / 15 * 100) }">{{ round.relevance?.score || '—' }}/15</span>
+                    <span class="fd-detail" v-if="round.relevance?.note">{{ round.relevance.note }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="fluency-suggestions" v-if="scoreReport.fluency.suggestions">
+              💡 {{ scoreReport.fluency.suggestions }}
+            </div>
+          </section>
 
           <!-- 逐句发音分析（全宽） -->
           <section class="report-card report-card--full" v-if="hasDetailedReport">
@@ -850,6 +943,82 @@ onUnmounted(() => {
   margin-top: 8px;
 }
 
+// 语法纠错卡片
+.grammar-correction-card {
+  background: #FFFBEB;
+  border: 1px solid #FDE68A;
+  border-radius: 12px;
+  padding: 0;
+  max-width: 85%;
+  align-self: flex-end;
+  overflow: hidden;
+  animation: gcSlideIn 0.3s ease;
+}
+
+@keyframes gcSlideIn {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.gc-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s;
+  &:hover { background: #FFF7D6; }
+  .gc-icon { font-size: 14px; }
+  .gc-count { font-size: 12px; font-weight: 600; color: #92400E; flex: 1; }
+  .gc-arrow {
+    font-size: 8px; color: #B45309;
+    transition: transform 0.2s;
+    &.expanded { transform: rotate(90deg); }
+  }
+}
+
+.gc-body {
+  padding: 0 12px 10px;
+  border-top: 1px solid #FDE68A;
+}
+
+.gc-corrected {
+  display: flex;
+  gap: 6px;
+  padding: 8px 0;
+  margin-bottom: 4px;
+  border-bottom: 1px dashed #FDE68A;
+  .gc-label { font-size: 11px; color: #92400E; font-weight: 600; flex-shrink: 0; }
+  .gc-corrected-text { font-size: 12px; color: #4A4A5A; line-height: 1.5; }
+}
+
+.gc-error-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 0;
+  flex-wrap: wrap;
+  & + & { border-top: 1px solid #FEF3C7; }
+  .gc-error-original {
+    font-size: 12px; color: #DC2626; text-decoration: line-through;
+    background: #FEE2E2; padding: 1px 6px; border-radius: 4px;
+  }
+  .gc-error-arrow { font-size: 10px; color: #999; }
+  .gc-error-correction {
+    font-size: 12px; color: #059669; font-weight: 600;
+    background: #D1FAE5; padding: 1px 6px; border-radius: 4px;
+  }
+  .gc-error-type {
+    font-size: 10px; color: #fff; padding: 1px 6px; border-radius: 8px;
+    font-weight: 500; flex-shrink: 0;
+  }
+  .gc-error-explain {
+    font-size: 11px; color: #999; width: 100%; margin-top: 2px;
+    padding-left: 2px;
+  }
+}
+
 // ========== 评分报告 ==========
 .report-screen {
   min-height: calc(100vh - 56px);
@@ -1096,6 +1265,85 @@ onUnmounted(() => {
 // 建议
 .suggestions-content {
   p { font-size: 13px; color: #666; line-height: 1.7; margin: 0; }
+}
+
+// ========== 流利度评估 ==========
+.fluency-badge {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  margin-left: 8px;
+  &.grade-优秀 { background: #E8F8F0; color: #3EC790; }
+  &.grade-良好 { background: #E8F0FF; color: #5B8DEF; }
+  &.grade-中等 { background: #FFF8E8; color: #F0A030; }
+  &.grade-初级 { background: #FFF0E8; color: #F08040; }
+  &.grade-入门 { background: #FFE8E8; color: #E05050; }
+}
+.fluency-overall {
+  font-size: 13px;
+  color: #888;
+  margin-left: auto;
+}
+.fluency-rounds {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 12px;
+}
+.fluency-round-card {
+  background: #FAFBFC;
+  border: 1px solid #EBEEF5;
+  border-radius: 10px;
+  padding: 12px 16px;
+  &.best-round {
+    border-color: #F6BD16;
+    background: #FFFDF5;
+  }
+}
+.fr-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.fr-label { font-size: 13px; font-weight: 600; color: #555; }
+.fr-best { font-size: 11px; color: #F0A030; }
+.fr-total { font-size: 14px; font-weight: 700; color: #4A4A5A; margin-left: auto; }
+.fr-text {
+  font-size: 12px;
+  color: #999;
+  margin-bottom: 10px;
+  font-style: italic;
+  line-height: 1.5;
+}
+.fr-dims {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.fr-dim {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: #fff;
+  border-radius: 8px;
+  padding: 8px 12px;
+  min-width: 70px;
+  border: 1px solid #F0F0F0;
+}
+.fd-label { font-size: 11px; color: #999; margin-bottom: 2px; }
+.fd-value { font-size: 15px; font-weight: 700; }
+.fd-detail { font-size: 10px; color: #bbb; margin-top: 2px; }
+.fluency-suggestions {
+  margin-top: 14px;
+  padding: 12px;
+  background: #F0F8FF;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #5B8DEF;
+  line-height: 1.6;
 }
 
 // 加载

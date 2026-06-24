@@ -53,3 +53,9 @@ class ConversationEndResponse(BaseModel):
         default="",
         description="综合分计算方式说明",
     )
+
+    # 流利度评估（SRS 3.3.3）
+    fluency: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="流利度评估报告（五维：语速/停顿/重复/语法/相关性）",
+    )

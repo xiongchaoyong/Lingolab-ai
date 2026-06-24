@@ -23,6 +23,7 @@ from app.schemas.auth import (
     ProfileResponse,
     ProfileUpdateRequest,
 )
+from app.schemas.profile import ProfileScoresResponse, ProfileRefreshResponse
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -170,7 +171,6 @@ async def update_profile(
         updated = True
 
     if not updated:
-        # 没有字段需要更新，直接返回当前画像
         return ProfileResponse(
             user_id=current_user.id,
             username=current_user.username,
@@ -186,19 +186,25 @@ async def update_profile(
             role=current_user.role,
         )
 
-    # 乐观锁
+    # 乐观锁：version 字段防止并发冲突
     current_version = current_user.version
     current_user.version = current_version + 1
 
     try:
-        db.query(UserProfile).filter(
-            UserProfile.id == current_user.id,
-            UserProfile.version == current_version,
-        ).update({
-            "learning_goal": current_user.learning_goal,
-            "interests": current_user.interests,
-            "version": current_user.version,
-        })
+        affected = (
+            db.query(UserProfile)
+            .filter(
+                UserProfile.id == current_user.id,
+                UserProfile.version == current_version,
+            )
+            .update(
+                {
+                    "learning_goal": current_user.learning_goal,
+                    "interests": current_user.interests,
+                    "version": current_user.version,
+                }
+            )
+        )
         db.commit()
         db.refresh(current_user)
     except Exception as e:
@@ -206,9 +212,7 @@ async def update_profile(
         logger.error(f"画像更新失败: {e}")
         raise HTTPException(status_code=500, detail="画像更新失败，请稍后重试")
 
-    # 检查是否发生并发冲突
-    if current_user.version == current_version:
-        # 更新未生效，可能是并发冲突
+    if affected == 0:
         raise HTTPException(status_code=409, detail="画像已被更新，请刷新后重试")
 
     logger.info(f"用户画像更新: {current_user.username} (id={current_user.id})")
@@ -226,4 +230,40 @@ async def update_profile(
         level_final=current_user.level_final,
         assessment_completed=bool(current_user.assessment_completed),
         role=current_user.role,
+    )
+
+
+@router.get("/profile/scores", response_model=ProfileScoresResponse)
+async def get_profile_scores(
+    current_user: UserProfile = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """获取用户动态技能分数（EMA 计算的各维度分数 + 最近记录）"""
+    from app.services.profile_updater import profile_updater
+
+    dim_avgs = profile_updater.get_dimension_averages(current_user.id, db)
+    recent = profile_updater.get_recent_scores(current_user.id, db)
+
+    return ProfileScoresResponse(
+        level_final=current_user.level_final,
+        dimension_scores=dim_avgs,
+        recent_scores=recent,
+    )
+
+
+@router.post("/profile/refresh", response_model=ProfileRefreshResponse)
+async def refresh_profile(
+    current_user: UserProfile = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """手动触发画像重算（基于最近 30 天练习数据）"""
+    from app.services.profile_updater import profile_updater
+
+    new_level, dim_avgs = profile_updater.recalculate(current_user.id, db)
+    db.commit()
+
+    return ProfileRefreshResponse(
+        level_final=new_level,
+        dimension_scores=dim_avgs,
+        message="Profile refreshed successfully",
     )

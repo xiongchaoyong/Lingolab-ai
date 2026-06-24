@@ -7,10 +7,11 @@ import uuid
 import tempfile
 import subprocess
 import logging
+import asyncio
 
 import json
 
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Query
 from fastapi.responses import StreamingResponse
 
 from app.schemas.roleplay import (
@@ -23,6 +24,8 @@ from app.services.asr import get_asr_service
 from app.services.llm import get_llm_service
 from app.services.tts import synthesize_speech
 from app.services.pronunciation import score_audio
+from app.services.fluency import assess_algorithmic, aggregate_fluency
+from app.services.audio_utils import convert_to_wav
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -45,18 +48,6 @@ ROLE_NAMES = {
     "waiter": "服务员",
     "guide": "导游",
 }
-
-
-def _convert_to_wav(input_path: str) -> str:
-    """将任意音频格式转为 16kHz 单声道 WAV"""
-    output_path = input_path + "_converted.wav"
-    subprocess.run(
-        ["ffmpeg", "-y", "-i", input_path,
-         "-ac", "1", "-ar", "16000", "-sample_fmt", "s16",
-         output_path],
-        check=True, capture_output=True,
-    )
-    return output_path
 
 
 async def _tts_to_base64(text: str, voice: str = "en-US-JennyNeural") -> str:
@@ -83,6 +74,8 @@ async def roleplay_start(req: RoleplayStartRequest):
         "history": [],
         "round": 0,
         "user_audios": [],
+        "fluency_scores": [],  # 每轮流利度算法评分
+        "tts_cache": {},  # TTS 预取缓存
     }
 
     # 生成 AI 角色开场白
@@ -138,7 +131,7 @@ async def roleplay_speak(
             tmp_path = tmp.name
 
         # 转码
-        converted_path = _convert_to_wav(tmp_path)
+        converted_path = convert_to_wav(tmp_path)
 
         # ASR 转写
         asr = get_asr_service()
@@ -157,6 +150,20 @@ async def roleplay_speak(
         # 记录用户消息
         session["history"].append({"role": "user", "text": user_text})
         session["round"] += 1
+
+        # 算法流利度计算（维度1-3，静默存储）
+        try:
+            words = asr_result.get("words", [])
+            audio_duration = asr_result.get("segments", [{}])[-1].get("end", 5.0) if asr_result.get("segments") else 5.0
+            fluency_algo = assess_algorithmic(user_text, words, audio_duration)
+            session["fluency_scores"].append({
+                "text": user_text,
+                "wpm": fluency_algo["wpm"],
+                "pause_frequency": fluency_algo["pause_frequency"],
+                "repetition": fluency_algo["repetition"],
+            })
+        except Exception as e:
+            logger.warning(f"流利度算法计算失败: {e}")
 
         # LLM 角色回复
         llm = get_llm_service()
@@ -210,6 +217,8 @@ async def roleplay_stream_start(req: RoleplayStartRequest):
         "history": [],
         "round": 0,
         "user_audios": [],
+        "fluency_scores": [],  # 每轮流利度算法评分
+        "tts_cache": {},  # TTS 预取缓存
     }
 
     opener = ROLE_OPENERS.get(role, ROLE_OPENERS["interviewee"])
@@ -222,7 +231,29 @@ async def roleplay_stream_start(req: RoleplayStartRequest):
                 full_text += token
                 yield f"data: {json.dumps({'type': 'token', 'content': token})}\n\n"
             _sessions[session_id]["history"].append({"role": "ai", "text": full_text})
-            yield f"data: {json.dumps({'type': 'done', 'session_id': session_id, 'full_text': full_text})}\n\n"
+
+            # TTS 预取：后台启动 Edge TTS 调用，缓存音频块
+            round_key = "0"
+            chunks = []
+            cache_entry = {"chunks": chunks, "done": False}
+            _sessions[session_id]["tts_cache"][round_key] = cache_entry
+
+            async def prefetch_tts():
+                try:
+                    import edge_tts
+                    communicate = edge_tts.Communicate(full_text, "en-US-JennyNeural")
+                    async for chunk in communicate.stream():
+                        if chunk["type"] == "audio":
+                            chunks.append(chunk["data"])
+                except Exception as e:
+                    logger.error(f"TTS 预取失败: {e}")
+                finally:
+                    cache_entry["done"] = True
+
+            asyncio.create_task(prefetch_tts())
+
+            tts_url = f"/api/roleplay/tts/cached/{session_id}/{round_key}"
+            yield f"data: {json.dumps({'type': 'done', 'session_id': session_id, 'full_text': full_text, 'tts_url': tts_url})}\n\n"
         except Exception as e:
             logger.error(f"角色扮演流式 start 失败: {e}")
             yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
@@ -261,7 +292,7 @@ async def roleplay_stream_speak(
             content = await audio.read()
             tmp.write(content)
             tmp_path = tmp.name
-        converted_path = _convert_to_wav(tmp_path)
+        converted_path = convert_to_wav(tmp_path)
     except Exception:
         for path in (tmp_path, converted_path):
             try:
@@ -289,7 +320,25 @@ async def roleplay_stream_speak(
             session["history"].append({"role": "user", "text": user_text})
             session["round"] += 1
 
+            # 算法流利度计算（维度1-3，静默存储）
+            try:
+                words = asr_result.get("words", [])
+                segments = asr_result.get("segments", [])
+                audio_duration = segments[-1].get("end", 5.0) if segments else 5.0
+                fluency_algo = assess_algorithmic(user_text, words, audio_duration)
+                session["fluency_scores"].append({
+                    "text": user_text,
+                    "wpm": fluency_algo["wpm"],
+                    "pause_frequency": fluency_algo["pause_frequency"],
+                    "repetition": fluency_algo["repetition"],
+                })
+            except Exception as e:
+                logger.warning(f"流利度算法计算失败: {e}")
+
+            # 语法纠错（后台并行，与 LLM 回复同时进行，不增加延迟）
             llm = get_llm_service()
+            grammar_task = asyncio.create_task(llm.correct_grammar(user_text, cefr_level))
+
             full_text = ""
             async for token in llm.chat_roleplay_stream(
                 role, user_text, session["history"][:-1], cefr_level
@@ -299,7 +348,37 @@ async def roleplay_stream_speak(
 
             session["history"].append({"role": "ai", "text": full_text})
             conversation_complete = session["round"] >= MAX_CONVERSATION_ROUNDS
-            yield f"data: {json.dumps({'type': 'done', 'full_text': full_text, 'conversation_complete': conversation_complete})}\n\n"
+
+            # 等待语法纠错结果（后台已并行执行）
+            try:
+                grammar_result = await grammar_task
+                if grammar_result.get("errors"):
+                    yield f"data: {json.dumps({'type': 'grammar', 'data': grammar_result})}\n\n"
+            except Exception as e:
+                logger.warning(f"语法纠错失败: {e}")
+
+            # TTS 预取：后台启动 Edge TTS 调用，缓存音频块
+            round_key = str(session["round"])
+            chunks = []
+            cache_entry = {"chunks": chunks, "done": False}
+            session["tts_cache"][round_key] = cache_entry
+
+            async def prefetch_tts():
+                try:
+                    import edge_tts
+                    communicate = edge_tts.Communicate(full_text, "en-US-JennyNeural")
+                    async for chunk in communicate.stream():
+                        if chunk["type"] == "audio":
+                            chunks.append(chunk["data"])
+                except Exception as e:
+                    logger.error(f"TTS 预取失败: {e}")
+                finally:
+                    cache_entry["done"] = True
+
+            asyncio.create_task(prefetch_tts())
+
+            tts_url = f"/api/roleplay/tts/cached/{session_id}/{round_key}"
+            yield f"data: {json.dumps({'type': 'done', 'full_text': full_text, 'conversation_complete': conversation_complete, 'tts_url': tts_url})}\n\n"
 
         except Exception as e:
             logger.error(f"角色扮演流式 speak 失败: {e}")
@@ -336,6 +415,76 @@ async def roleplay_tts(
         raise HTTPException(status_code=500, detail=f"语音合成失败: {str(e)}")
 
 
+@router.get("/tts/stream")
+async def roleplay_tts_stream(
+    text: str = Query(..., description="要合成的文本"),
+    voice: str = Query(default="en-US-JennyNeural", description="Edge TTS 音色"),
+):
+    """
+    流式文本转语音 — 直接返回 MP3 音频流
+
+    浏览器可直接作为 <audio> 的 src 使用，边下载边播放。
+    """
+    if not text or not text.strip():
+        raise HTTPException(status_code=422, detail="文本不能为空")
+
+    text = text.strip()
+    if len(text) > 500:
+        raise HTTPException(status_code=422, detail="文本过长")
+
+    async def generate():
+        try:
+            import edge_tts
+            communicate = edge_tts.Communicate(text, voice)
+            async for chunk in communicate.stream():
+                if chunk["type"] == "audio":
+                    yield chunk["data"]
+        except Exception as e:
+            logger.error(f"角色扮演流式 TTS 失败: {e}")
+
+    return StreamingResponse(
+        generate(),
+        media_type="audio/mpeg",
+        headers={
+            "Content-Disposition": "inline",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
+
+
+@router.get("/tts/cached/{session_id}/{round_key}")
+async def roleplay_tts_cached(session_id: str, round_key: str):
+    """
+    获取预取的 TTS 音频缓存 — 后台 Edge TTS 调用完成后流式返回
+    """
+    session = _sessions.get(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="会话不存在或已过期")
+
+    cache = session.get("tts_cache", {}).get(round_key)
+    if not cache:
+        raise HTTPException(status_code=404, detail="TTS 缓存不存在")
+
+    async def generate():
+        idx = 0
+        while True:
+            while idx < len(cache["chunks"]):
+                yield cache["chunks"][idx]
+                idx += 1
+            if cache["done"]:
+                break
+            await asyncio.sleep(0.05)
+
+    return StreamingResponse(
+        generate(),
+        media_type="audio/mpeg",
+        headers={
+            "Content-Disposition": "inline",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
+
+
 @router.post("/end", response_model=RoleplayEndResponse)
 async def roleplay_end(
     session_id: str = Form(..., description="会话 ID"),
@@ -364,6 +513,7 @@ async def roleplay_end(
     suggestions = ""
     dimension_details = []
     scoring_methodology = ""
+    fluency_report = None
 
     user_messages = [h for h in history if h["role"] == "user"]
 
@@ -450,8 +600,11 @@ async def roleplay_end(
             ]
             suggestions = "还没有开口说话，无法评估。再来一次试试吧！"
 
-        # 3. 综合分
-        role_avg = sum(d["score"] for d in dimensions) / len(dimensions) if dimensions else 0
+        # 3. 综合分（角色表现加权：贴合度40% + 礼仪25% + 术语20% + 应对15%）
+        role_weights = {"角色贴合度": 0.40, "场景礼仪": 0.25, "专业术语": 0.20, "应对能力": 0.15}
+        role_avg = sum(
+            d["score"] * role_weights.get(d["label"], 0.25) for d in dimensions
+        ) if dimensions else 0
         pron_avg = sum(d["score"] for d in pronunciation) / len(pronunciation) if pronunciation else 0
 
         if dimensions and pronunciation:
@@ -462,10 +615,49 @@ async def roleplay_end(
             overall = round(pron_avg)
 
         scoring_methodology = (
-            "综合分 = 角色表现均分 × 60% + 发音均分 × 40%\n"
-            "角色表现（LLM 评估）：角色贴合度、场景礼仪、专业术语、应对能力\n"
+            "综合分 = 角色表现加权分 × 60% + 发音均分 × 40%\n"
+            "角色表现（LLM 评估）：角色贴合度(40%)、场景礼仪(25%)、专业术语(20%)、应对能力(15%)\n"
             "发音评测（wav2vec2 + GOP 算法）：音素准确度、重音位置、语调曲线、连读表现、节奏感"
         )
+
+        # 4. 流利度评估（SRS 3.3.3）
+        fluency_scores = session.get("fluency_scores", [])
+        if fluency_scores and len(user_messages) >= 1:
+            try:
+                llm_utterances = []
+                for i, fs in enumerate(fluency_scores):
+                    context = ""
+                    for j in range(len(history)):
+                        if history[j].get("role") == "user" and history[j]["text"] == fs["text"]:
+                            if j > 0 and history[j - 1]["role"] == "ai":
+                                context = history[j - 1]["text"]
+                            break
+                    llm_utterances.append({
+                        "round": i + 1,
+                        "text": fs["text"],
+                        "context": context,
+                    })
+
+                llm = get_llm_service()
+                fluency_llm_result = await llm.score_fluency(
+                    llm_utterances, cefr_level, role
+                )
+
+                llm_rounds = fluency_llm_result.get("rounds", [])
+                for i, fs in enumerate(fluency_scores):
+                    if i < len(llm_rounds):
+                        fs["llm"] = {
+                            "grammar": llm_rounds[i].get("grammar", {"score": 15, "errors": [], "max": 20}),
+                            "relevance": llm_rounds[i].get("relevance", {"score": 10, "max": 15, "note": ""}),
+                        }
+
+                fluency_report = aggregate_fluency(fluency_scores)
+                fluency_report["suggestions"] = fluency_llm_result.get("overall_suggestions", "")
+                logger.info(f"角色扮演流利度评估完成: overall={fluency_report['overall']}/100, grade={fluency_report['grade']}")
+            except Exception as e:
+                logger.warning(f"角色扮演流利度 LLM 评估失败，仅返回算法评分: {e}")
+                fluency_report = aggregate_fluency(fluency_scores)
+                fluency_report["suggestions"] = "流利度评估仅供参考，多说多练！"
 
     except Exception as e:
         logger.error(f"角色扮演评分失败: {e}")
@@ -497,4 +689,5 @@ async def roleplay_end(
         pronunciation=pronunciation,
         dimension_details=dimension_details,
         scoring_methodology=scoring_methodology,
+        fluency=fluency_report,
     )

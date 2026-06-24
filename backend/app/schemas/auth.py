@@ -10,7 +10,7 @@ class RegisterRequest(BaseModel):
     username: str = Field(..., description="用户名，4-20 字符，字母数字下划线")
     email: str = Field(..., description="邮箱地址")
     password: str = Field(..., description="密码，8-32 字符，需包含字母和数字")
-    age: int = Field(..., ge=6, le=99, description="年龄，6-99")
+    age: int = Field(..., ge=1, le=150, description="年龄，1-150")
     learning_goal: str = Field(..., description="学习目标：daily/exam/business/abroad/hobby")
     interests: List[str] = Field(default_factory=list, description="兴趣标签数组")
 

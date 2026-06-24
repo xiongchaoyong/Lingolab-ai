@@ -1,0 +1,251 @@
+"""ProfileUpdater — EMA 驱动的用户画像动态更新服务
+
+流程：
+1. 练习完成后调用 ingest_*() 写入 UserSkillScore
+2. 自动调用 recalculate() 用 EMA 重算各维度分数
+3. 更新 user_profiles.level_final
+"""
+
+import logging
+from datetime import datetime, timedelta
+from typing import Dict, Optional, Tuple, List
+
+from sqlalchemy.orm import Session
+from sqlalchemy import func
+
+from app.models.user import UserProfile
+from app.models.profile import UserSkillScore
+from app.models.knowledge_graph import DailyTask
+
+logger = logging.getLogger(__name__)
+
+# CEFR 定级阈值（与 assessment.py 保持一致）
+CEFR_THRESHOLDS = [
+    (96, "C2"),
+    (81, "C1"),
+    (61, "B2"),
+    (41, "B1"),
+    (21, "A2"),
+    (0, "A1"),
+]
+
+# EMA 参数
+EMA_ALPHA = 0.3  # 新分数权重
+MAX_DAYS = 30     # 只计算最近 30 天
+
+# 发音维度 → 用户画像维度映射
+PRONUNCIATION_DIM_MAP = {
+    "phoneme_accuracy": "speaking",
+    "stress": "speaking",
+    "intonation": "speaking",
+    "linking": "speaking",
+    "rhythm": "speaking",
+}
+
+# 对话文本维度 → 用户画像维度映射
+TEXT_DIM_MAP = {
+    "语法正确率": "grammar",
+    "词汇丰富度": "reading",
+    "对话参与度": "speaking",
+}
+
+# 任务类型 → 用户画像维度映射
+TASK_DIM_MAP = {
+    "shadowing": "speaking",
+    "conversation": "speaking",
+    "listening": "listening",
+}
+
+
+def _get_cefr(score: float) -> str:
+    """根据分数返回 CEFR 等级"""
+    for threshold, level in CEFR_THRESHOLDS:
+        if score >= threshold:
+            return level
+    return "A1"
+
+
+class ProfileUpdater:
+    """用户画像动态更新器"""
+
+    # ============================================================
+    # 分数摄入
+    # ============================================================
+
+    def ingest_pronunciation_scores(
+        self, user_id: int, dimensions: List[dict], source_id: int, db: Session,
+    ):
+        """摄入发音评测分数
+
+        Args:
+            dimensions: [{label: '音素准确度', score: 85}, ...]
+        """
+        label_map = {
+            "音素准确度": "phoneme_accuracy",
+            "重音位置": "stress",
+            "语调曲线": "intonation",
+            "连读表现": "linking",
+            "节奏感": "rhythm",
+        }
+
+        for dim in dimensions:
+            eng_name = label_map.get(dim["label"], dim["label"])
+            mapped_dim = PRONUNCIATION_DIM_MAP.get(eng_name, "speaking")
+
+            db.add(UserSkillScore(
+                user_id=user_id,
+                dimension=mapped_dim,
+                skill_name=f"pronunciation:{eng_name}",
+                score=dim["score"],
+                source="pronunciation",
+                source_id=source_id,
+            ))
+
+        self.recalculate(user_id, db)
+
+    def ingest_conversation_scores(
+        self, user_id: int, pronunciation: List[dict],
+        text_dimensions: List[dict], source_id: int, db: Session,
+    ):
+        """摄入对话评分
+
+        Args:
+            pronunciation: [{label: '音素准确度', score: 80}, ...] (5 个语音维度)
+            text_dimensions: [{label: '语法正确率', score: 75}, ...] (3 个文本维度)
+        """
+        # 语音维度
+        for dim in pronunciation:
+            db.add(UserSkillScore(
+                user_id=user_id,
+                dimension="speaking",
+                skill_name=f"conversation:pronunciation:{dim['label']}",
+                score=dim["score"],
+                source="conversation",
+                source_id=source_id,
+            ))
+
+        # 文本维度
+        for dim in text_dimensions:
+            mapped_dim = TEXT_DIM_MAP.get(dim["label"], "speaking")
+            db.add(UserSkillScore(
+                user_id=user_id,
+                dimension=mapped_dim,
+                skill_name=f"conversation:text:{dim['label']}",
+                score=dim["score"],
+                source="conversation",
+                source_id=source_id,
+            ))
+
+        self.recalculate(user_id, db)
+
+    def ingest_task_score(self, user_id: int, task: DailyTask, db: Session):
+        """摄入任务完成分数"""
+        dimension = TASK_DIM_MAP.get(task.task_type, "speaking")
+        score = float(task.score) if task.score else 70.0
+
+        db.add(UserSkillScore(
+            user_id=user_id,
+            dimension=dimension,
+            skill_name=f"task:{task.task_type}",
+            score=score,
+            source="daily_task",
+            source_id=task.id,
+        ))
+
+        self.recalculate(user_id, db)
+
+    # ============================================================
+    # EMA 计算
+    # ============================================================
+
+    def get_dimension_averages(self, user_id: int, db: Session) -> Dict[str, Optional[float]]:
+        """计算各维度 EMA 分数"""
+        cutoff = datetime.utcnow() - timedelta(days=MAX_DAYS)
+
+        scores = (
+            db.query(UserSkillScore)
+            .filter(
+                UserSkillScore.user_id == user_id,
+                UserSkillScore.created_at >= cutoff,
+            )
+            .order_by(UserSkillScore.created_at.asc())
+            .all()
+        )
+
+        # 按维度分组
+        dimension_values = {
+            "listening": [],
+            "speaking": [],
+            "reading": [],
+            "grammar": [],
+        }
+        for s in scores:
+            if s.dimension in dimension_values:
+                dimension_values[s.dimension].append(float(s.score))
+
+        # EMA 计算
+        result = {}
+        for dim, vals in dimension_values.items():
+            if not vals:
+                result[dim] = None
+                continue
+            ema = vals[0]
+            for v in vals[1:]:
+                ema = v * EMA_ALPHA + ema * (1 - EMA_ALPHA)
+            result[dim] = round(ema, 1)
+
+        return result
+
+    def get_recent_scores(self, user_id: int, db: Session, limit: int = 100) -> List[dict]:
+        """获取最近分数记录"""
+        scores = (
+            db.query(UserSkillScore)
+            .filter(UserSkillScore.user_id == user_id)
+            .order_by(UserSkillScore.created_at.desc())
+            .limit(limit)
+            .all()
+        )
+
+        return [
+            {
+                "dimension": s.dimension,
+                "skill_name": s.skill_name,
+                "score": float(s.score),
+                "source": s.source,
+                "created_at": s.created_at.isoformat() if s.created_at else "",
+            }
+            for s in scores
+        ]
+
+    # ============================================================
+    # 画像重算
+    # ============================================================
+
+    def recalculate(self, user_id: int, db: Session) -> Tuple[Optional[str], Dict[str, Optional[float]]]:
+        """重算 level_final 并更新数据库"""
+        dim_avgs = self.get_dimension_averages(user_id, db)
+
+        # 只考虑有值的维度
+        valid_dims = {k: v for k, v in dim_avgs.items() if v is not None}
+        if not valid_dims:
+            return None, dim_avgs
+
+        # 综合分 = 有效维度均分
+        overall = sum(valid_dims.values()) / len(valid_dims)
+        new_level = _get_cefr(overall)
+
+        # 更新 user_profiles
+        user = db.query(UserProfile).filter(UserProfile.id == user_id).first()
+        if user:
+            old_level = user.level_final
+            user.level_final = new_level
+            logger.info(
+                f"用户 {user_id} ({user.username}) 画像更新: "
+                f"level {old_level} → {new_level}, overall={overall:.1f}"
+            )
+
+        return new_level, dim_avgs
+
+
+# 全局单例
+profile_updater = ProfileUpdater()
