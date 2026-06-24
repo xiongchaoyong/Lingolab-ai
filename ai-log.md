@@ -101,10 +101,10 @@
 
 | 时间  | 操作     | 描述                                                         | 成员 |      |
 | ----- | -------- | :----------------------------------------------------------- | :--: | :--: |
-| 10:00 | 数据库 | 评审需求说明书数据字典(30张表)，修正缺失字段(user_profiles补email+role、system_config补全)、优化数据类型(groups表SMALLINT)、补全索引+ENUM定义，创建 backend/sql/init.sql(31张表)并执行初始化 | DJQ | ✅ |
-| 10:30 | 发音评测 | 综合分改为PRD要求的模式加权：单词模式(音素50%/重音25%/节奏25%)、句子模式(音素40%/重音15%/连读15%/语调15%/节奏15%)，前后端同步传递mode参数 | DJQ | ✅ |
-| 11:00 | 导航重构 | 按需求文档7个模块重构导航栏：合并模块2为「学习中心」下拉菜单(发音评测/AI对话/角色扮演)、模块3「学习路径」下拉、模块4「学习进度」下拉、模块5「社区」、模块7「帮助」、模块6「后台管理」按角色显示；hover触发下拉子菜单，点击父级进入第一子项；路由恢复独立页面 | DJQ | ✅ |
-| 11:30 | 项目规划 | 创建 docs/TODO.md 待办事项文档，按7模块+基础设施梳理约50项任务，标注P0-P3优先级 | DJQ | ✅ |
+| 10:00 | 数据库 | 评审需求说明书数据字典(30张表)，修正缺失字段(user_profiles补email+role、system_config补全)、优化数据类型(groups表SMALLINT)、补全索引+ENUM定义，创建 backend/sql/init.sql(31张表)并执行初始化 | XCY | ✅ |
+| 10:30 | 发音评测 | 综合分改为PRD要求的模式加权：单词模式(音素50%/重音25%/节奏25%)、句子模式(音素40%/重音15%/连读15%/语调15%/节奏15%)，前后端同步传递mode参数 | XCY | ✅ |
+| 11:00 | 导航重构 | 按需求文档7个模块重构导航栏：合并模块2为「学习中心」下拉菜单(发音评测/AI对话/角色扮演)、模块3「学习路径」下拉、模块4「学习进度」下拉、模块5「社区」、模块7「帮助」、模块6「后台管理」按角色显示；hover触发下拉子菜单，点击父级进入第一子项；路由恢复独立页面 | XCY | ✅ |
+| 11:30 | 项目规划 | 创建 docs/TODO.md 待办事项文档，按7模块+基础设施梳理约50项任务，标注P0-P3优先级 | XCY | ✅ |
 | 14:00 | 对话模块 | 后端切换阿里百炼DashScope、新建ASR服务(WhisperX转录+词级时间戳)+TTS服务(Edge TTS语音合成)、前端对话路由从学习布局改为独立全屏路由、删除旧ConversationView由VoiceCallView替代 | XCY | ✅ |
 | 15:00 | 对话评分 | 对话评分综合报告v2丰富版：后端Schema新增utterances/transcript/text_dimension_details/scoring_methodology字段、LLM评分提示升级(每维度feedback+strengths+weaknesses详评)、/end端点保留完整发音评分+对话记录+方法论；前端报告页重构为多节可滚动布局(综合分→语音评测→文本评测→对话记录→改进建议)、新建UtteranceDetailPanel共享组件(逐音素评分表+重音能量图+语调F0曲线+连读词对表+节奏时长图) | XCY | ✅ |
 | 16:00 | 角色扮演+UI | 角色扮演模块后端+前端API接入：新增LLM服务(chat_roleplay/chat_roleplay_stream/score_roleplay四维评分：角色贴合度/场景礼仪/专业术语/应对能力)+3个内置场景Prompt(interviewee/waiter/guide)、新建api/roleplay.py+schema；淡紫可爱风UI改版(品牌色#A78BFA、Quicksand+Nunito字体、马卡龙辅助色系)+路由扁平化(Introduction合并进TopNavLayout、/home重定向到/)+CLAUDE.md同步更新 | XCY | ✅ |
