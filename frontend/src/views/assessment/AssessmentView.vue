@@ -1,6 +1,7 @@
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
 import { useAssessmentStore } from '@/stores/assessment'
 import VoiceRecorder from '@/components/common/VoiceRecorder.vue'
 
@@ -53,8 +54,13 @@ function handleSpeakingComplete() {
 async function handleNext() {
   selectedOption.value = null
   if (store.isLastQuestion) {
-    await store.completeAssessment()
-    router.push('/assessment/result')
+    try {
+      await store.completeAssessment()
+      router.push('/assessment/result')
+    } catch (e) {
+      console.error('提交测评失败:', e)
+      ElMessage.error('提交失败，请检查网络后重试')
+    }
   } else {
     store.nextQuestion()
   }
@@ -137,7 +143,7 @@ function handleSkip() {
           </p>
 
           <VoiceRecorder
-            :prep-time="15"
+            :prep-time="3"
             :max-duration="45"
             @complete="handleSpeakingComplete"
           />

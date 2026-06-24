@@ -68,7 +68,7 @@ function beginCapture() {
   mediaRecorder.onstop = () => {
     // 释放麦克风
     stream.getTracks().forEach(t => t.stop())
-    const actualMime = mediaRecorder.mimeType || mimeType
+    const actualMime = mediaRecorder.mimeType || 'audio/webm'
     audioBlob = new Blob(audioChunks, { type: actualMime })
 
     // 通知父组件
