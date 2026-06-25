@@ -1,5 +1,6 @@
 <script setup>
-import { ref, nextTick } from 'vue'
+import { ref, nextTick, onUnmounted } from 'vue'
+import { chatText, chatVoice } from '@/api/help'
 
 const faqCategories = [
   {
@@ -39,6 +40,14 @@ const faqCategories = [
   },
 ]
 
+const categoryLabels = {
+  product_use: '产品使用',
+  study_advice: '学习建议',
+  tech_issue: '技术问题',
+  refund: '付费相关',
+  off_topic: '其他',
+}
+
 const messages = ref([
   { role: 'ai', text: '你好！我是 Lingolab 智能客服小语，有什么可以帮你的？', time: '刚刚' },
 ])
@@ -46,42 +55,177 @@ const messages = ref([
 const inputText = ref('')
 const chatRef = ref(null)
 const showQuickQuestions = ref(true)
+const loading = ref(false)
+const isRecording = ref(false)
+
+// 语音录制
+let mediaRecorder = null
+let audioChunks = []
+let stream = null
 
 const quickQuestions = [
   '如何练习发音？', '口语水平怎么提升？', '学习路径如何调整？',
   '怎么查看学习报告？', '如何加入学习小组？', '反馈建议在哪里提交？',
 ]
 
+function getHistory() {
+  return messages.value
+    .filter(m => m.role === 'user' || m.role === 'ai')
+    .slice(-12)
+    .map(m => ({ role: m.role === 'ai' ? 'ai' : 'user', text: m.text }))
+}
+
 function selectFaq(faq) {
-  messages.value.push({ role: 'user', text: faq.q, time: '刚刚' })
+  messages.value.push({ role: 'user', text: faq.q, time: formatTime() })
   showQuickQuestions.value = false
   scrollToBottom()
+  // FAQ 使用预置答案，不调 API
   setTimeout(() => {
-    messages.value.push({ role: 'ai', text: faq.a, time: '刚刚' })
+    messages.value.push({ role: 'ai', text: faq.a, time: formatTime() })
     scrollToBottom()
-  }, 600)
+  }, 400)
 }
 
-function selectQuick(q) {
-  messages.value.push({ role: 'user', text: q, time: '刚刚' })
+async function selectQuick(q) {
+  messages.value.push({ role: 'user', text: q, time: formatTime() })
   showQuickQuestions.value = false
   scrollToBottom()
-  setTimeout(() => {
-    messages.value.push({ role: 'ai', text: '这是一个好问题！让我来帮你解答：\n\n你可以先在学习页面的发音评测模块进行基础练习，系统会根据你的表现给出具体建议。同时建议每天完成学习路径中的跟读任务，这是最有效的提升方法。\n\n如果还有疑问，可以查看「学习功能」分类下的常见问题。', time: '刚刚' })
-    scrollToBottom()
-  }, 600)
+  await callChatAPI(q)
 }
 
-function sendMessage() {
-  if (!inputText.value.trim()) return
-  messages.value.push({ role: 'user', text: inputText.value, time: '刚刚' })
+async function sendMessage() {
+  if (!inputText.value.trim() || loading.value) return
+  const text = inputText.value.trim()
+  messages.value.push({ role: 'user', text, time: formatTime() })
   inputText.value = ''
   showQuickQuestions.value = false
   scrollToBottom()
-  setTimeout(() => {
-    messages.value.push({ role: 'ai', text: '收到你的消息了！小语正在努力学习更多知识，目前建议你查看左侧的常见问题分类，或者联系人工客服获取更详细的帮助。', time: '刚刚' })
+  await callChatAPI(text)
+}
+
+async function callChatAPI(message) {
+  loading.value = true
+  try {
+    const history = getHistory()
+    const res = await chatText(message, history.slice(0, -1)) // exclude current message
+    const data = res.data || res
+    const category = data.category || 'study_advice'
+    let reply = data.reply || '抱歉，我暂时无法处理你的问题。'
+
+    // 如果标记转人工，追加提示
+    if (data.escalate && !reply.includes('support@lingolab.com')) {
+      reply += '\n\n如需进一步帮助，请发送邮件至 support@lingolab.com 联系人工客服。'
+    }
+
+    messages.value.push({
+      role: 'ai',
+      text: reply,
+      time: formatTime(),
+      category,
+      escalate: data.escalate,
+    })
+  } catch (e) {
+    console.error('客服 API 调用失败:', e)
+    messages.value.push({
+      role: 'ai',
+      text: '抱歉，我暂时无法处理你的问题。请尝试查看左侧的常见问题分类，或发送邮件至 support@lingolab.com 联系人工客服。',
+      time: formatTime(),
+      category: 'tech_issue',
+      escalate: true,
+    })
+  } finally {
+    loading.value = false
     scrollToBottom()
-  }, 800)
+  }
+}
+
+async function toggleRecording() {
+  if (isRecording.value) {
+    stopRecording()
+  } else {
+    await startRecording()
+  }
+}
+
+async function startRecording() {
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      audio: { sampleRate: 16000, channelCount: 1 },
+    })
+  } catch (e) {
+    console.error('麦克风访问失败:', e)
+    return
+  }
+
+  isRecording.value = true
+  audioChunks = []
+  mediaRecorder = new MediaRecorder(stream)
+
+  mediaRecorder.ondataavailable = (e) => {
+    if (e.data.size > 0) audioChunks.push(e.data)
+  }
+
+  mediaRecorder.onstop = async () => {
+    stream.getTracks().forEach(t => t.stop())
+    const mimeType = mediaRecorder.mimeType || 'audio/webm'
+    const blob = new Blob(audioChunks, { type: mimeType })
+    await sendVoiceMessage(blob)
+  }
+
+  mediaRecorder.start()
+}
+
+function stopRecording() {
+  isRecording.value = false
+  if (mediaRecorder?.state === 'recording') {
+    mediaRecorder.stop()
+  }
+}
+
+async function sendVoiceMessage(blob) {
+  loading.value = true
+  showQuickQuestions.value = false
+  try {
+    const history = getHistory()
+    const res = await chatVoice(blob, history)
+    const data = res.data || res
+    const transcript = data.transcript || ''
+    const category = data.category || 'study_advice'
+    let reply = data.reply || '未能识别你的语音，请用文字输入问题。'
+
+    // 显示用户语音转写文本
+    if (transcript) {
+      messages.value.push({
+        role: 'user',
+        text: transcript,
+        time: formatTime(),
+      })
+    }
+
+    if (data.escalate && !reply.includes('support@lingolab.com')) {
+      reply += '\n\n如需进一步帮助，请发送邮件至 support@lingolab.com 联系人工客服。'
+    }
+
+    messages.value.push({
+      role: 'ai',
+      text: reply,
+      time: formatTime(),
+      category,
+      escalate: data.escalate,
+    })
+  } catch (e) {
+    console.error('语音客服失败:', e)
+    messages.value.push({
+      role: 'ai',
+      text: '语音识别失败，请用文字输入问题或重试。',
+      time: formatTime(),
+      category: 'tech_issue',
+      escalate: false,
+    })
+  } finally {
+    loading.value = false
+    scrollToBottom()
+  }
 }
 
 function handleEnter(e) {
@@ -96,6 +240,15 @@ function scrollToBottom() {
     if (chatRef.value) chatRef.value.scrollTop = chatRef.value.scrollHeight
   })
 }
+
+function formatTime() {
+  const now = new Date()
+  return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
+}
+
+onUnmounted(() => {
+  stream?.getTracks().forEach(t => t.stop())
+})
 </script>
 
 <template>
@@ -128,7 +281,7 @@ function scrollToBottom() {
           </div>
           <div>
             <div class="agent-name">智能客服 · 小语</div>
-            <div class="agent-status">在线 | 响应时间 &lt; 1分钟</div>
+            <div class="agent-status">在线 | AI 驱动</div>
           </div>
         </div>
         <el-tag size="small" type="success">AI 客服</el-tag>
@@ -142,11 +295,33 @@ function scrollToBottom() {
           </div>
           <div class="msg-bubble" :class="msg.role">
             <div class="msg-text">{{ msg.text }}</div>
-            <div class="msg-time">{{ msg.time }}</div>
+            <div class="msg-meta">
+              <span class="msg-time">{{ msg.time }}</span>
+              <el-tag
+                v-if="msg.role === 'ai' && msg.category"
+                size="small"
+                :type="msg.escalate ? 'warning' : 'info'"
+                class="msg-category-tag"
+              >
+                {{ categoryLabels[msg.category] || msg.category }}
+              </el-tag>
+            </div>
           </div>
         </div>
 
-        <div v-if="showQuickQuestions" class="quick-questions">
+        <!-- 加载动画 -->
+        <div v-if="loading" class="msg-row ai">
+          <div class="msg-avatar">
+            <el-icon :size="18"><Service /></el-icon>
+          </div>
+          <div class="msg-bubble ai typing-bubble">
+            <span class="typing-dot" />
+            <span class="typing-dot" />
+            <span class="typing-dot" />
+          </div>
+        </div>
+
+        <div v-if="showQuickQuestions && !loading" class="quick-questions">
           <p class="quick-hint">你可能想问：</p>
           <el-tag
             v-for="q in quickQuestions" :key="q"
@@ -160,16 +335,26 @@ function scrollToBottom() {
       </div>
 
       <div class="chat-input">
+        <el-button
+          :type="isRecording ? 'danger' : 'default'"
+          :icon="isRecording ? 'VideoPause' : 'Microphone'"
+          circle
+          :class="{ 'is-recording': isRecording }"
+          @click="toggleRecording"
+        />
         <el-input
           v-model="inputText"
           placeholder="输入你的问题..."
+          :disabled="loading"
           @keydown="handleEnter"
-        >
-          <template #suffix>
-            <el-button text :icon="Microphone" size="small" />
-          </template>
-        </el-input>
-        <el-button type="primary" :icon="Promotion" :disabled="!inputText.trim()" @click="sendMessage" />
+        />
+        <el-button
+          type="primary"
+          :icon="Promotion"
+          :disabled="!inputText.trim() || loading"
+          :loading="loading"
+          @click="sendMessage"
+        />
       </div>
     </div>
   </div>
@@ -231,9 +416,30 @@ function scrollToBottom() {
   &.ai { background: var(--color-bg-primary); border: 1px solid var(--color-border); border-radius: var(--radius-md); border-top-left-radius: 0; }
   &.user { background: var(--color-primary); color: #fff; border-radius: var(--radius-md); border-top-right-radius: 0; }
   .msg-text { padding: var(--spacing-md); font-size: var(--font-size-base); line-height: 1.6; white-space: pre-line; }
-  .msg-time { font-size: 11px; padding: 2px var(--spacing-md) var(--spacing-sm); opacity: 0.6; }
+  .msg-meta { display: flex; align-items: center; gap: var(--spacing-sm); padding: 2px var(--spacing-md) var(--spacing-sm); }
+  .msg-time { font-size: 11px; opacity: 0.6; }
+  .msg-category-tag { font-size: 10px; }
 }
-.msg-row.user .msg-time { text-align: right; }
+.msg-row.user .msg-meta { justify-content: flex-end; }
+.msg-row.user .msg-time { opacity: 0.8; }
+
+// 打字动画
+.typing-bubble {
+  padding: var(--spacing-md);
+  display: flex; align-items: center; gap: 4px;
+  .typing-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--color-text-disabled);
+    animation: typing-bounce 1.4s infinite ease-in-out both;
+    &:nth-child(1) { animation-delay: -0.32s; }
+    &:nth-child(2) { animation-delay: -0.16s; }
+    &:nth-child(3) { animation-delay: 0s; }
+  }
+}
+@keyframes typing-bounce {
+  0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
+  40% { transform: scale(1); opacity: 1; }
+}
 
 .quick-questions {
   background: var(--color-bg-primary); border-radius: var(--radius-md);
@@ -244,6 +450,14 @@ function scrollToBottom() {
 
 .chat-input {
   display: flex; gap: var(--spacing-sm); padding: var(--spacing-lg);
-  border-top: 1px solid var(--color-border);
+  border-top: 1px solid var(--color-border); align-items: center;
+  .el-input { flex: 1; }
+}
+.is-recording {
+  animation: pulse-rec 1.2s infinite;
+}
+@keyframes pulse-rec {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(var(--color-danger-rgb), 0.4); }
+  50% { box-shadow: 0 0 0 8px rgba(var(--color-danger-rgb), 0); }
 }
 </style>
