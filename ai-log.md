@@ -126,3 +126,9 @@
 | 14:00 | TTS优化 | Edge TTS 后端预取优化：将 TTS 合成从串行改为并行（asyncio.create_task），在 SSE 流结束前提前启动 TTS，消除串行等待延迟；新增 audio_utils.py 共享音频工具（提取 convert_to_wav 消除 conversation/roleplay 重复代码） | XCY | ✅ |
 | 15:00 | 语法纠错 | 模块7 AI语法纠错与润色全链路实现：后端新建 schemas/grammar.py（GrammarError/GrammarCorrectResponse）+ api/grammar.py（POST /correct 文本纠错、POST /correct/voice 语音纠错）+ llm.py 新增 correct_grammar 方法（temperature=0.3）；前端新建 GrammarView.vue 独立页面（双模式输入+差异高亮+错误卡片+润色建议）+ 路由注册 + 导航入口；conversation.py + roleplay.py 对话内实时纠错（asyncio.create_task 并行执行 grammar_task，不增加延迟，SSE 新增 grammar 事件）；前端 VoiceCallView + RolePlayView 新增可折叠语法纠错卡片（错误类型颜色标签+中英文解释） | XCY | ✅ |
 | 16:00 | 测评P0修复 | 测评模块6项P0修复：①llm.py修复score_fluency/correct_grammar/score_speaking缩进错误（模块级函数→类方法）；②测评API重写为逐题提交+自适应难度（CEFR数值映射A1-C2:1.0-6.0，得分≥60升0.5级/<60降0.5级，钳制[1.0,6.0]）；③新增POST /answer（口语题ASR+LLM四维评分）+ POST /complete（四维均分→CEFR定级+短板分析）；④Schema新增AssessmentAnswerResponse；⑤题库扩充至30题（A2:9/B1:11/B2:10，听力8+口语6+阅读8+语法8）；⑥前端适配：API层新增answerQuestionApi/completeAssessmentApi，Store重构为逐题提交流程（submitAndAdvance+audioBlob），AssessmentView捕获录音blob+评分中加载状态，路由守卫强制未测评用户跳转/assessment | XCY | ✅ |
+
+## 2026-06-25
+
+| 时间  | 操作     | 描述                                                         | 成员 |      |
+| ----- | -------- | :----------------------------------------------------------- | :--: | :--: |
+| 15:00 | 模块4 | 激励服务模块全链路实现：4.1 游戏化闯关学习（后端 gamification 模型/服务/API — 每日闯关5级递增难度+配音挑战+积分7种动作+勋章7种+排行榜，前端 ChallengeView 重写接入真实 API+VoiceRecorder 评分集成）；4.2 学习进度可视化（后端 progress 模型/服务/API — 雷达图+趋势折线图+日历热力图+6项统计卡片，前端 ProgressView 重写+日/周/月/全部时间切换）；4.3 学习效果预测与预警（后端 prediction 模型/服务/API — 线性回归预测达标日期+3条预警规则+通知中心，前端 ProgressView 预测区+TopNavLayout 通知铃铛动态未读数+60s轮询） | XCY | ✅ |
