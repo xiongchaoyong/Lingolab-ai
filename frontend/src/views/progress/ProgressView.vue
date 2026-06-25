@@ -1,150 +1,53 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { computed, onMounted } from 'vue'
+import { useProgressStore } from '@/stores/progress'
+import { usePredictionStore } from '@/stores/prediction'
 
-const timeRange = ref('week')
+const store = useProgressStore()
+const predStore = usePredictionStore()
 
-// ========== Mock 数据 ==========
-
-// 雷达图数据
-const radarData = {
-  dimensions: ['发音准确率', '流利度', '语法', '听力', '表达丰富度'],
-  current: [72, 65, 78, 80, 60],
-  previous: [65, 58, 75, 75, 55],
-}
-
-// 趋势折线图数据
-const trendData = {
-  week: {
-    labels: ['周一', '周二', '周三', '周四', '周五', '周六', '周日'],
-    pronunciation: [68, 70, 72, 71, 74, 73, 72],
-    fluency: [60, 62, 63, 64, 65, 66, 65],
-  },
-  month: {
-    labels: ['W1', 'W2', 'W3', 'W4'],
-    pronunciation: [65, 69, 72, 73],
-    fluency: [58, 62, 64, 65],
-  },
-  all: {
-    labels: ['5月', '6月'],
-    pronunciation: [60, 72],
-    fluency: [55, 65],
-  },
-}
-
-// 统计指标
-const stats = ref({
-  totalMinutes: 720,
-  checkinDays: 23,
-  streakDays: 7,
-  maxStreak: 14,
-  shadowCount: 45,
-  conversationCount: 18,
-})
-
-// ========== ECharts 配置 ==========
-
-const radarOption = computed(() => ({
-  tooltip: {},
-  legend: { data: ['当前', '上次'], bottom: 0 },
-  radar: {
-    indicator: radarData.dimensions.map(d => ({ name: d, max: 100 })),
-    center: ['50%', '55%'],
-  },
-  series: [{
-    type: 'radar',
-    data: [
-      { value: radarData.current, name: '当前', lineStyle: { color: '#A78BFA' }, areaStyle: { color: 'rgba(167,139,250,0.15)' } },
-      { value: radarData.previous, name: '上次', lineStyle: { color: '#C4B5D4', type: 'dashed' }, areaStyle: { color: 'rgba(196,181,212,0.12)' } },
-    ],
-  }],
-}))
-
-const lineOption = computed(() => {
-  const data = trendData[timeRange.value]
+const predDisplay = computed(() => {
+  const p = predStore.prediction
   return {
-    tooltip: { trigger: 'axis' },
-    legend: { data: ['发音准确率', '流利度'], bottom: 0 },
-    grid: { left: 8, right: 8, top: 8, bottom: 24 },
-    xAxis: { type: 'category', data: data.labels },
-    yAxis: { type: 'value', min: 0, max: 100 },
-    series: [
-      { name: '发音准确率', type: 'line', data: data.pronunciation, smooth: true, lineStyle: { color: '#A78BFA' }, itemStyle: { color: '#A78BFA' } },
-      { name: '流利度', type: 'line', data: data.fluency, smooth: true, lineStyle: { color: '#C4B5FD' }, itemStyle: { color: '#C4B5FD' } },
-    ],
+    currentScore: p.current_score ?? 0,
+    trendSlope: p.trend_slope != null ? `+${p.trend_slope}` : '--',
+    trend: p.trend || 'stable',
+    predictedDate: p.predicted_date || '--',
+    predictedDays: p.predicted_days != null ? `${p.predicted_days} 天` : '--',
+    targetScore: p.target_score ?? 85,
+    predNote:
+      p.predicted_days != null
+        ? `按当前节奏，距离目标 ${p.target_score} 分还需 ${p.predicted_days} 天`
+        : p.message || '数据不足，继续学习 3 天后再查看预测',
   }
 })
 
-// 日历热力图数据（简化）
-const calendarOption = computed(() => {
-  const now = new Date()
-  const data = []
-  for (let i = 180; i >= 0; i--) {
-    const d = new Date(now - i * 86400000)
-    const val = Math.random() > 0.3 ? Math.floor(Math.random() * 4) : 0
-    data.push([d.toISOString().slice(0, 10), val])
-  }
-  return {
-    tooltip: {},
-    visualMap: {
-      min: 0, max: 3,
-      orient: 'horizontal', left: 'center', bottom: 0,
-      inRange: { color: ['#E2E8F0', '#A7F3D0', '#6EE7B7', '#059669'] },
-      textStyle: { color: '#64748B' },
-    },
-    calendar: {
-      range: '2026',
-      cellSize: ['auto', 14],
-      dayLabel: { nameMap: ['日', '一', '二', '三', '四', '五', '六'] },
-      monthLabel: { nameMap: 'cn' },
-    },
-    series: [{
-      type: 'heatmap',
-      coordinateSystem: 'calendar',
-      data,
-    }],
-  }
+onMounted(() => {
+  store.fetchAll('week')
+  predStore.fetchPrediction()
+  predStore.checkAlerts()
 })
-
-const statCards = computed(() => [
-  { label: '累计学习', value: `${Math.floor(stats.value.totalMinutes / 60)}h`, unit: `${stats.value.totalMinutes}min` },
-  { label: '累计打卡', value: stats.value.checkinDays, unit: '天' },
-  { label: '连续打卡', value: stats.value.streakDays, unit: '天' },
-  { label: '最长连续', value: stats.value.maxStreak, unit: '天' },
-  { label: '跟读次数', value: stats.value.shadowCount, unit: '次' },
-  { label: '对话次数', value: stats.value.conversationCount, unit: '次' },
-])
-
-// ========== 预测数据 ==========
-const prediction = ref({
-  currentScore: 72,
-  trendSlope: 0.35,
-  targetScore: 85,
-  predictedDays: 37,
-  predictedDate: '7月5日',
-  trend: 'up',
-})
-
-const alerts = ref([
-  { id: 1, level: 'info', msg: '连续打卡 7 天，继续保持！' },
-])
-
-// 空状态(暂不使用, 保留)
-const isEmpty = ref(false)
 </script>
 
 <template>
   <div class="content-card">
     <div class="page-header">
       <h2 class="page-title">学习报告</h2>
-      <el-radio-group v-model="timeRange" size="small">
+      <el-radio-group v-model="store.timeRange" size="small" @change="store.setTimeRange">
+        <el-radio-button value="day">天</el-radio-button>
         <el-radio-button value="week">周</el-radio-button>
         <el-radio-button value="month">月</el-radio-button>
         <el-radio-button value="all">全部</el-radio-button>
       </el-radio-group>
     </div>
 
+    <!-- 加载中 -->
+    <div v-if="store.loading" class="loading-state">
+      <el-skeleton :rows="5" animated />
+    </div>
+
     <!-- 空状态 -->
-    <div v-if="isEmpty" class="empty-state">
+    <div v-else-if="store.isEmpty" class="empty-state">
       <el-empty description="暂无学习数据">
         <template #image>
           <el-icon :size="64" color="var(--color-text-disabled)"><DataLine /></el-icon>
@@ -160,13 +63,15 @@ const isEmpty = ref(false)
         <el-col :span="12">
           <div class="chart-box">
             <h4 class="chart-title">能力雷达图</h4>
-            <v-chart :option="radarOption" autoresize style="height: 320px" />
+            <v-chart v-if="store.radarData.dimensions?.length" :option="store.radarOption" autoresize style="height: 320px" />
+            <el-empty v-else description="暂无雷达图数据" :image-size="60" />
           </div>
         </el-col>
         <el-col :span="12">
           <div class="chart-box">
             <h4 class="chart-title">趋势折线图</h4>
-            <v-chart :option="lineOption" autoresize style="height: 320px" />
+            <v-chart v-if="store.trendData.points?.length" :option="store.lineOption" autoresize style="height: 320px" />
+            <el-empty v-else description="暂无趋势数据" :image-size="60" />
           </div>
         </el-col>
       </el-row>
@@ -174,10 +79,11 @@ const isEmpty = ref(false)
       <!-- 日历热力图 -->
       <div class="chart-box" style="margin-top: var(--spacing-lg);">
         <h4 class="chart-title">学习日历</h4>
-        <v-chart :option="calendarOption" autoresize style="height: 200px" />
+        <v-chart v-if="store.heatmapData.days?.length" :option="store.calendarOption" autoresize style="height: 200px" />
+        <el-empty v-else description="暂无日历数据" :image-size="60" />
       </div>
 
-      <!-- 学习预测 -->
+      <!-- 学习预测（4.3 接入真实 API） -->
       <div class="chart-box" style="margin-top: var(--spacing-lg);">
         <h4 class="chart-title">学习预测</h4>
         <div class="prediction-content">
@@ -185,41 +91,41 @@ const isEmpty = ref(false)
             <el-col :span="8">
               <div class="pred-item">
                 <span class="pred-label">当前综合分</span>
-                <span class="pred-value">{{ prediction.currentScore }}</span>
+                <span class="pred-value">{{ predDisplay.currentScore }}</span>
               </div>
             </el-col>
             <el-col :span="8">
               <div class="pred-item">
                 <span class="pred-label">趋势</span>
-                <span class="pred-value" :style="{ color: prediction.trend === 'up' ? 'var(--color-success)' : 'var(--color-danger)' }">
-                  +{{ prediction.trendSlope }} 分/天
+                <span class="pred-value" :style="{ color: predDisplay.trend === 'up' ? 'var(--color-success)' : 'var(--color-danger)' }">
+                  {{ predDisplay.trendSlope }} 分/天
                 </span>
               </div>
             </el-col>
             <el-col :span="8">
               <div class="pred-item">
                 <span class="pred-label">预计达标</span>
-                <span class="pred-value">{{ prediction.predictedDate }}（{{ prediction.predictedDays }} 天）</span>
+                <span class="pred-value">{{ predDisplay.predictedDate }}（{{ predDisplay.predictedDays }}）</span>
               </div>
             </el-col>
           </el-row>
-          <div class="pred-note">按当前节奏，距离目标 {{ prediction.targetScore }} 分还需 {{ prediction.predictedDays }} 天</div>
+          <div class="pred-note">{{ predDisplay.predNote }}</div>
         </div>
       </div>
 
-      <!-- 预警通知 -->
-      <div class="chart-box" style="margin-top: var(--spacing-base);" v-if="alerts.length">
+      <!-- 预警通知（4.3 接入真实 API） -->
+      <div class="chart-box" style="margin-top: var(--spacing-base);" v-if="predStore.alerts.length">
         <h4 class="chart-title">系统提醒</h4>
-        <div v-for="alert in alerts" :key="alert.id" class="alert-item">
+        <div v-for="alert in predStore.alerts" :key="alert.type" class="alert-item">
           <el-icon color="var(--color-warning)"><WarningFilled /></el-icon>
-          <span>{{ alert.msg }}</span>
+          <span>{{ alert.message }}</span>
         </div>
       </div>
 
       <!-- 统计卡片 -->
       <h4 class="chart-title" style="margin-top: var(--spacing-xl);">学习统计</h4>
       <el-row :gutter="12">
-        <el-col :span="4" v-for="card in statCards" :key="card.label">
+        <el-col :span="4" v-for="card in store.statCards" :key="card.label">
           <el-card shadow="hover" class="stat-card">
             <div class="stat-value">{{ card.value }}</div>
             <div class="stat-unit">{{ card.unit }}</div>
@@ -239,6 +145,8 @@ const isEmpty = ref(false)
   margin-bottom: var(--spacing-xl);
 }
 
+.loading-state { min-height: 300px; }
+
 .empty-state {
   padding: var(--spacing-huge) 0;
   text-align: center;
@@ -249,9 +157,7 @@ const isEmpty = ref(false)
   }
 }
 
-.charts-row {
-  margin-bottom: 0;
-}
+.charts-row { margin-bottom: 0; }
 
 .chart-box {
   background: var(--color-bg-primary);
