@@ -1,13 +1,28 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { usePredictionStore } from '@/stores/prediction'
 
 const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
+const predStore = usePredictionStore()
 const mobileMenuOpen = ref(false)
 const hoveredNav = ref(null)
+
+let noticeTimer = null
+
+onMounted(() => {
+  if (authStore.isLoggedIn) {
+    predStore.fetchUnreadCount()
+    noticeTimer = setInterval(() => predStore.fetchUnreadCount(), 60000)
+  }
+})
+
+onUnmounted(() => {
+  if (noticeTimer) clearInterval(noticeTimer)
+})
 
 // ========== 导航定义（按需求文档七个模块） ==========
 
@@ -227,7 +242,7 @@ function handleLogout() {
         </template>
         <template v-else>
           <!-- 通知 -->
-          <el-badge :value="3" :max="99" class="tn-notice">
+          <el-badge :value="predStore.unreadCount" :max="99" :hidden="!predStore.unreadCount" class="tn-notice">
             <el-icon :size="20"><Bell /></el-icon>
           </el-badge>
 

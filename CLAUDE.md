@@ -9,11 +9,13 @@
 
 **在进行任何代码编写前，必须先读取 `docs/ai-collaboration-standards.md`**，严格遵循其中的项目结构、前端/后端模式、命名规范和协作流程。所有 AI 生成的代码必须符合该规范。
 
+**⛔ 开始编码前必须执行 Git 工作流（见下方「Git 工作流」章节），禁止在 main 分支上直接开发。**
+
 ---
 
 ## 项目概述
 
-基于 NLP 与大语言模型的英语口语训练系统，覆盖全年龄段用户，支持发音评测、AI 智能对话、个性化学习路径等 **16 个功能模块**（详见  /Users/x/Desktop/大项目/Lingolab-ai/docs/需求说明书.docx  ）。
+基于 NLP 与大语言模型的英语口语训练系统，覆盖全年龄段用户，支持发音评测、AI 智能对话、个性化学习路径等 **7 大服务模块、16 项子功能**（详见 `docs/需求说明书.docx`）。
 
 - **行业**：在线教育 / 语言学习 / AI 教育
 - **团队规模**：3人
@@ -95,7 +97,7 @@ uvicorn main:app --reload                # 开发服务器（默认 localhost:80
 ### 数据库
 ```bash
 mysql -u root -p
-# 开发库：english_training_dev（注意：Alembic 尚未初始化，无数据表）
+# 开发库：english_training_dev（Alembic 尚未初始化，通过 SQLAlchemy + init.sql 管理表结构）
 ```
 
 ---
@@ -154,6 +156,7 @@ mysql -u root -p
 - ❌ 禁止 AI 自主执行数据库迁移（`alembic upgrade`）
 - ❌ 禁止在代码中硬编码 API Key、密码等敏感信息
 - ❌ 禁止在前端组件中直接写业务逻辑，必须通过 store 或 api 层
+- ❌ 禁止在 `main` 分支上直接编写代码，必须创建 `feat/` 分支
 
 ---
 
@@ -224,3 +227,4 @@ VITE_API_BASE_URL=http://localhost:8000
 
 - [2026-05-25] 项目初始化 push 后未同步更新 ai-log.md → 每次 git 操作必须同步更新 ai-log.md 记录操作摘要
 - [2026-05-25] 先推送再补 log 导致反复遗漏 → 执行顺序：先更新 ai-log.md → 再 commit → 最后 push，确保 log 和变更在同一个 commit 里
+- [2026-06-25] 在 main 分支上直接创建了新文件开始编码 → 开始任何编码任务前，必须先执行 Git 工作流：checkout dev → pull dev → pull main → 创建 feat/ 分支，编码前用 `git branch` 确认当前分支不是 main
