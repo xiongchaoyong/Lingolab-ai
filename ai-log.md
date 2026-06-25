@@ -131,4 +131,5 @@
 
 | 时间  | 操作     | 描述                                                         | 成员 |      |
 | ----- | -------- | :----------------------------------------------------------- | :--: | :--: |
+| 17:00 | 模块5 | 社区服务模块全链路实现：后端新建7表模型(voice_challenges/challenge_submissions/discussion_posts/post_comments/post_likes复用groups/group_members)+community Schema+CommunityService(语音挑战排行榜+发音评分/讨论帖CRUD+点赞评论/学习小组加入退出)+9个API端点；前端新建api/community.js+Pinia store+CommunityView重写接入真实API(三Tab：语音挑战录音评分+排行榜/话题讨论发帖点赞评论弹窗/学习小组卡片加入退出)；种子数据3挑战+3帖子+6评论+4小组 | XCY | ✅ |
 | 15:00 | 模块4 | 激励服务模块全链路实现：4.1 游戏化闯关学习（后端 gamification 模型/服务/API — 每日闯关5级递增难度+配音挑战+积分7种动作+勋章7种+排行榜，前端 ChallengeView 重写接入真实 API+VoiceRecorder 评分集成）；4.2 学习进度可视化（后端 progress 模型/服务/API — 雷达图+趋势折线图+日历热力图+6项统计卡片，前端 ProgressView 重写+日/周/月/全部时间切换）；4.3 学习效果预测与预警（后端 prediction 模型/服务/API — 线性回归预测达标日期+3条预警规则+通知中心，前端 ProgressView 预测区+TopNavLayout 通知铃铛动态未读数+60s轮询） | XCY | ✅ |

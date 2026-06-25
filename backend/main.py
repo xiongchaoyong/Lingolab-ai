@@ -74,6 +74,7 @@ from app.api.assessment import router as assessment_router
 from app.api.learning_path import router as learning_path_router
 from app.api.recommendation import router as recommendation_router
 from app.api.grammar import router as grammar_router
+from app.api.community import router as community_router
 from app.api.gamification import router as gamification_router
 from app.api.progress import router as progress_router
 from app.api.prediction import router as prediction_router
@@ -86,6 +87,7 @@ app.include_router(assessment_router, prefix="/api/assessment", tags=["水平测
 app.include_router(learning_path_router, prefix="/api/learning-path", tags=["学习路径"])
 app.include_router(recommendation_router, prefix="/api/recommendations", tags=["资料推荐"])
 app.include_router(grammar_router, prefix="/api/grammar", tags=["语法纠错"])
+app.include_router(community_router, prefix="/api/community", tags=["社区服务"])
 app.include_router(gamification_router, prefix="/api/gamification", tags=["游戏化闯关"])
 app.include_router(progress_router, prefix="/api/progress", tags=["学习进度"])
 app.include_router(prediction_router, prefix="/api", tags=["学习预测"])
