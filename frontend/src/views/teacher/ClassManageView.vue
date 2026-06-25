@@ -2,7 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { Plus } from '@element-plus/icons-vue'
 import { useAdminStore } from '@/stores/admin'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
 
 const store = useAdminStore()
 

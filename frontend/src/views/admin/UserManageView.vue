@@ -35,7 +35,7 @@ watch([searchQuery, filterRole], () => {
   searchTimer = setTimeout(loadUsers, 300)
 })
 
-watch(currentPage, () => {
+watch([currentPage, pageSize], () => {
   loadUsers()
 })
 

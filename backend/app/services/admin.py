@@ -199,7 +199,7 @@ class TeacherService:
             })
         return result
 
-    def review_submission(self, submission_id: int, teacher_id: int, feedback: str, score: float, db: Session) -> Dict:
+    def review_submission(self, submission_id: int, teacher_id: int, feedback: str, score: float | None, db: Session) -> Dict:
         """教师点评作业"""
         sub = (
             db.query(AssignmentSubmission)
@@ -215,9 +215,11 @@ class TeacherService:
         sub.teacher_score = score
         sub.status = "reviewed"
         db.flush()
+
+        user = db.query(UserProfile).filter(UserProfile.id == sub.user_id).first()
         return {
             "id": sub.id, "user_id": sub.user_id,
-            "username": "", "assignment_id": sub.assignment_id,
+            "username": user.username if user else "未知", "assignment_id": sub.assignment_id,
             "audio_url": sub.audio_url,
             "score": float(sub.score) if sub.score else None,
             "teacher_feedback": sub.teacher_feedback,
