@@ -74,6 +74,7 @@ from app.api.assessment import router as assessment_router
 from app.api.learning_path import router as learning_path_router
 from app.api.recommendation import router as recommendation_router
 from app.api.grammar import router as grammar_router
+from app.api.admin import router as admin_router
 
 app.include_router(pronunciation_router, prefix="/api/pronunciation", tags=["发音评测"])
 app.include_router(conversation_router, prefix="/api/conversation", tags=["语音对话"])
@@ -83,3 +84,4 @@ app.include_router(assessment_router, prefix="/api/assessment", tags=["水平测
 app.include_router(learning_path_router, prefix="/api/learning-path", tags=["学习路径"])
 app.include_router(recommendation_router, prefix="/api/recommendations", tags=["资料推荐"])
 app.include_router(grammar_router, prefix="/api/grammar", tags=["语法纠错"])
+app.include_router(admin_router, prefix="/api/admin", tags=["后台管理"])
