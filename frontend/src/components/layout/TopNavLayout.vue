@@ -15,6 +15,10 @@ let noticeTimer = null
 
 onMounted(() => {
   if (authStore.isLoggedIn) {
+    // 加载完整用户信息（头像、用户名等）
+    if (!authStore.userInfo?.avatar || !authStore.userInfo?.email) {
+      authStore.fetchProfile()
+    }
     predStore.fetchUnreadCount()
     noticeTimer = setInterval(() => predStore.fetchUnreadCount(), 60000)
   }
@@ -26,7 +30,7 @@ onUnmounted(() => {
 
 // ========== 导航定义（按需求文档七个模块） ==========
 
-const FULLSCREEN_ROUTES = ['/conversation']
+const FULLSCREEN_ROUTES = ['/conversation', '/role-play']
 
 const isFullscreenRoute = computed(() => FULLSCREEN_ROUTES.includes(route.path))
 
@@ -46,6 +50,7 @@ const learnerNavs = [
     children: [
       { path: '/learning-path', title: '路径规划' },
       { path: '/recommend', title: '资料推荐' },
+      { path: '/profile-summary', title: '个人情况说明' },
     ],
   },
   {
@@ -53,12 +58,14 @@ const learnerNavs = [
     children: [
       { path: '/progress', title: '进度追踪' },
       { path: '/challenge', title: '闯关挑战' },
+      { path: '/my-homework', title: '我的作业' },
     ],
   },
   {
     title: '社区',
     children: [
       { path: '/community', title: '社区广场' },
+      { path: '/my-classes', title: '我的班级' },
     ],
   },
   { path: '/help', title: '智能客服' },
@@ -80,6 +87,7 @@ const teacherNavs = [
     children: [
       { path: '/learning-path', title: '路径规划' },
       { path: '/recommend', title: '资料推荐' },
+      { path: '/profile-summary', title: '个人情况说明' },
     ],
   },
   {
@@ -87,12 +95,14 @@ const teacherNavs = [
     children: [
       { path: '/progress', title: '进度追踪' },
       { path: '/challenge', title: '闯关挑战' },
+      { path: '/my-homework', title: '我的作业' },
     ],
   },
   {
     title: '社区',
     children: [
       { path: '/community', title: '社区广场' },
+      { path: '/my-classes', title: '我的班级' },
     ],
   },
   { path: '/help', title: '智能客服' },
@@ -122,6 +132,7 @@ const adminNavs = [
     children: [
       { path: '/learning-path', title: '路径规划' },
       { path: '/recommend', title: '资料推荐' },
+      { path: '/profile-summary', title: '个人情况说明' },
     ],
   },
   {
@@ -129,17 +140,27 @@ const adminNavs = [
     children: [
       { path: '/progress', title: '进度追踪' },
       { path: '/challenge', title: '闯关挑战' },
+      { path: '/my-homework', title: '我的作业' },
     ],
   },
   {
     title: '社区',
     children: [
       { path: '/community', title: '社区广场' },
+      { path: '/my-classes', title: '我的班级' },
     ],
   },
   { path: '/help', title: '智能客服' },
   {
-    title: '后台管理',
+    title: '教师管理',
+    children: [
+      { path: '/teacher/classes', title: '班级管理' },
+      { path: '/teacher/reports', title: '学生报告' },
+      { path: '/teacher/homework', title: '作业管理' },
+    ],
+  },
+  {
+    title: '运营管理',
     children: [
       { path: '/admin/dashboard', title: '运营看板' },
       { path: '/admin/users', title: '用户管理' },
@@ -184,9 +205,13 @@ function onParentClick(item) {
   }
 }
 
-function handleLogout() {
-  authStore.logout()
-  router.push('/')
+function handleCommand(command) {
+  if (command === 'profile') {
+    router.push('/profile')
+  } else if (command === 'logout') {
+    authStore.logout()
+    router.push('/')
+  }
 }
 </script>
 
@@ -242,14 +267,14 @@ function handleLogout() {
         </template>
         <template v-else>
           <!-- 通知 -->
-          <el-badge :value="predStore.unreadCount" :max="99" :hidden="!predStore.unreadCount" class="tn-notice">
+          <el-badge :value="predStore.unreadCount" :max="99" :hidden="!predStore.unreadCount" class="tn-notice" @click="router.push('/notices')">
             <el-icon :size="20"><Bell /></el-icon>
           </el-badge>
 
           <!-- 用户下拉 -->
-          <el-dropdown trigger="click" @command="handleLogout">
+          <el-dropdown trigger="click" @command="handleCommand">
             <span class="tn-user">
-              <el-avatar :size="32" icon="UserFilled" />
+              <el-avatar :size="32" :src="authStore.userInfo?.avatar" icon="UserFilled" />
               <span class="tn-username">{{ authStore.userInfo?.username || '用户' }}</span>
               <el-icon><ArrowDown /></el-icon>
             </span>
@@ -335,7 +360,7 @@ function handleLogout() {
 
 .tn-logo {
   font-family: var(--font-heading);
-  font-size: var(--font-size-lg);
+  font-size: 24px;
   font-weight: 700;
   background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
   -webkit-background-clip: text;

@@ -32,7 +32,7 @@ class RoleplayEndResponse(BaseModel):
         default_factory=list,
         description="每句话的发音评分结果",
     )
-    transcript: List[Dict[str, str]] = Field(
+    transcript: List[Dict[str, Any]] = Field(
         default_factory=list,
         description="对话完整记录",
     )

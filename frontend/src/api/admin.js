@@ -18,6 +18,10 @@ export function joinClassApi(inviteCode) {
   return request.post('/api/admin/classes/join', { invite_code: inviteCode })
 }
 
+export function refreshInviteCodeApi(classId) {
+  return request.post(`/api/admin/classes/${classId}/refresh-code`)
+}
+
 // ===== 作业管理 =====
 
 export function getAssignmentsApi() {
@@ -66,6 +70,18 @@ export function getStudentDetailApi(studentId) {
 
 export function getContentListApi(contentType) {
   return request.get(`/api/admin/content/${contentType}`)
+}
+
+export function createContentApi(data) {
+  return request.post('/api/admin/content', data)
+}
+
+export function updateContentApi(contentType, itemId, data) {
+  return request.put(`/api/admin/content/${contentType}/${itemId}`, { content_type: contentType, data })
+}
+
+export function deleteContentApi(contentType, itemId) {
+  return request.delete(`/api/admin/content/${contentType}/${itemId}`)
 }
 
 // ===== 反馈管理 =====

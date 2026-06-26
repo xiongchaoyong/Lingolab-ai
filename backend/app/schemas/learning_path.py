@@ -110,3 +110,51 @@ class CompleteTaskRequest(BaseModel):
     """完成任务请求"""
     score: Optional[float] = Field(default=None, description="任务得分 0-100")
     duration_seconds: Optional[int] = Field(default=None, description="完成耗时（秒）")
+
+
+# ============================================================
+# 个人情况说明
+# ============================================================
+
+class DimensionScore(BaseModel):
+    """单维度分数"""
+    label: str = Field(..., description="维度中文名")
+    key: str = Field(..., description="维度标识")
+    score: Optional[float] = Field(default=None, description="分数 0-100")
+    is_weakness: bool = Field(default=False, description="是否为短板")
+
+
+class RecentStats(BaseModel):
+    """近期练习统计"""
+    total_tasks: int = 0
+    completed_tasks: int = 0
+    pronunciation_count: int = 0
+    conversation_count: int = 0
+    roleplay_count: int = 0
+    avg_pronunciation_score: Optional[float] = None
+    avg_conversation_score: Optional[float] = None
+
+
+class RecommendationFactor(BaseModel):
+    """推荐因子说明"""
+    name: str
+    weight: str
+    description: str
+
+
+class RecommendationLogic(BaseModel):
+    """推荐算法说明"""
+    algorithm: str = "四因子评分"
+    factors: List[RecommendationFactor]
+
+
+class ProfileSummaryResponse(BaseModel):
+    """个人情况说明响应"""
+    cefr_level: str = "A1"
+    level_source: str = ""          # "智能测评" / "自评" / "EMA动态"
+    learning_goal: str = ""
+    interests: List[str] = Field(default_factory=list)
+    age_group: str = ""
+    dimension_scores: List[DimensionScore] = Field(default_factory=list)
+    recent_stats: RecentStats = Field(default_factory=RecentStats)
+    recommendation_logic: RecommendationLogic = Field(default_factory=RecommendationLogic)

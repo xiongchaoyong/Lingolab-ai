@@ -81,6 +81,12 @@ const routes = [
         component: () => import('@/views/learning/RecommendationView.vue'),
         meta: { title: '资料推荐', auth: true },
       },
+      {
+        path: 'profile-summary',
+        name: 'ProfileSummary',
+        component: () => import('@/views/learning/ProfileSummaryView.vue'),
+        meta: { title: '个人情况说明', auth: true },
+      },
       // 模块四：激励服务
       {
         path: 'progress',
@@ -101,12 +107,31 @@ const routes = [
         component: () => import('@/views/community/CommunityView.vue'),
         meta: { title: '社区', auth: true },
       },
+      // 学生端：我的班级 & 我的作业
+      {
+        path: 'my-classes',
+        name: 'MyClasses',
+        component: () => import('@/views/student/MyClassesView.vue'),
+        meta: { title: '我的班级', auth: true },
+      },
+      {
+        path: 'my-homework',
+        name: 'MyHomework',
+        component: () => import('@/views/student/MyHomeworkView.vue'),
+        meta: { title: '我的作业', auth: true },
+      },
       // 模块七：智能客服
       {
         path: 'help',
         name: 'Help',
         component: () => import('@/views/help/HelpView.vue'),
         meta: { title: '智能客服', auth: true },
+      },
+      {
+        path: 'notices',
+        name: 'Notices',
+        component: () => import('@/views/notice/NoticeView.vue'),
+        meta: { title: '通知中心', auth: true },
       },
       {
         path: 'conversation',
@@ -217,8 +242,12 @@ router.beforeEach((to, from, next) => {
     return next('/assessment')
   }
 
-  // 角色检查：教师/管理员路由
+  // 角色检查：教师/管理员路由（admin 可访问教师路由）
   if (to.meta.role && authStore.userInfo?.role !== to.meta.role) {
+    // admin 可访问 teacher 路由
+    if (to.meta.role === 'teacher' && authStore.userInfo?.role === 'admin') {
+      return next()
+    }
     return next('/')
   }
 

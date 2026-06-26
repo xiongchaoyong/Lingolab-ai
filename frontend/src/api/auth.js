@@ -19,3 +19,9 @@ export function updateProfileApi(data) {
 export function refreshTokenApi() {
   return request.post('/api/auth/token/refresh')
 }
+
+export function uploadAvatarApi(formData) {
+  return request.post('/api/auth/avatar', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
+}

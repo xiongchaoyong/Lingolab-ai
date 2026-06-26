@@ -30,6 +30,7 @@ class UserProfile(Base):
         nullable=False,
     )
     assessment_completed = Column(Integer, default=0, nullable=False)
+    avatar_url = Column(String(500), nullable=True, default=None, comment="头像URL")
     is_active = Column(Integer, default=1, nullable=False)
     version = Column(Integer, default=1, nullable=False)
     created_at = Column(DateTime, server_default=func.now())

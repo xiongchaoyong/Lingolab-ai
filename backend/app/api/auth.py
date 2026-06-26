@@ -1,8 +1,9 @@
 """用户认证 API 路由"""
 
 import logging
+import os
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -142,6 +143,8 @@ async def login(req: LoginRequest, db: Session = Depends(get_db)):
         token=token,
         assessment_completed=bool(user.assessment_completed),
         redirect=redirect,
+        role=user.role,
+        avatar=user.avatar_url,
     )
 
 
@@ -170,6 +173,7 @@ async def get_profile(
         level_final=current_user.level_final,
         assessment_completed=bool(current_user.assessment_completed),
         role=current_user.role,
+        avatar=current_user.avatar_url,
     )
 
 
@@ -207,6 +211,7 @@ async def update_profile(
             level_final=current_user.level_final,
             assessment_completed=bool(current_user.assessment_completed),
             role=current_user.role,
+            avatar=current_user.avatar_url,
         )
 
     # 乐观锁：version 字段防止并发冲突
@@ -253,7 +258,57 @@ async def update_profile(
         level_final=current_user.level_final,
         assessment_completed=bool(current_user.assessment_completed),
         role=current_user.role,
+        avatar=current_user.avatar_url,
     )
+
+
+@router.post("/avatar")
+async def upload_avatar(
+    file: UploadFile = File(..., description="头像图片"),
+    current_user: UserProfile = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    上传用户头像。
+    - 支持格式：jpg / jpeg / png / gif / webp
+    - 最大 2MB
+    - 覆盖式存储，以用户 ID 命名
+    """
+    # 校验文件大小
+    contents = await file.read()
+    if len(contents) > 2 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="头像文件不能超过 2MB")
+
+    # 校验图片类型
+    allowed_types = {"jpg", "jpeg", "png", "gif", "webp"}
+    ext = file.filename.rsplit(".", 1)[-1].lower() if "." in file.filename else ""
+    if ext not in allowed_types:
+        raise HTTPException(status_code=400, detail=f"不支持的图片格式：{ext}，支持 jpg/png/gif/webp")
+
+    # 用 Pillow 二次校验文件头
+    from PIL import Image
+    from io import BytesIO
+    try:
+        img = Image.open(BytesIO(contents))
+        img.verify()
+    except Exception:
+        raise HTTPException(status_code=400, detail="文件内容不是有效图片")
+
+    # 保存头像
+    avatar_dir = os.path.join("uploads", "avatars")
+    os.makedirs(avatar_dir, exist_ok=True)
+    filepath = os.path.join(avatar_dir, f"{current_user.id}.{ext}")
+    with open(filepath, "wb") as f:
+        f.write(contents)
+
+    # 更新数据库
+    avatar_url = f"/static/avatars/{current_user.id}.{ext}"
+    current_user.avatar_url = avatar_url
+    db.commit()
+
+    logger.info(f"用户头像上传: {current_user.username} (id={current_user.id})")
+
+    return {"avatar_url": avatar_url}
 
 
 @router.get("/profile/scores", response_model=ProfileScoresResponse)

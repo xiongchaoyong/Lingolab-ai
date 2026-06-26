@@ -7,10 +7,13 @@ const authStore = useAuthStore()
 <template>
   <div class="home-page">
     <div class="welcome-section">
-      <h2 class="page-title">
-        欢迎回来，{{ authStore.userInfo?.username || '同学' }}
-      </h2>
-      <p class="welcome-subtitle">今日学习进度</p>
+      <el-avatar :size="48" :src="authStore.userInfo?.avatar" icon="UserFilled" class="welcome-avatar" />
+      <div>
+        <h2 class="page-title">
+          欢迎回来，{{ authStore.userInfo?.username || '同学' }}
+        </h2>
+        <p class="welcome-subtitle">今日学习进度</p>
+      </div>
     </div>
 
     <!-- 统计卡片 -->
@@ -72,7 +75,14 @@ const authStore = useAuthStore()
 <style lang="scss" scoped>
 .home-page {
   .welcome-section {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
     margin-bottom: var(--spacing-xl);
+
+    .welcome-avatar {
+      flex-shrink: 0;
+    }
 
     .welcome-subtitle {
       color: var(--color-text-secondary);

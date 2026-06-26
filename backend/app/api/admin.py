@@ -23,6 +23,8 @@ from app.schemas.admin import (
     FeedbackListResponse,
     FeedbackReplyRequest,
     FeedbackStatusRequest,
+    ContentCreateRequest,
+    ContentUpdateRequest,
 )
 from app.services.admin import teacher_service, admin_service
 
@@ -31,9 +33,9 @@ logger = logging.getLogger(__name__)
 
 
 def require_teacher(current_user: UserProfile = Depends(get_current_user)):
-    """要求教师角色"""
-    if current_user.role != "teacher":
-        raise HTTPException(status_code=403, detail="仅教师可访问")
+    """要求教师或管理员角色"""
+    if current_user.role not in ("teacher", "admin"):
+        raise HTTPException(status_code=403, detail="仅教师或管理员可访问")
     return current_user
 
 
@@ -101,6 +103,22 @@ def join_class(
         result = teacher_service.join_class(current_user.id, req.invite_code, db)
         db.commit()
         return {"code": 0, "data": result, "message": "加入成功"}
+    except ValueError as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/classes/{class_id}/refresh-code", response_model=dict)
+def refresh_invite_code(
+    class_id: int,
+    teacher: UserProfile = Depends(require_teacher),
+    db: Session = Depends(get_db),
+):
+    """刷新班级邀请码"""
+    try:
+        result = teacher_service.refresh_invite_code(class_id, teacher.id, db)
+        db.commit()
+        return {"code": 0, "data": result, "message": "邀请码已刷新"}
     except ValueError as e:
         db.rollback()
         raise HTTPException(status_code=400, detail=str(e))
@@ -261,6 +279,57 @@ def get_content_list(
         raise HTTPException(status_code=400, detail="无效的内容类型")
     items = admin_service.get_content_list(content_type, db)
     return {"items": items}
+
+
+@router.post("/content", response_model=dict)
+def create_content(
+    req: ContentCreateRequest,
+    admin: UserProfile = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """创建内容项"""
+    try:
+        result = admin_service.create_content(req.content_type, req.data, admin.id, db)
+        db.commit()
+        return {"code": 0, "data": result, "message": "创建成功"}
+    except ValueError as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.put("/content/{content_type}/{item_id}", response_model=dict)
+def update_content(
+    content_type: str,
+    item_id: int,
+    req: ContentUpdateRequest,
+    admin: UserProfile = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """更新内容项"""
+    try:
+        result = admin_service.update_content(content_type, item_id, req.data, admin.id, db)
+        db.commit()
+        return {"code": 0, "data": result, "message": "更新成功"}
+    except ValueError as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.delete("/content/{content_type}/{item_id}", response_model=dict)
+def delete_content(
+    content_type: str,
+    item_id: int,
+    admin: UserProfile = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """删除内容项（软删除）"""
+    try:
+        result = admin_service.delete_content(content_type, item_id, admin.id, db)
+        db.commit()
+        return {"code": 0, "data": result, "message": "删除成功"}
+    except ValueError as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 # ============================================================

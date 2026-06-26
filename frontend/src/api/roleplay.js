@@ -1,6 +1,13 @@
 import request from './index'
+import { useAuthStore } from '@/stores/auth'
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || ''
+
+function authHeaders(extra = {}) {
+  const authStore = useAuthStore()
+  const token = authStore.token
+  return token ? { Authorization: `Bearer ${token}`, ...extra } : extra
+}
 
 /**
  * 流式开始角色扮演 — SSE 逐 token 返回
@@ -11,7 +18,7 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL || ''
 export async function streamStartRoleplay(role, cefrLevel, callbacks) {
   const resp = await fetch(`${API_BASE}/api/roleplay/stream/start`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify({ role, cefr_level: cefrLevel }),
   })
   await readSSEStream(resp, callbacks)
@@ -31,6 +38,7 @@ export async function streamSpeakRoleplay(sessionId, role, audioBlob, callbacks)
   form.append('audio', audioBlob, 'recording.wav')
   const resp = await fetch(`${API_BASE}/api/roleplay/stream/speak`, {
     method: 'POST',
+    headers: authHeaders(),
     body: form,
   })
   await readSSEStream(resp, callbacks)

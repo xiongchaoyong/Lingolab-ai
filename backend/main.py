@@ -6,6 +6,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 # HuggingFace 镜像（在导入模型前设置）
 if "HF_ENDPOINT" not in os.environ:
@@ -49,6 +50,19 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# 全局异常处理 — 确保 500 错误也返回 CORS 头
+from fastapi.responses import JSONResponse
+from fastapi.requests import Request
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    logger.error(f"未捕获异常: {type(exc).__name__}: {exc}", exc_info=True)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": f"服务器内部错误: {str(exc)}"},
+        headers={"Access-Control-Allow-Origin": "*"},
+    )
+
 # CORS — 开发阶段允许所有来源
 app.add_middleware(
     CORSMiddleware,
@@ -75,6 +89,7 @@ from app.api.learning_path import router as learning_path_router
 from app.api.recommendation import router as recommendation_router
 from app.api.grammar import router as grammar_router
 from app.api.admin import router as admin_router
+from app.api.student import router as student_router
 from app.api.community import router as community_router
 from app.api.gamification import router as gamification_router
 from app.api.progress import router as progress_router
@@ -90,8 +105,12 @@ app.include_router(learning_path_router, prefix="/api/learning-path", tags=["学
 app.include_router(recommendation_router, prefix="/api/recommendations", tags=["资料推荐"])
 app.include_router(grammar_router, prefix="/api/grammar", tags=["语法纠错"])
 app.include_router(admin_router, prefix="/api/admin", tags=["后台管理"])
+app.include_router(student_router, prefix="/api/student", tags=["学生端"])
 app.include_router(community_router, prefix="/api/community", tags=["社区服务"])
 app.include_router(gamification_router, prefix="/api/gamification", tags=["游戏化闯关"])
 app.include_router(progress_router, prefix="/api/progress", tags=["学习进度"])
 app.include_router(prediction_router, prefix="/api", tags=["学习预测"])
 app.include_router(help_router, prefix="/api/help", tags=["智能客服"])
+
+# 静态文件服务 — 上传的头像等资源
+app.mount("/static", StaticFiles(directory="uploads"), name="static")

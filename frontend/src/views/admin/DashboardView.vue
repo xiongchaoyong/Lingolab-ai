@@ -20,8 +20,14 @@ const metrics = computed(() => {
   return [
     { label: 'DAU', value: String(d.dau), color: '#A78BFA' },
     { label: 'MAU', value: String(d.mau), color: '#C4B5FD' },
+    { label: '日新增', value: String(d.daily_new_users || 0), color: '#FDE68A' },
     { label: '总用户', value: String(d.total_users), color: '#FDBA74' },
     { label: '活跃用户', value: String(d.active_users), color: '#FDA4AF' },
+    { label: '次日留存', value: d.retention_d1 != null ? d.retention_d1 + '%' : '-', color: '#86EFAC' },
+    { label: '7日留存', value: d.retention_d7 != null ? d.retention_d7 + '%' : '-', color: '#67E8F9' },
+    { label: '总时长(h)', value: d.total_duration_minutes ? Math.floor(d.total_duration_minutes / 60) : '0', color: '#D8B4FE' },
+    { label: '人均时长(m)', value: d.avg_duration_minutes != null ? String(d.avg_duration_minutes) : '0', color: '#FCA5A5' },
+    { label: '对话完成率', value: d.conversation_completion_rate != null ? d.conversation_completion_rate + '%' : '-', color: '#93C5FD' },
   ]
 })
 
@@ -73,7 +79,7 @@ const typeDist = computed(() => {
 
     <template v-else-if="store.dashboard">
       <el-row :gutter="16" class="metrics-row">
-        <el-col :span="6" v-for="m in metrics" :key="m.label">
+        <el-col :span="4" v-for="m in metrics" :key="m.label">
           <div class="metric-card" :style="{ borderTopColor: m.color }">
             <div class="metric-value" :style="{ color: m.color }">{{ m.value }}</div>
             <div class="metric-label">{{ m.label }}</div>

@@ -319,6 +319,7 @@ async def roleplay_stream_speak(
     session_id: str = Form(..., description="会话 ID"),
     role: str = Form(default="interviewee", description="角色标识"),
     audio: UploadFile = File(..., description="用户语音"),
+    db: Session = Depends(get_db),
 ):
     """
     流式角色扮演对话 — ASR 后 SSE 逐 token 返回 AI 回复
@@ -563,6 +564,8 @@ async def roleplay_tts_cached(session_id: str, round_key: str):
 @router.post("/end", response_model=RoleplayEndResponse)
 async def roleplay_end(
     session_id: str = Form(..., description="会话 ID"),
+    current_user: UserProfile = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
     """
     结束角色扮演并评分

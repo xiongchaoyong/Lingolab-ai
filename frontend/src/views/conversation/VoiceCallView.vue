@@ -1,11 +1,13 @@
 <script setup>
-import { ref, computed, onUnmounted } from 'vue'
+import { ref, computed, onUnmounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
 import { ArrowLeft, InfoFilled } from '@element-plus/icons-vue'
 import { streamStartConversation, streamSpeakConversation, ttsStreamUrl, ttsCachedUrl, endConversation } from '@/api/conversation'
 import UtteranceDetailPanel from '@/components/pronunciation/UtteranceDetailPanel.vue'
 
 const router = useRouter()
+const authStore = useAuthStore()
 
 // ========== 场景配置 ==========
 const SCENARIOS = [
@@ -19,13 +21,16 @@ const SCENARIOS = [
 const phase = ref('select') // select | calling | report
 const selectedScenario = ref(null)
 const sessionId = ref('')
-const callState = ref('idle') // idle | ai_speaking | listening | thinking
-const subtitle = ref('')
-const userSubtitle = ref('')
+const callState = ref('idle') // idle | ai_speaking | listening | thinking | paused
 const isConnecting = ref(false)
+const isPaused = ref(false)
 const scoreReport = ref(null)
 const isScoring = ref(false)
-const grammarCorrection = ref(null)  // 当前轮语法纠错结果
+
+// 对话记录（滚动展示）
+const messages = ref([])  // [{role: 'user'|'ai', text, grammar?, streaming?}]
+const chatBoxRef = ref(null)
+let currentUserMsgIdx = -1  // 当前等待语法纠错的用户消息索引
 
 // 语法错误类型颜色映射
 const ERROR_TYPE_COLORS = {
@@ -74,6 +79,29 @@ function toggleUtterance(index) {
   expandedUtterance.value = expandedUtterance.value === index ? null : index
 }
 
+// 滚动到底部
+async function scrollToBottom() {
+  await nextTick()
+  if (chatBoxRef.value) {
+    chatBoxRef.value.scrollTop = chatBoxRef.value.scrollHeight
+  }
+}
+
+// 逐字流式显示用户文本
+function typewriteUserText(idx, fullText) {
+  let pos = 0
+  const speed = 15  // 每字间隔 ms，模拟流式速度
+  function step() {
+    if (isHangingUp) return
+    if (pos < fullText.length && idx < messages.value.length) {
+      messages.value[idx].text = fullText.slice(0, ++pos)
+      scrollToBottom()
+      setTimeout(step, speed * (Math.random() * 0.5 + 0.75))  // 模拟 token 随机性
+    }
+  }
+  step()
+}
+
 // 音频相关
 let audioContext = null
 let analyser = null
@@ -81,63 +109,76 @@ let mediaRecorder = null
 let audioChunks = []
 let silenceTimer = null
 let currentAudio = null
+let vadRaF = null  // VAD requestAnimationFrame ID
+let isHangingUp = false  // 挂断中，阻止后续操作
 const SILENCE_THRESHOLD = 0.02  // 音量阈值
-const SILENCE_DURATION = 1500   // 静音 1.5 秒后自动停止
+const SILENCE_DURATION = 2500   // 静音 2.5 秒后自动停止
 
 // ========== 场景选择 ==========
 async function selectScenario(scenario) {
   selectedScenario.value = scenario
   phase.value = 'calling'
   callState.value = 'idle'
-  subtitle.value = ''
-  userSubtitle.value = ''
+  isPaused.value = false
+  messages.value = []
+  currentUserMsgIdx = -1
 
   // 开始对话
   isConnecting.value = true
   streamStartConversation(scenario.id, 'B1', {
     onToken(text) {
-      subtitle.value += text
+      if (isConnecting.value) isConnecting.value = false
+      const last = messages.value[messages.value.length - 1]
+      if (last && last.role === 'ai' && last.streaming) {
+        last.text += text
+      } else {
+        messages.value.push({ role: 'ai', text, streaming: true })
+      }
+      scrollToBottom()
     },
     onDone(data) {
       isConnecting.value = false
       sessionId.value = data.session_id
-      subtitle.value = data.full_text
-      // 使用预取 TTS URL 播放（后台已并行启动 Edge TTS）
+      const last = messages.value[messages.value.length - 1]
+      if (last && last.role === 'ai') {
+        last.text = data.full_text
+        last.streaming = false
+      }
       speakAndListen(data.full_text, data.tts_url ? ttsCachedUrl(data.tts_url) : null)
     },
     onError() {
       isConnecting.value = false
-      subtitle.value = 'Connection failed. Please try again.'
+      messages.value.push({ role: 'ai', text: 'Connection failed. Please try again.' })
     },
   })
 }
 
 // ========== AI 说话 → 自动听 ==========
 async function speakAndListen(text, ttsUrl) {
+  if (isPaused.value) return
   callState.value = 'ai_speaking'
   try {
     const url = ttsUrl || ttsStreamUrl(text)
     currentAudio = new Audio(url)
     currentAudio.onended = () => {
-      // AI 说完 → 自动开始听
-      startListening()
+      currentAudio = null
+      if (!isPaused.value) startListening()
     }
     currentAudio.onerror = () => {
-      // 播放失败，直接开始听
-      startListening()
+      currentAudio = null
+      if (!isPaused.value) startListening()
     }
     await currentAudio.play()
   } catch (e) {
-    // TTS 失败，直接开始听
-    startListening()
+    currentAudio = null
+    if (!isPaused.value) startListening()
   }
 }
 
 // ========== VAD 录音 ==========
 async function startListening() {
+  if (isPaused.value || isHangingUp) return
   callState.value = 'listening'
-  userSubtitle.value = ''
-  grammarCorrection.value = null
   audioChunks = []
 
   try {
@@ -158,16 +199,18 @@ async function startListening() {
     mediaRecorder.onstop = () => {
       stream.getTracks().forEach((t) => t.stop())
       audioContext.close()
-      processUserAudio()
+      audioContext = null
+      if (!isPaused.value) processUserAudio()
     }
     mediaRecorder.start()
 
     // VAD 检测循环
     const dataArray = new Uint8Array(analyser.frequencyBinCount)
     let silenceStart = null
+    let hasVoice = false  // 是否检测到过语音
 
     function checkVolume() {
-      if (callState.value !== 'listening') return
+      if (callState.value !== 'listening' || isPaused.value) return
       analyser.getByteTimeDomainData(dataArray)
       let sum = 0
       for (let i = 0; i < dataArray.length; i++) {
@@ -177,20 +220,23 @@ async function startListening() {
       const rms = Math.sqrt(sum / dataArray.length)
 
       if (rms < SILENCE_THRESHOLD) {
-        if (!silenceStart) silenceStart = Date.now()
-        else if (Date.now() - silenceStart > SILENCE_DURATION) {
-          // 静音足够久，停止录音
-          if (mediaRecorder?.state === 'recording') {
-            mediaRecorder.stop()
+        // 只有检测到过语音后，才开始计时静音
+        if (hasVoice) {
+          if (!silenceStart) silenceStart = Date.now()
+          else if (Date.now() - silenceStart > SILENCE_DURATION) {
+            if (mediaRecorder?.state === 'recording') {
+              mediaRecorder.stop()
+            }
+            return
           }
-          return
         }
       } else {
+        hasVoice = true
         silenceStart = null
       }
-      requestAnimationFrame(checkVolume)
+      vadRaF = requestAnimationFrame(checkVolume)
     }
-    requestAnimationFrame(checkVolume)
+    vadRaF = requestAnimationFrame(checkVolume)
   } catch (e) {
     console.error('麦克风访问失败:', e)
     callState.value = 'idle'
@@ -198,8 +244,8 @@ async function startListening() {
 }
 
 async function processUserAudio() {
+  if (isPaused.value || isHangingUp) return
   if (audioChunks.length === 0) {
-    // 用户没说话，重新开始听
     startListening()
     return
   }
@@ -209,36 +255,100 @@ async function processUserAudio() {
 
   streamSpeakConversation(sessionId.value, selectedScenario.value.id, audioBlob, {
     onAsr(text) {
-      userSubtitle.value = text
+      const idx = messages.value.push({ role: 'user', text: '' }) - 1
+      currentUserMsgIdx = idx
+      scrollToBottom()
+      // 逐字流式显示用户文本
+      typewriteUserText(idx, text)
     },
     onGrammar(data) {
-      grammarCorrection.value = data
+      // 语法纠错挂到对应索引的用户消息上
+      if (currentUserMsgIdx >= 0 && currentUserMsgIdx < messages.value.length) {
+        const msg = messages.value[currentUserMsgIdx]
+        if (msg && msg.role === 'user') {
+          msg.grammar = { ...data, _collapsed: true }
+        }
+      }
     },
     onToken(text) {
-      subtitle.value += text
+      const last = messages.value[messages.value.length - 1]
+      if (last && last.role === 'ai' && last.streaming) {
+        last.text += text
+      } else {
+        messages.value.push({ role: 'ai', text, streaming: true })
+      }
+      scrollToBottom()
     },
     onDone(data) {
-      subtitle.value = data.full_text
-      // 使用预取 TTS URL 播放（后台已并行启动 Edge TTS）
+      const last = messages.value[messages.value.length - 1]
+      if (last && last.role === 'ai') {
+        last.text = data.full_text
+        last.streaming = false
+      }
       speakAndListen(data.full_text, data.tts_url ? ttsCachedUrl(data.tts_url) : null)
     },
     onError() {
-      subtitle.value = 'Sorry, I had trouble understanding that.'
+      messages.value.push({ role: 'ai', text: 'Sorry, I had trouble understanding that.' })
+      scrollToBottom()
       startListening()
     },
   })
 }
 
+// ========== 暂停 / 继续 ==========
+function togglePause() {
+  if (isPaused.value) {
+    // 继续对话
+    isPaused.value = false
+    if (currentAudio) {
+      currentAudio.play()
+      callState.value = 'ai_speaking'
+    } else {
+      startListening()
+    }
+  } else {
+    // 暂停对话
+    isPaused.value = true
+    if (currentAudio) currentAudio.pause()
+    if (mediaRecorder?.state === 'recording') mediaRecorder.stop()
+    if (vadRaF) { cancelAnimationFrame(vadRaF); vadRaF = null }
+    callState.value = 'paused'
+  }
+}
+
 // ========== 挂断 ==========
 async function hangUp() {
-  if (mediaRecorder?.state === 'recording') {
-    mediaRecorder.stop()
+  isHangingUp = true
+  isPaused.value = false
+
+  // 1. 停止录音和相关资源
+  if (vadRaF) { cancelAnimationFrame(vadRaF); vadRaF = null }
+  if (mediaRecorder) {
+    // 移除 onstop 回调，防止触发 processUserAudio
+    mediaRecorder.onstop = null
+    if (mediaRecorder.state === 'recording') {
+      mediaRecorder.stop()
+    }
+    // 立即释放麦克风
+    if (mediaRecorder.stream) {
+      mediaRecorder.stream.getTracks().forEach(t => t.stop())
+    }
+    mediaRecorder = null
   }
+  if (audioContext) {
+    audioContext.close()
+    audioContext = null
+  }
+
+  // 2. 停止 AI 音频播放
   if (currentAudio) {
     currentAudio.pause()
+    currentAudio.src = ''
     currentAudio = null
   }
-  if (silenceTimer) clearTimeout(silenceTimer)
+  if (silenceTimer) { clearTimeout(silenceTimer); silenceTimer = null }
+
+  callState.value = 'idle'
 
   // 获取评分报告
   if (sessionId.value) {
@@ -269,8 +379,7 @@ async function hangUp() {
 function resetCall() {
   selectedScenario.value = null
   callState.value = 'idle'
-  subtitle.value = ''
-  userSubtitle.value = ''
+  messages.value = []
   scoreReport.value = null
   sessionId.value = ''
 }
@@ -365,52 +474,84 @@ onUnmounted(() => {
             <template v-else-if="callState === 'thinking'">
               <span class="state-dot thinking"></span> 思考中...
             </template>
+            <template v-else-if="callState === 'paused'">
+              <span class="state-dot paused"></span> 已暂停
+            </template>
             <template v-else>准备就绪</template>
           </div>
         </div>
 
-        <!-- 底部字幕区 -->
-        <div class="call-subtitles">
-          <div v-if="userSubtitle" class="subtitle user-subtitle">
-            <span class="subtitle-avatar">😊</span>
-            <span class="subtitle-text">{{ userSubtitle }}</span>
-          </div>
-          <!-- 语法纠错卡片 -->
-          <div v-if="grammarCorrection?.errors?.length" class="grammar-correction-card">
-            <div class="gc-header" @click="grammarCorrection = { ...grammarCorrection, _collapsed: !grammarCorrection._collapsed }">
-              <span class="gc-icon">📝</span>
-              <span class="gc-count">{{ grammarCorrection.errors.length }} 个语法错误</span>
-              <span class="gc-arrow" :class="{ expanded: !grammarCorrection._collapsed }">▶</span>
-            </div>
-            <div class="gc-body" v-show="!grammarCorrection._collapsed">
-              <div class="gc-corrected" v-if="grammarCorrection.corrected_text !== grammarCorrection.original_text">
-                <span class="gc-label">修正：</span>
-                <span class="gc-corrected-text">{{ grammarCorrection.corrected_text }}</span>
+        <!-- 底部字幕区 → 滚动聊天记录 -->
+        <div class="call-chat-box" ref="chatBoxRef">
+          <div
+            v-for="(msg, idx) in messages"
+            :key="idx"
+            class="chat-bubble"
+            :class="msg.role"
+          >
+            <span class="bubble-avatar" v-if="msg.role === 'user'">
+                <el-avatar :size="32" :src="authStore.userInfo?.avatar" icon="UserFilled" />
+              </span>
+              <span class="bubble-avatar" v-else>🐱</span>
+            <div class="bubble-content">
+              <p class="bubble-text">{{ msg.text }}</p>
+              <!-- 语法检测中 -->
+              <div
+                v-if="!msg.grammar && msg.role === 'user' && idx === currentUserMsgIdx && msg.text && msg.text !== '(未识别到语音)'"
+                class="grammar-checking"
+              >
+                <span class="gck-dot"></span> 语法检测中...
               </div>
-              <div v-for="(err, i) in grammarCorrection.errors" :key="i" class="gc-error-item">
-                <span class="gc-error-original">{{ err.original }}</span>
-                <span class="gc-error-arrow">→</span>
-                <span class="gc-error-correction">{{ err.correction }}</span>
-                <span
-                  class="gc-error-type"
-                  :style="{ background: ERROR_TYPE_COLORS[err.error_type] || '#909399' }"
-                >{{ ERROR_TYPE_LABELS[err.error_type] || err.error_type }}</span>
-                <span class="gc-error-explain">{{ err.explanation }}</span>
+              <!-- 语法纠错入口（每条用户消息下方） -->
+              <div
+                v-if="msg.grammar?.errors?.length"
+                class="grammar-indicator"
+                :class="{ expanded: !msg.grammar._collapsed }"
+                @click="msg.grammar._collapsed = !msg.grammar._collapsed"
+              >
+                <span class="gi-icon">📝</span>
+                <span class="gi-text">{{ msg.grammar._collapsed ? `${msg.grammar.errors.length} 个语法提示` : '收起语法提示' }}</span>
+                <span class="gi-count">{{ msg.grammar.errors.length }}</span>
+                <span class="gi-arrow">▾</span>
+              </div>
+              <!-- 语法纠错详情 -->
+              <div v-if="msg.grammar?.errors?.length && !msg.grammar._collapsed" class="grammar-correction-card">
+                <div class="gc-corrected" v-if="msg.grammar.corrected_text !== msg.grammar.original_text">
+                  <span class="gc-label">修正：</span>
+                  <span class="gc-corrected-text">{{ msg.grammar.corrected_text }}</span>
+                </div>
+                <div v-for="(err, i) in msg.grammar.errors" :key="i" class="gc-error-item">
+                  <span class="gc-error-original">{{ err.original }}</span>
+                  <span class="gc-error-arrow">→</span>
+                  <span class="gc-error-correction">{{ err.correction }}</span>
+                  <span
+                    class="gc-error-type"
+                    :style="{ background: ERROR_TYPE_COLORS[err.error_type] || '#909399' }"
+                  >{{ ERROR_TYPE_LABELS[err.error_type] || err.error_type }}</span>
+                  <span class="gc-error-explain">{{ err.explanation }}</span>
+                </div>
               </div>
             </div>
           </div>
-          <div v-if="subtitle" class="subtitle ai-subtitle">
-            <span class="subtitle-avatar">🐱</span>
-            <span class="subtitle-text">{{ subtitle }}</span>
+          <!-- 思考中指示器 -->
+          <div v-if="callState === 'thinking'" class="chat-bubble ai thinking">
+            <span class="bubble-avatar">🐱</span>
+            <div class="bubble-content">
+              <span class="thinking-dots">...</span>
+            </div>
           </div>
         </div>
 
-        <!-- 挂断按钮 -->
+        <!-- 操作按钮 -->
         <div class="call-actions">
+          <button class="pause-btn" @click="togglePause">
+            <span class="pause-icon">{{ isPaused ? '▶️' : '⏸️' }}</span>
+          </button>
+          <p class="pause-label">{{ isPaused ? '继续' : '暂停' }}</p>
           <button class="hangup-btn" @click="hangUp">
             <span class="hangup-icon">📞</span>
           </button>
-          <p class="hangup-label">点击挂断</p>
+          <p class="hangup-label">挂断</p>
         </div>
       </div>
     </template>
@@ -600,8 +741,26 @@ onUnmounted(() => {
               </div>
               <div class="transcript-list">
                 <div v-for="(msg, idx) in scoreReport.transcript" :key="idx" class="transcript-msg" :class="msg.role">
-                  <div class="transcript-role">{{ msg.role === 'user' ? '😊 你' : '🐱 AI' }}</div>
-                  <div class="transcript-bubble">{{ msg.text }}</div>
+                  <template v-if="msg.role === 'grammar'">
+                    <div class="transcript-role">📝 语法纠错</div>
+                    <div class="transcript-grammar">
+                      <div class="tg-corrected" v-if="msg.text.corrected_text !== msg.text.original_text">
+                        <span class="tg-label">修正：</span>
+                        <span class="tg-corrected-text">{{ msg.text.corrected_text }}</span>
+                      </div>
+                      <div v-for="(err, i) in msg.text.errors" :key="i" class="tg-error">
+                        <span class="tg-error-original">{{ err.original }}</span>
+                        <span>→</span>
+                        <span class="tg-error-correction">{{ err.correction }}</span>
+                        <span class="tg-error-type" :style="{ background: ERROR_TYPE_COLORS[err.error_type] || '#909399' }">{{ ERROR_TYPE_LABELS[err.error_type] || err.error_type }}</span>
+                        <span class="tg-error-explain">{{ err.explanation }}</span>
+                      </div>
+                    </div>
+                  </template>
+                  <template v-else>
+                    <div class="transcript-role">{{ msg.role === 'user' ? '😊 你' : '🐱 AI' }}</div>
+                    <div class="transcript-bubble">{{ msg.text }}</div>
+                  </template>
                 </div>
               </div>
             </section>
@@ -848,6 +1007,9 @@ onUnmounted(() => {
       background: #F6BD16;
       animation: pulse-dot 0.5s ease-in-out infinite;
     }
+    &.paused {
+      background: #909399;
+    }
   }
 }
 
@@ -856,62 +1018,120 @@ onUnmounted(() => {
   50% { opacity: 1; transform: scale(1.2); }
 }
 
-// 字幕
-.call-subtitles {
-  padding: 0 24px 20px;
-  max-width: 520px;
-  margin: 0 auto;
-  width: 100%;
+// 聊天记录滚动区
+.call-chat-box {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 20px;
   display: flex;
   flex-direction: column;
   gap: 10px;
+  max-height: calc(100vh - 360px);
+  min-height: 0;
+
+  &::-webkit-scrollbar { width: 4px; }
+  &::-webkit-scrollbar-thumb { background: #E0D8F0; border-radius: 2px; }
 }
 
-.subtitle {
+.chat-bubble {
   display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 14px 16px;
-  border-radius: 18px;
-  font-size: 14px;
-  line-height: 1.5;
-  max-width: 85%;
+  gap: 8px;
+  max-width: 80%;
+  animation: bubbleIn 0.3s ease;
 
-  .subtitle-avatar {
+  .bubble-avatar {
     font-size: 22px;
     flex-shrink: 0;
     line-height: 1;
+    margin-top: 4px;
   }
-  .subtitle-text {
+  .bubble-content {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .bubble-text {
+    padding: 10px 14px;
+    border-radius: 14px;
+    font-size: 18px;
+    font-weight: 600;
+    line-height: 1.5;
+    margin: 0;
     color: #4A4A5A;
   }
+
+  &.user {
+    align-self: flex-end;
+    flex-direction: row-reverse;
+    .bubble-text {
+      background: #F0F0FF;
+      border-bottom-right-radius: 4px;
+      text-align: left;
+    }
+  }
+  &.ai {
+    align-self: flex-start;
+    .bubble-text {
+      background: #FFF0F3;
+      border-bottom-left-radius: 4px;
+    }
+    &.thinking .bubble-text {
+      background: #FFF0F3;
+      .thinking-dots {
+        animation: dotPulse 1.2s infinite;
+        font-size: 18px;
+        letter-spacing: 2px;
+      }
+    }
+  }
 }
 
-.user-subtitle {
-  background: #fff;
-  box-shadow: 0 2px 8px rgba(91, 143, 249, 0.1);
-  align-self: flex-end;
-  border-bottom-right-radius: 6px;
+@keyframes bubbleIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
-.ai-subtitle {
-  background: #fff;
-  box-shadow: 0 2px 8px rgba(255, 107, 138, 0.1);
-  align-self: flex-start;
-  border-bottom-left-radius: 6px;
+@keyframes dotPulse {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 1; }
 }
 
-// 挂断
+// 操作按钮
 .call-actions {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  padding: 0 20px 44px;
+  justify-content: center;
+  gap: 24px;
+  padding: 16px 20px 36px;
+  flex-shrink: 0;
+}
+
+.pause-btn {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  border: none;
+  background: #F0E8FF;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.25s;
+  .pause-icon { font-size: 20px; }
+  &:hover { background: #E0D0FF; transform: scale(1.05); }
+  &:active { transform: scale(0.95); }
+}
+
+.pause-label {
+  font-size: 11px;
+  color: #bbb;
+  margin: 0;
+  text-align: center;
 }
 
 .hangup-btn {
-  width: 60px;
-  height: 60px;
+  width: 52px;
+  height: 52px;
   border-radius: 50%;
   border: none;
   background: linear-gradient(135deg, #FF6B8A, #FF8E9E);
@@ -924,7 +1144,7 @@ onUnmounted(() => {
   transition: all 0.25s;
 
   .hangup-icon {
-    font-size: 24px;
+    font-size: 22px;
   }
 
   &:hover {
@@ -937,55 +1157,87 @@ onUnmounted(() => {
 }
 
 .hangup-label {
-  font-size: 12px;
+  font-size: 11px;
   color: #bbb;
-  margin-top: 8px;
+  margin: 0;
+  text-align: center;
+}
+
+// 语法检测中
+.grammar-checking {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: #B45309;
+  margin-top: 4px;
+  .gck-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: #F59E0B;
+    animation: pulse-dot 0.8s ease-in-out infinite;
+  }
+}
+
+// 语法纠错入口指示器
+.grammar-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  background: #FFFBEB;
+  border: 1px solid #FDE68A;
+  border-radius: 14px;
+  cursor: pointer;
+  font-size: 11px;
+  color: #92400E;
+  user-select: none;
+  transition: all 0.2s;
+  margin-top: 4px;
+
+  &:hover { background: #FEF3C7; }
+  &.expanded { border-radius: 14px 14px 0 0; border-bottom: none; }
+
+  .gi-icon { font-size: 12px; }
+  .gi-text { flex: 1; }
+  .gi-count {
+    background: #F59E0B;
+    color: #fff;
+    border-radius: 10px;
+    padding: 0 6px;
+    font-size: 10px;
+    font-weight: 600;
+    min-width: 16px;
+    text-align: center;
+  }
+  .gi-arrow {
+    font-size: 10px;
+    transition: transform 0.2s;
+    color: #B45309;
+  }
+  &.expanded .gi-arrow { transform: rotate(180deg); }
 }
 
 // 语法纠错卡片
 .grammar-correction-card {
   background: #FFFBEB;
   border: 1px solid #FDE68A;
-  border-radius: 12px;
-  padding: 0;
-  max-width: 85%;
-  align-self: flex-end;
-  overflow: hidden;
-  animation: gcSlideIn 0.3s ease;
+  border-top: none;
+  border-radius: 0 0 14px 14px;
+  padding: 8px 12px 10px;
+  margin-top: -1px;
+  animation: gcSlideIn 0.2s ease;
 }
 
 @keyframes gcSlideIn {
-  from { opacity: 0; transform: translateY(-8px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-.gc-header {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 12px;
-  cursor: pointer;
-  user-select: none;
-  transition: background 0.15s;
-  &:hover { background: #FFF7D6; }
-  .gc-icon { font-size: 14px; }
-  .gc-count { font-size: 12px; font-weight: 600; color: #92400E; flex: 1; }
-  .gc-arrow {
-    font-size: 8px; color: #B45309;
-    transition: transform 0.2s;
-    &.expanded { transform: rotate(90deg); }
-  }
-}
-
-.gc-body {
-  padding: 0 12px 10px;
-  border-top: 1px solid #FDE68A;
+  from { opacity: 0; max-height: 0; }
+  to { opacity: 1; max-height: 300px; }
 }
 
 .gc-corrected {
   display: flex;
   gap: 6px;
-  padding: 8px 0;
+  padding: 6px 0;
   margin-bottom: 4px;
   border-bottom: 1px dashed #FDE68A;
   .gc-label { font-size: 11px; color: #92400E; font-weight: 600; flex-shrink: 0; }
@@ -996,20 +1248,20 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 0;
+  padding: 5px 0;
   flex-wrap: wrap;
   & + & { border-top: 1px solid #FEF3C7; }
   .gc-error-original {
-    font-size: 12px; color: #DC2626; text-decoration: line-through;
-    background: #FEE2E2; padding: 1px 6px; border-radius: 4px;
+    font-size: 11px; color: #DC2626; text-decoration: line-through;
+    background: #FEE2E2; padding: 1px 5px; border-radius: 4px;
   }
   .gc-error-arrow { font-size: 10px; color: #999; }
   .gc-error-correction {
-    font-size: 12px; color: #059669; font-weight: 600;
-    background: #D1FAE5; padding: 1px 6px; border-radius: 4px;
+    font-size: 11px; color: #059669; font-weight: 600;
+    background: #D1FAE5; padding: 1px 5px; border-radius: 4px;
   }
   .gc-error-type {
-    font-size: 10px; color: #fff; padding: 1px 6px; border-radius: 8px;
+    font-size: 10px; color: #fff; padding: 1px 5px; border-radius: 8px;
     font-weight: 500; flex-shrink: 0;
   }
   .gc-error-explain {
@@ -1252,6 +1504,7 @@ onUnmounted(() => {
   max-width: 90%;
   &.user { align-self: flex-end; }
   &.ai { align-self: flex-start; }
+  &.grammar { align-self: flex-start; }
   .transcript-role { font-size: 10px; color: #999; margin-bottom: 2px; padding: 0 4px; }
   &.user .transcript-role { text-align: right; }
   .transcript-bubble {
@@ -1259,6 +1512,29 @@ onUnmounted(() => {
   }
   &.user .transcript-bubble { background: #F0F0FF; border-bottom-right-radius: 4px; }
   &.ai .transcript-bubble { background: #FFF0F3; border-bottom-left-radius: 4px; }
+}
+
+// 报告中的语法纠错
+.transcript-grammar {
+  background: #FFFBEB;
+  border: 1px solid #FDE68A;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 11px;
+  .tg-corrected {
+    display: flex; gap: 4px; margin-bottom: 6px; padding-bottom: 6px;
+    border-bottom: 1px dashed #FDE68A;
+    .tg-label { color: #92400E; font-weight: 600; flex-shrink: 0; }
+    .tg-corrected-text { color: #4A4A5A; }
+  }
+  .tg-error {
+    display: flex; align-items: center; gap: 4px; padding: 3px 0; flex-wrap: wrap;
+    font-size: 11px; color: #666;
+    .tg-error-original { color: #DC2626; text-decoration: line-through; background: #FEE2E2; padding: 0 4px; border-radius: 3px; }
+    .tg-error-correction { color: #059669; font-weight: 600; background: #D1FAE5; padding: 0 4px; border-radius: 3px; }
+    .tg-error-type { font-size: 10px; color: #fff; padding: 0 5px; border-radius: 8px; }
+    .tg-error-explain { width: 100%; color: #999; font-size: 10px; margin-top: 1px; }
+  }
 }
 
 // 建议

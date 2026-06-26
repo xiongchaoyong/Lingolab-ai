@@ -1,11 +1,18 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { loginApi, registerApi, getProfileApi, updateProfileApi } from '@/api/auth'
+import { loginApi, registerApi, getProfileApi, updateProfileApi, uploadAvatarApi } from '@/api/auth'
 
 export const useAuthStore = defineStore('auth', () => {
   // ---- state ----
   const token = ref(localStorage.getItem('token') || '')
-  const userInfo = ref(null)
+
+  // 从 localStorage 恢复 userInfo
+  let savedInfo = null
+  try {
+    const raw = localStorage.getItem('userInfo')
+    if (raw) savedInfo = JSON.parse(raw)
+  } catch { /* ignore */ }
+  const userInfo = ref(savedInfo)
 
   // ---- getters ----
   const isLoggedIn = computed(() => !!token.value)
@@ -19,6 +26,9 @@ export const useAuthStore = defineStore('auth', () => {
 
   function setUserInfo(info) {
     userInfo.value = info
+    if (info) {
+      localStorage.setItem('userInfo', JSON.stringify(info))
+    }
   }
 
   async function login(username, password) {
@@ -27,8 +37,9 @@ export const useAuthStore = defineStore('auth', () => {
     setUserInfo({
       id: res.user_id,
       username: res.username,
-      role: 'learner',
+      role: res.role || 'learner',
       assessment_completed: res.assessment_completed,
+      avatar: res.avatar,
     })
     return res
   }
@@ -57,6 +68,7 @@ export const useAuthStore = defineStore('auth', () => {
     token.value = ''
     userInfo.value = null
     localStorage.removeItem('token')
+    localStorage.removeItem('userInfo')
   }
 
   async function fetchProfile() {
@@ -72,16 +84,26 @@ export const useAuthStore = defineStore('auth', () => {
       level_final: res.level_final,
       assessment_completed: res.assessment_completed,
       role: res.role,
+      avatar: res.avatar,
     })
     return res
   }
 
   async function updateProfile(data) {
     const res = await updateProfileApi(data)
-    // 更新本地 userInfo 中的可修改字段
     if (userInfo.value) {
       userInfo.value.learning_goal = res.learning_goal
       userInfo.value.interests = res.interests
+    }
+    return res
+  }
+
+  async function uploadAvatar(file) {
+    const formData = new FormData()
+    formData.append('file', file)
+    const res = await uploadAvatarApi(formData)
+    if (userInfo.value) {
+      userInfo.value.avatar = res.avatar_url
     }
     return res
   }
@@ -98,5 +120,6 @@ export const useAuthStore = defineStore('auth', () => {
     logout,
     fetchProfile,
     updateProfile,
+    uploadAvatar,
   }
 })

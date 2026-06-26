@@ -28,8 +28,8 @@ class ClassListResponse(BaseModel):
 
 class CreateClassRequest(BaseModel):
     """创建班级"""
-    name: str = Field(..., max_length=100)
-    description: str = ""
+    name: str = Field(..., max_length=50)
+    description: str = Field(default="", max_length=200)
     level_range: str = ""
 
 
@@ -149,6 +149,10 @@ class DashboardMetrics(BaseModel):
     retention_d7: float = 0.0
     total_users: int = 0
     active_users: int = 0
+    total_duration_minutes: int = 0
+    avg_duration_minutes: float = 0.0
+    conversation_completion_rate: float = 0.0
+    daily_new_users: int = 0
 
 
 class TrendPoint(BaseModel):
@@ -196,3 +200,19 @@ class FeedbackReplyRequest(BaseModel):
 class FeedbackStatusRequest(BaseModel):
     """修改反馈状态"""
     status: str = Field(..., pattern="^(pending|resolved)$")
+
+
+# ============================================================
+# 内容管理 CRUD
+# ============================================================
+
+class ContentCreateRequest(BaseModel):
+    """通用内容创建"""
+    content_type: str = Field(..., description="questions/shadow/materials/dubbing")
+    data: dict = Field(..., description="内容数据（根据类型不同字段不同）")
+
+
+class ContentUpdateRequest(BaseModel):
+    """通用内容更新"""
+    content_type: str = Field(..., description="questions/shadow/materials/dubbing")
+    data: dict = Field(..., description="更新的字段")

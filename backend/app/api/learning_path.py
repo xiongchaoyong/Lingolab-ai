@@ -1,13 +1,15 @@
-"""学习路径 API — 每日任务管理"""
+"""学习路径 API — 每日任务管理 + 个人情况说明"""
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 
 from app.core.database import get_db
 from app.core.security import get_current_user
 from app.models.user import UserProfile
 from app.models.knowledge_graph import DailyTask
+from app.models.profile import UserSkillScore
 from app.services.recommendation import recommendation_service
 from app.services.profile_updater import profile_updater
 from app.schemas.learning_path import (
@@ -20,6 +22,11 @@ from app.schemas.learning_path import (
     HistoryDay,
     HistoryResponse,
     CompleteTaskRequest,
+    DimensionScore,
+    RecentStats,
+    RecommendationFactor,
+    RecommendationLogic,
+    ProfileSummaryResponse,
 )
 
 router = APIRouter()
@@ -203,3 +210,115 @@ def get_history(
     ]
 
     return HistoryResponse(records=history_days)
+
+
+@router.get("/profile-summary", response_model=ProfileSummaryResponse)
+def get_profile_summary(
+    current_user: UserProfile = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """获取个人情况说明 — 解释推荐依据"""
+    # 维度中文标签
+    DIM_LABELS = {
+        "speaking": "口语", "listening": "听力",
+        "reading": "阅读", "grammar": "语法",
+    }
+
+    # 1. 用户基础信息
+    level_source = "自评"
+    if current_user.level_test:
+        level_source = "智能测评"
+    if current_user.level_final and current_user.level_final != current_user.level_test:
+        level_source = "EMA动态更新"
+
+    # 2. EMA 维度分数
+    dim_avgs = profile_updater.get_dimension_averages(current_user.id, db)
+    weakness_dim = recommendation_service.get_weakness_dimension(current_user, db)
+
+    dimension_scores = []
+    for key, label in DIM_LABELS.items():
+        dimension_scores.append(DimensionScore(
+            label=label,
+            key=key,
+            score=dim_avgs.get(key),
+            is_weakness=(key == weakness_dim),
+        ))
+
+    # 3. 近期练习统计（近30天）
+    cutoff = datetime.utcnow() - timedelta(days=30)
+    skill_scores = (
+        db.query(UserSkillScore)
+        .filter(UserSkillScore.user_id == current_user.id, UserSkillScore.created_at >= cutoff)
+        .all()
+    )
+
+    pronunciation_scores = [s for s in skill_scores if s.source == "pronunciation"]
+    conversation_scores = [s for s in skill_scores if s.source == "conversation"]
+    roleplay_scores = [s for s in skill_scores if s.source == "roleplay"]
+
+    tasks_count = (
+        db.query(func.count(DailyTask.id))
+        .filter(DailyTask.user_id == current_user.id, DailyTask.task_date >= cutoff.date())
+        .scalar()
+    ) or 0
+    completed_count = (
+        db.query(func.count(DailyTask.id))
+        .filter(DailyTask.user_id == current_user.id, DailyTask.task_date >= cutoff.date(), DailyTask.status == "completed")
+        .scalar()
+    ) or 0
+
+    def avg_score(scores):
+        vals = [float(s.score) for s in scores]
+        return round(sum(vals) / len(vals), 1) if vals else None
+
+    recent_stats = RecentStats(
+        total_tasks=tasks_count,
+        completed_tasks=completed_count,
+        pronunciation_count=len(pronunciation_scores),
+        conversation_count=len(conversation_scores),
+        roleplay_count=len(roleplay_scores),
+        avg_pronunciation_score=avg_score(pronunciation_scores),
+        avg_conversation_score=avg_score(conversation_scores),
+    )
+
+    # 4. 推荐算法说明
+    weakness_label = DIM_LABELS.get(weakness_dim, weakness_dim)
+    interests_text = "、".join(current_user.interests[:3]) if current_user.interests else "暂无"
+    level_text = current_user.level_final or "A1"
+
+    recommendation_logic = RecommendationLogic(
+        algorithm="四因子评分模型",
+        factors=[
+            RecommendationFactor(
+                name="短板匹配",
+                weight="40%",
+                description=f"你的「{weakness_label}」维度得分较低，系统优先推荐该维度的练习内容，帮助补齐短板",
+            ),
+            RecommendationFactor(
+                name="难度匹配",
+                weight="35%",
+                description=f"匹配 CEFR {level_text} 等级的内容，确保难度适中，既不会太简单也不会太难",
+            ),
+            RecommendationFactor(
+                name="兴趣匹配",
+                weight="25%",
+                description=f"结合你的兴趣偏好（{interests_text}），推荐更符合个人喜好的学习资料",
+            ),
+            RecommendationFactor(
+                name="新颖度去重",
+                weight="乘性因子",
+                description="7天内已推荐过的资料会降低权重，标记为「不感兴趣」的资料不再推荐",
+            ),
+        ],
+    )
+
+    return ProfileSummaryResponse(
+        cefr_level=current_user.level_final or "A1",
+        level_source=level_source,
+        learning_goal=current_user.learning_goal or "未设置",
+        interests=current_user.interests or [],
+        age_group=current_user.age_group or "",
+        dimension_scores=dimension_scores,
+        recent_stats=recent_stats,
+        recommendation_logic=recommendation_logic,
+    )
