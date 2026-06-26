@@ -8,9 +8,13 @@ from typing import Dict, List
 from sqlalchemy.orm import Session
 from sqlalchemy import func, desc, case
 
-from app.models.admin import Class, ClassStudent, Assignment, AssignmentSubmission, AdminLog
+from app.models.admin import Class, ClassStudent, Assignment, AssignmentSubmission, AdminLog, UserFeedback
 from app.models.user import UserProfile
 from app.models.profile import UserSkillScore
+from app.models.assessment import AssessmentQuestion
+from app.models.pronunciation import PronunciationContent
+from app.models.learning import LearningMaterial
+from app.models.gamification import DubbingContent
 
 logger = logging.getLogger(__name__)
 
@@ -228,6 +232,121 @@ class TeacherService:
             "submitted_at": sub.submitted_at.isoformat() if sub.submitted_at else "",
         }
 
+    # ===== 学生报告 =====
+
+    def get_all_students(self, teacher_id: int, db: Session) -> List[Dict]:
+        """获取教师所有班级的学生列表（含学习统计）"""
+        # 获取教师所有班级 ID
+        class_ids = [
+            c.id for c in db.query(Class).filter(Class.teacher_id == teacher_id).all()
+        ]
+        if not class_ids:
+            return []
+
+        # 获取这些班级的所有学生
+        user_ids = [
+            cs.user_id for cs in db.query(ClassStudent)
+            .filter(ClassStudent.class_id.in_(class_ids))
+            .all()
+        ]
+        if not user_ids:
+            return []
+
+        users = db.query(UserProfile).filter(UserProfile.id.in_(user_ids)).all()
+        result = []
+        for u in users:
+            # 学习记录数（近似学习时长）
+            score_count = (
+                db.query(func.count(UserSkillScore.id))
+                .filter(UserSkillScore.user_id == u.id)
+                .scalar()
+            ) or 0
+
+            # 最近一条记录时间
+            last_score = (
+                db.query(UserSkillScore)
+                .filter(UserSkillScore.user_id == u.id)
+                .order_by(UserSkillScore.created_at.desc())
+                .first()
+            )
+            last_active = ""
+            if last_score and last_score.created_at:
+                delta = datetime.now() - last_score.created_at
+                if delta.days == 0:
+                    last_active = "今天"
+                elif delta.days == 1:
+                    last_active = "昨天"
+                else:
+                    last_active = f"{delta.days}天前"
+
+            result.append({
+                "id": u.id,
+                "username": u.username,
+                "level_final": u.level_final or "未测评",
+                "total_minutes": score_count * 5,  # 粗略估算
+                "streak": 0,  # 需要打卡表支持
+                "last_active": last_active,
+            })
+        return result
+
+    def get_student_detail(self, student_id: int, teacher_id: int, db: Session) -> Dict:
+        """获取学生详细报告（维度分数 + 最近活动）"""
+        user = db.query(UserProfile).filter(UserProfile.id == student_id).first()
+        if not user:
+            raise ValueError("学生不存在")
+
+        # 验证师生关系
+        class_ids = [c.id for c in db.query(Class).filter(Class.teacher_id == teacher_id).all()]
+        if class_ids:
+            is_student = (
+                db.query(ClassStudent)
+                .filter(ClassStudent.class_id.in_(class_ids), ClassStudent.user_id == student_id)
+                .first()
+            )
+            if not is_student:
+                raise ValueError("该学生不在你的班级中")
+
+        # 获取维度分数
+        dim_scores = {}
+        recent_scores = (
+            db.query(UserSkillScore)
+            .filter(UserSkillScore.user_id == student_id)
+            .order_by(UserSkillScore.created_at.desc())
+            .limit(50)
+            .all()
+        )
+        for s in recent_scores:
+            dim = s.dimension
+            if dim not in dim_scores:
+                dim_scores[dim] = []
+            dim_scores[dim].append(float(s.score))
+
+        dimension_averages = {
+            dim: round(sum(scores) / len(scores), 1)
+            for dim, scores in dim_scores.items()
+        } if dim_scores else {}
+
+        # 最近活动
+        recent_activities = []
+        for s in recent_scores[:10]:
+            recent_activities.append({
+                "dimension": s.dimension,
+                "score": float(s.score),
+                "source_type": s.source_type,
+                "created_at": s.created_at.isoformat() if s.created_at else "",
+            })
+
+        return {
+            "id": user.id,
+            "username": user.username,
+            "level_final": user.level_final or "未测评",
+            "learning_goal": user.learning_goal,
+            "age_group": user.age_group,
+            "dimension_averages": dimension_averages,
+            "recent_activities": recent_activities,
+            "total_records": len(recent_scores),
+        }
+
 
 class AdminService:
     """运营端服务"""
@@ -353,6 +472,134 @@ class AdminService:
             "user_trend": user_trend,
             "content_type_distribution": type_dist,
             "level_distribution": level_dist,
+        }
+
+    # ===== 内容管理 =====
+
+    def get_content_list(self, content_type: str, db: Session) -> List[Dict]:
+        """获取内容列表（题库/跟读/资料/配音）"""
+        if content_type == "questions":
+            items = db.query(AssessmentQuestion).order_by(AssessmentQuestion.id).all()
+            return [{
+                "id": q.id, "content": q.question_text,
+                "type": q.question_type, "difficulty": q.difficulty,
+                "dimension": q.dimension,
+            } for q in items]
+
+        elif content_type == "shadow":
+            items = db.query(PronunciationContent).filter(PronunciationContent.is_active == 1).order_by(PronunciationContent.id).all()
+            return [{
+                "id": c.id, "word": c.content_text,
+                "ipa": c.phonetic_ipa or "",
+                "difficulty": c.cefr_level, "type": c.content_type,
+            } for c in items]
+
+        elif content_type == "materials":
+            items = db.query(LearningMaterial).filter(LearningMaterial.is_active == 1).order_by(LearningMaterial.id).all()
+            return [{
+                "id": m.id, "title": m.title,
+                "type": m.material_type, "category": m.category or "",
+                "level": m.cefr_level,
+            } for m in items]
+
+        elif content_type == "dubbing":
+            items = db.query(DubbingContent).filter(DubbingContent.is_active == 1).order_by(DubbingContent.id).all()
+            return [{
+                "id": d.id, "title": d.title,
+                "line": d.dialogue_text or "", "difficulty": d.difficulty_level or "",
+            } for d in items]
+
+        return []
+
+    # ===== 反馈管理 =====
+
+    def get_feedbacks(self, page: int, page_size: int, status: str, db: Session) -> Dict:
+        """获取反馈列表（分页+状态筛选）"""
+        query = db.query(UserFeedback)
+        if status:
+            query = query.filter(UserFeedback.status == status)
+
+        total = query.count()
+        items = (
+            query.order_by(UserFeedback.created_at.desc())
+            .offset((page - 1) * page_size)
+            .limit(page_size)
+            .all()
+        )
+
+        result = []
+        for f in items:
+            user = db.query(UserProfile).filter(UserProfile.id == f.user_id).first()
+            result.append({
+                "id": f.id,
+                "user_id": f.user_id,
+                "username": user.username if user else "未知",
+                "content": f.content,
+                "feedback_type": f.feedback_type,
+                "status": f.status,
+                "admin_reply": f.admin_reply,
+                "replied_at": f.replied_at.isoformat() if f.replied_at else None,
+                "created_at": f.created_at.isoformat() if f.created_at else "",
+            })
+
+        return {"feedbacks": result, "total": total}
+
+    def reply_feedback(self, feedback_id: int, reply: str, admin_id: int, db: Session) -> Dict:
+        """回复反馈"""
+        fb = db.query(UserFeedback).filter(UserFeedback.id == feedback_id).first()
+        if not fb:
+            raise ValueError("反馈不存在")
+
+        fb.admin_reply = reply
+        fb.replied_at = datetime.utcnow()
+        fb.status = "resolved"
+        db.flush()
+
+        db.add(AdminLog(
+            admin_id=admin_id,
+            action="feedback_reply",
+            target_type="feedback",
+            target_id=feedback_id,
+            detail=f"回复反馈: {reply[:100]}",
+        ))
+        db.flush()
+
+        user = db.query(UserProfile).filter(UserProfile.id == fb.user_id).first()
+        return {
+            "id": fb.id, "user_id": fb.user_id,
+            "username": user.username if user else "未知",
+            "content": fb.content, "feedback_type": fb.feedback_type,
+            "status": fb.status, "admin_reply": fb.admin_reply,
+            "replied_at": fb.replied_at.isoformat() if fb.replied_at else None,
+            "created_at": fb.created_at.isoformat() if fb.created_at else "",
+        }
+
+    def resolve_feedback(self, feedback_id: int, admin_id: int, db: Session) -> Dict:
+        """标记反馈为已解决"""
+        fb = db.query(UserFeedback).filter(UserFeedback.id == feedback_id).first()
+        if not fb:
+            raise ValueError("反馈不存在")
+
+        fb.status = "resolved"
+        db.flush()
+
+        db.add(AdminLog(
+            admin_id=admin_id,
+            action="feedback_resolve",
+            target_type="feedback",
+            target_id=feedback_id,
+            detail="标记反馈为已解决",
+        ))
+        db.flush()
+
+        user = db.query(UserProfile).filter(UserProfile.id == fb.user_id).first()
+        return {
+            "id": fb.id, "user_id": fb.user_id,
+            "username": user.username if user else "未知",
+            "content": fb.content, "feedback_type": fb.feedback_type,
+            "status": fb.status, "admin_reply": fb.admin_reply,
+            "replied_at": fb.replied_at.isoformat() if fb.replied_at else None,
+            "created_at": fb.created_at.isoformat() if fb.created_at else "",
         }
 
 

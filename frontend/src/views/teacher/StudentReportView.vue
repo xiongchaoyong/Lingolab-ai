@@ -1,54 +1,83 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import { ElMessage } from 'element-plus'
+import { use } from 'echarts/core'
+import { CanvasRenderer } from 'echarts/renderers'
+import { RadarChart } from 'echarts/charts'
+import { GridComponent, TooltipComponent } from 'echarts/components'
+import VChart from 'vue-echarts'
+import { getAllStudentsApi, getStudentDetailApi } from '@/api/admin'
 
-const students = ref([
-  { id: 1, name: 'Alice', level: 'B1', totalMinutes: 580, streak: 7, shadowScore: 78, conversationScore: 72, lastActive: '2小时前' },
-  { id: 2, name: 'Bob', level: 'A2', totalMinutes: 320, streak: 3, shadowScore: 65, conversationScore: 60, lastActive: '昨天' },
-  { id: 3, name: 'Charlie', level: 'B2', totalMinutes: 920, streak: 14, shadowScore: 85, conversationScore: 82, lastActive: '5分钟前' },
-])
+use([CanvasRenderer, RadarChart, GridComponent, TooltipComponent])
 
+const students = ref([])
+const loading = ref(false)
 const showDetail = ref(false)
 const selectedStudent = ref(null)
+const detailLoading = ref(false)
+const studentDetail = ref(null)
 const detailsTab = ref('radar')
 
-function viewStudent(student) {
-  selectedStudent.value = student
-  showDetail.value = true
+onMounted(() => { loadStudents() })
+
+async function loadStudents() {
+  loading.value = true
+  try {
+    const res = await getAllStudentsApi()
+    students.value = res.students || []
+  } catch {
+    ElMessage.error('加载学生列表失败')
+  } finally {
+    loading.value = false
+  }
 }
 
-const radarOption = computed(() => ({
-  tooltip: {},
-  radar: {
-    indicator: [
-      { name: '发音', max: 100 }, { name: '流利度', max: 100 },
-      { name: '语法', max: 100 }, { name: '听力', max: 100 }, { name: '表达', max: 100 },
-    ],
-  },
-  series: [{
-    type: 'radar',
-    data: [{ value: [78, 65, 72, 80, 60], name: '能力分布' }],
-    lineStyle: { color: '#A78BFA' },
-    areaStyle: { color: 'rgba(167,139,250,0.15)' },
-  }],
-}))
+async function viewStudent(student) {
+  selectedStudent.value = student
+  showDetail.value = true
+  detailLoading.value = true
+  studentDetail.value = null
+  try {
+    studentDetail.value = await getStudentDetailApi(student.id)
+  } catch {
+    ElMessage.error('加载学生详情失败')
+  } finally {
+    detailLoading.value = false
+  }
+}
+
+const radarOption = computed(() => {
+  const dims = studentDetail.value?.dimension_averages || {}
+  const labels = Object.keys(dims)
+  const values = Object.values(dims)
+  return {
+    tooltip: {},
+    radar: {
+      indicator: labels.map(l => ({ name: l, max: 100 })),
+    },
+    series: [{
+      type: 'radar',
+      data: [{ value: values, name: '能力分布' }],
+      lineStyle: { color: '#A78BFA' },
+      areaStyle: { color: 'rgba(167,139,250,0.15)' },
+    }],
+  }
+})
 </script>
 
 <template>
   <div class="content-card">
     <h2 class="page-title">学生报告</h2>
 
-    <el-table :data="students" stripe>
-      <el-table-column prop="name" label="姓名" width="100" />
-      <el-table-column prop="level" label="CEFR" width="70">
-        <template #default="{ row }"><el-tag size="small">{{ row.level }}</el-tag></template>
+    <el-table v-loading="loading" :data="students" stripe empty-text="暂无学生数据">
+      <el-table-column prop="username" label="姓名" width="120" />
+      <el-table-column prop="level_final" label="CEFR" width="80">
+        <template #default="{ row }"><el-tag size="small">{{ row.level_final }}</el-tag></template>
       </el-table-column>
-      <el-table-column prop="totalMinutes" label="学习时长" width="100">
-        <template #default="{ row }">{{ Math.floor(row.totalMinutes / 60) }}h</template>
+      <el-table-column prop="total_minutes" label="学习时长" width="100">
+        <template #default="{ row }">{{ Math.floor(row.total_minutes / 60) }}h</template>
       </el-table-column>
-      <el-table-column prop="streak" label="连续(天)" width="80" />
-      <el-table-column prop="shadowScore" label="发音分" width="80" />
-      <el-table-column prop="conversationScore" label="对话分" width="80" />
-      <el-table-column prop="lastActive" label="最近活跃" width="110" />
+      <el-table-column prop="last_active" label="最近活跃" width="120" />
       <el-table-column label="操作" width="120">
         <template #default="{ row }">
           <el-button size="small" text type="primary" @click="viewStudent(row)">查看详情</el-button>
@@ -56,25 +85,40 @@ const radarOption = computed(() => ({
       </el-table-column>
     </el-table>
 
-    <el-dialog v-model="showDetail" :title="`${selectedStudent?.name} 学习详情`" width="600px">
-      <template v-if="selectedStudent">
+    <el-dialog v-model="showDetail" :title="`${selectedStudent?.username} 学习详情`" width="600px" destroy-on-close>
+      <div v-if="detailLoading" v-loading="true" style="height: 200px;"></div>
+      <template v-else-if="studentDetail">
+        <div style="margin-bottom: var(--spacing-md); display: flex; gap: var(--spacing-lg);">
+          <div><strong>CEFR 等级：</strong><el-tag size="small">{{ studentDetail.level_final }}</el-tag></div>
+          <div><strong>学习目标：</strong>{{ studentDetail.learning_goal || '-' }}</div>
+          <div><strong>记录数：</strong>{{ studentDetail.total_records }}</div>
+        </div>
         <el-tabs v-model="detailsTab">
           <el-tab-pane label="能力雷达图" name="radar">
-            <v-chart :option="radarOption" autoresize style="height:320px" />
+            <v-chart
+              v-if="Object.keys(studentDetail.dimension_averages || {}).length > 0"
+              :option="radarOption"
+              autoresize
+              style="height: 320px;"
+            />
+            <p v-else style="color: var(--color-text-disabled); text-align: center; padding: 40px 0;">暂无维度分数数据</p>
           </el-tab-pane>
-          <el-tab-pane label="学习记录" name="records">
-            <el-timeline>
-              <el-timeline-item timestamp="6月3日 14:30">完成发音练习 · 82分</el-timeline-item>
-              <el-timeline-item timestamp="6月3日 10:15">完成AI对话 · 餐厅场景 · 75分</el-timeline-item>
-              <el-timeline-item timestamp="6月2日 16:00">完成每日闯关 · 全通 · 130积分</el-timeline-item>
-              <el-timeline-item timestamp="6月2日 09:30">完成听力训练 · 80分</el-timeline-item>
+          <el-tab-pane label="最近活动" name="records">
+            <el-timeline v-if="studentDetail.recent_activities?.length">
+              <el-timeline-item
+                v-for="(act, i) in studentDetail.recent_activities"
+                :key="i"
+                :timestamp="act.created_at ? new Date(act.created_at).toLocaleString('zh-CN') : ''"
+              >
+                {{ act.dimension }} · {{ act.score }}分
+              </el-timeline-item>
             </el-timeline>
+            <p v-else style="color: var(--color-text-disabled); text-align: center; padding: 40px 0;">暂无活动记录</p>
           </el-tab-pane>
         </el-tabs>
       </template>
       <template #footer>
         <el-button @click="showDetail = false">关闭</el-button>
-        <el-button type="primary">点评学生</el-button>
       </template>
     </el-dialog>
   </div>

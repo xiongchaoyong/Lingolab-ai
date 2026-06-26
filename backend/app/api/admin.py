@@ -20,6 +20,9 @@ from app.schemas.admin import (
     UserListResponse,
     UserStatusRequest,
     DashboardResponse,
+    FeedbackListResponse,
+    FeedbackReplyRequest,
+    FeedbackStatusRequest,
 )
 from app.services.admin import teacher_service, admin_service
 
@@ -213,3 +216,98 @@ def get_dashboard(
     """获取运营仪表盘数据"""
     result = admin_service.get_dashboard(db)
     return DashboardResponse(**result)
+
+
+# ============================================================
+# 教师端 — 学生报告
+# ============================================================
+
+@router.get("/students")
+def get_all_students(
+    teacher: UserProfile = Depends(require_teacher),
+    db: Session = Depends(get_db),
+):
+    """获取教师所有班级的学生列表"""
+    students = teacher_service.get_all_students(teacher.id, db)
+    return {"students": students}
+
+
+@router.get("/students/{student_id}")
+def get_student_detail(
+    student_id: int,
+    teacher: UserProfile = Depends(require_teacher),
+    db: Session = Depends(get_db),
+):
+    """获取学生详细报告"""
+    try:
+        result = teacher_service.get_student_detail(student_id, teacher.id, db)
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+# ============================================================
+# 运营端 — 内容管理
+# ============================================================
+
+@router.get("/content/{content_type}")
+def get_content_list(
+    content_type: str,
+    admin: UserProfile = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """获取内容列表（questions/shadow/materials/dubbing）"""
+    if content_type not in ("questions", "shadow", "materials", "dubbing"):
+        raise HTTPException(status_code=400, detail="无效的内容类型")
+    items = admin_service.get_content_list(content_type, db)
+    return {"items": items}
+
+
+# ============================================================
+# 运营端 — 反馈管理
+# ============================================================
+
+@router.get("/feedbacks", response_model=FeedbackListResponse)
+def get_feedbacks(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    status: str = Query(""),
+    admin: UserProfile = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """获取反馈列表（分页+状态筛选）"""
+    result = admin_service.get_feedbacks(page, page_size, status, db)
+    return FeedbackListResponse(**result)
+
+
+@router.post("/feedbacks/{feedback_id}/reply", response_model=dict)
+def reply_feedback(
+    feedback_id: int,
+    req: FeedbackReplyRequest,
+    admin: UserProfile = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """回复反馈"""
+    try:
+        result = admin_service.reply_feedback(feedback_id, req.reply, admin.id, db)
+        db.commit()
+        return {"code": 0, "data": result, "message": "回复成功"}
+    except ValueError as e:
+        db.rollback()
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.put("/feedbacks/{feedback_id}/resolve", response_model=dict)
+def resolve_feedback(
+    feedback_id: int,
+    admin: UserProfile = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """标记反馈为已解决"""
+    try:
+        result = admin_service.resolve_feedback(feedback_id, admin.id, db)
+        db.commit()
+        return {"code": 0, "data": result, "message": "已标记解决"}
+    except ValueError as e:
+        db.rollback()
+        raise HTTPException(status_code=404, detail=str(e))
