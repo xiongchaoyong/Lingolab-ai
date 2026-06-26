@@ -519,6 +519,51 @@ class LLMService:
                 "suggestions": "继续练习，尝试在角色中更自然地表达自己！",
             }
 
+    async def _call_bailian(
+        self,
+        messages: list[dict],
+        temperature: float = 0.7,
+        max_tokens: int = 200,
+        timeout: float = 15.0,
+    ) -> str:
+        """调用百炼 API 的底层方法"""
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            resp = await client.post(
+                BAILIAN_API_URL,
+                headers={
+                    "Authorization": f"Bearer {self.api_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": self.model,
+                    "messages": messages,
+                    "max_tokens": max_tokens,
+                    "temperature": temperature,
+                },
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            return data["choices"][0]["message"]["content"].strip()
+
+    async def _raw_chat(
+        self,
+        prompt: str,
+        temperature: float = 0.7,
+        max_tokens: int = 200,
+    ) -> str:
+        """简单对话：传入 prompt 字符串，返回 AI 回复"""
+        messages = [{"role": "user", "content": prompt}]
+        return await self._call_bailian(messages, temperature=temperature, max_tokens=max_tokens)
+
+    async def _raw_chat_messages(
+        self,
+        messages: list[dict],
+        temperature: float = 0.7,
+        max_tokens: int = 200,
+    ) -> str:
+        """多轮对话：传入消息列表，返回 AI 回复"""
+        return await self._call_bailian(messages, temperature=temperature, max_tokens=max_tokens)
+
 
 async def score_fluency(
             self,

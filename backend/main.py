@@ -79,6 +79,7 @@ from app.api.community import router as community_router
 from app.api.gamification import router as gamification_router
 from app.api.progress import router as progress_router
 from app.api.prediction import router as prediction_router
+from app.api.help import router as help_router
 
 app.include_router(pronunciation_router, prefix="/api/pronunciation", tags=["发音评测"])
 app.include_router(conversation_router, prefix="/api/conversation", tags=["语音对话"])
@@ -93,3 +94,4 @@ app.include_router(community_router, prefix="/api/community", tags=["社区服�
 app.include_router(gamification_router, prefix="/api/gamification", tags=["游戏化闯关"])
 app.include_router(progress_router, prefix="/api/progress", tags=["学习进度"])
 app.include_router(prediction_router, prefix="/api", tags=["学习预测"])
+app.include_router(help_router, prefix="/api/help", tags=["智能客服"])
