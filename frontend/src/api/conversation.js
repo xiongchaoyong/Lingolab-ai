@@ -155,3 +155,12 @@ export function ttsConversation(text, voice = 'en-US-JennyNeural') {
   form.append('voice', voice)
   return request.post('/api/conversation/tts', form)
 }
+
+/**
+ * 获取对话历史
+ * @param {number} limit - 返回条数
+ * @returns {Promise<Array>} 对话会话列表
+ */
+export function getConversationSessions(limit = 10) {
+  return request.get('/api/conversation/sessions', { params: { limit } })
+}

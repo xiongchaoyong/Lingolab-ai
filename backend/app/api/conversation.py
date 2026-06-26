@@ -13,6 +13,7 @@ import json
 
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Depends, Query
 from fastapi.responses import StreamingResponse
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -24,6 +25,7 @@ from app.schemas.conversation import (
     ConversationSpeakResponse,
     ConversationEndResponse,
 )
+from app.models.conversation import ConversationSession, ConversationMessage
 from app.services.asr import get_asr_service
 from app.services.llm import get_llm_service
 from app.services.tts import synthesize_speech
@@ -37,7 +39,7 @@ logger = logging.getLogger(__name__)
 # 内存会话存储（生产环境应迁移至 Redis）
 _sessions: dict[str, dict] = {}
 
-MAX_CONVERSATION_ROUNDS = 6
+MAX_CONVERSATION_ROUNDS = 10
 
 
 async def _tts_to_base64(text: str, voice: str = "en-US-JennyNeural") -> str:
@@ -47,7 +49,11 @@ async def _tts_to_base64(text: str, voice: str = "en-US-JennyNeural") -> str:
 
 
 @router.post("/start", response_model=ConversationStartResponse)
-async def conversation_start(req: ConversationStartRequest):
+async def conversation_start(
+    req: ConversationStartRequest,
+    current_user: UserProfile = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     """
     开始新对话
 
@@ -57,7 +63,7 @@ async def conversation_start(req: ConversationStartRequest):
     scene = req.scene
     cefr_level = req.cefr_level
 
-    # 初始化会话
+    # 初始化内存会话
     _sessions[session_id] = {
         "scene": scene,
         "cefr_level": cefr_level,
@@ -67,6 +73,22 @@ async def conversation_start(req: ConversationStartRequest):
         "fluency_scores": [],  # 每轮流利度算法评分
         "tts_cache": {},  # TTS 预取缓存 {round_key: {"chunks": [...], "done": bool}}
     }
+
+    # 持久化到 DB
+    try:
+        db_session = ConversationSession(
+            user_id=current_user.id,
+            session_uuid=session_id,
+            scene=scene,
+            cefr_level=cefr_level,
+            status="active",
+        )
+        db.add(db_session)
+        db.commit()
+        _sessions[session_id]["db_session_id"] = db_session.id
+    except Exception as e:
+        db.rollback()
+        logger.warning(f"保存会话到 DB 失败: {e}")
 
     # 生成 AI 开场白（不同场景使用不同的开场提示）
     scene_openers = {
@@ -205,7 +227,11 @@ async def conversation_speak(
 
 
 @router.post("/stream/start")
-async def conversation_stream_start(req: ConversationStartRequest):
+async def conversation_stream_start(
+    req: ConversationStartRequest,
+    current_user: UserProfile = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     """
     流式开始新对话 — SSE 逐 token 返回 AI 开场白
     """
@@ -222,6 +248,22 @@ async def conversation_stream_start(req: ConversationStartRequest):
         "fluency_scores": [],  # 每轮流利度算法评分
         "tts_cache": {},  # TTS 预取缓存
     }
+
+    # 持久化到 DB
+    try:
+        db_session = ConversationSession(
+            user_id=current_user.id,
+            session_uuid=session_id,
+            scene=scene,
+            cefr_level=cefr_level,
+            status="active",
+        )
+        db.add(db_session)
+        db.commit()
+        _sessions[session_id]["db_session_id"] = db_session.id
+    except Exception as e:
+        db.rollback()
+        logger.warning(f"保存会话到 DB 失败: {e}")
 
     scene_openers = {
         "self_intro": "Greet the user and ask them to introduce themselves.",
@@ -332,6 +374,22 @@ async def conversation_stream_speak(
             session["history"].append({"role": "user", "text": user_text})
             session["round"] += 1
 
+            # 持久化用户消息
+            try:
+                db_sid = session.get("db_session_id")
+                if db_sid:
+                    db_msg = ConversationMessage(
+                        session_id=db_sid,
+                        round_number=session["round"],
+                        role="user",
+                        content_text=user_text,
+                    )
+                    db.add(db_msg)
+                    db.commit()
+            except Exception as e:
+                db.rollback()
+                logger.warning(f"保存用户消息失败: {e}")
+
             # 算法流利度计算（维度1-3，静默存储）
             try:
                 words = asr_result.get("words", [])
@@ -360,6 +418,22 @@ async def conversation_stream_speak(
                 yield f"data: {json.dumps({'type': 'token', 'content': token})}\n\n"
 
             session["history"].append({"role": "ai", "text": full_text})
+
+            # 持久化 AI 回复
+            try:
+                db_sid = session.get("db_session_id")
+                if db_sid:
+                    db_msg = ConversationMessage(
+                        session_id=db_sid,
+                        round_number=session["round"],
+                        role="assistant",
+                        content_text=full_text,
+                    )
+                    db.add(db_msg)
+                    db.commit()
+            except Exception as e:
+                db.rollback()
+                logger.warning(f"保存 AI 消息失败: {e}")
             conversation_complete = session["round"] >= MAX_CONVERSATION_ROUNDS
 
             # 等待语法纠错结果（后台已并行执行）
@@ -722,6 +796,29 @@ async def conversation_end(
     except Exception as e:
         logger.warning(f"持久化对话分数失败: {e}")
 
+    # 更新 DB 会话评分
+    try:
+        db_session_id = session.get("db_session_id")
+        if db_session_id:
+            db.query(ConversationSession).filter(
+                ConversationSession.id == db_session_id
+            ).update({
+                "round_count": session.get("round", 0),
+                "status": "completed",
+                "score_pronunciation": round(sum(d["score"] for d in pronunciation) / len(pronunciation), 2) if pronunciation else None,
+                "score_grammar": next((d["score"] for d in text_dimensions if d["label"] == "语法正确率"), None),
+                "score_vocabulary": next((d["score"] for d in text_dimensions if d["label"] == "词汇丰富度"), None),
+                "score_engagement": next((d["score"] for d in text_dimensions if d["label"] == "对话参与度"), None),
+                "score_overall": overall,
+                "improvement_suggestions": suggestions,
+                "ended_at": func.now(),
+            })
+            db.commit()
+            logger.info(f"会话 {session_id} 评分已保存到 DB")
+    except Exception as e:
+        db.rollback()
+        logger.warning(f"保存会话评分到 DB 失败: {e}")
+
     return ConversationEndResponse(
         overall=overall,
         pronunciation=pronunciation,
@@ -733,3 +830,35 @@ async def conversation_end(
         scoring_methodology=scoring_methodology,
         fluency=fluency_report,
     )
+
+
+@router.get("/sessions")
+async def list_sessions(
+    limit: int = 10,
+    current_user: UserProfile = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """获取当前用户的对话历史"""
+    sessions = (
+        db.query(ConversationSession)
+        .filter(ConversationSession.user_id == current_user.id)
+        .order_by(ConversationSession.created_at.desc())
+        .limit(limit)
+        .all()
+    )
+    return [
+        {
+            "id": s.id,
+            "session_uuid": s.session_uuid,
+            "scene": s.scene,
+            "cefr_level": s.cefr_level,
+            "round_count": s.round_count,
+            "status": s.status,
+            "score_overall": float(s.score_overall) if s.score_overall else None,
+            "score_pronunciation": float(s.score_pronunciation) if s.score_pronunciation else None,
+            "score_grammar": float(s.score_grammar) if s.score_grammar else None,
+            "started_at": s.started_at.isoformat() if s.started_at else None,
+            "ended_at": s.ended_at.isoformat() if s.ended_at else None,
+        }
+        for s in sessions
+    ]
