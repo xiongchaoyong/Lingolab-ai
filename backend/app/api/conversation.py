@@ -321,6 +321,7 @@ async def conversation_stream_speak(
     session_id: str = Form(..., description="会话 ID"),
     scene: str = Form(default="self_intro", description="场景标识"),
     audio: UploadFile = File(..., description="用户语音"),
+    db: Session = Depends(get_db),
 ):
     """
     流式对话 — ASR 转写后 SSE 逐 token 返回 AI 回复
@@ -452,25 +453,6 @@ async def conversation_stream_speak(
                 logger.warning(f"保存 AI 消息失败: {e}")
             conversation_complete = session["round"] >= MAX_CONVERSATION_ROUNDS
 
-            # 等待语法纠错结果（后台已并行执行）
-            try:
-                grammar_result = await grammar_task
-                if grammar_result.get("errors"):
-                    yield f"data: {json.dumps({'type': 'grammar', 'data': grammar_result})}\n\n"
-
-                # 持久化语法纠错到 conversation_messages
-                if db_msg_id and grammar_result:
-                    try:
-                        db.query(ConversationMessage).filter(
-                            ConversationMessage.id == db_msg_id
-                        ).update({"grammar_check": grammar_result})
-                        db.commit()
-                    except Exception as e:
-                        db.rollback()
-                        logger.warning(f"保存语法纠错失败: {e}")
-            except Exception as e:
-                logger.warning(f"语法纠错失败: {e}")
-
             # TTS 预取：后台启动 Edge TTS 调用，缓存音频块
             round_key = str(session["round"])
             chunks = []
@@ -492,7 +474,29 @@ async def conversation_stream_speak(
             asyncio.create_task(prefetch_tts())
 
             tts_url = f"/api/conversation/tts/cached/{session_id}/{round_key}"
+            # 先发送 done 事件，前端可立即播放 TTS，语法纠错不阻塞对话流
             yield f"data: {json.dumps({'type': 'done', 'full_text': full_text, 'conversation_complete': conversation_complete, 'tts_url': tts_url})}\n\n"
+
+            # 等待语法纠错结果（后台已并行执行，不阻塞 TTS 播放）
+            try:
+                grammar_result = await grammar_task
+                if grammar_result.get("errors"):
+                    yield f"data: {json.dumps({'type': 'grammar', 'data': grammar_result})}\n\n"
+                    # 存入会话历史，评分报告中的对话记录可展示纠错
+                    session["history"].append({"role": "grammar", "text": grammar_result})
+
+                # 持久化语法纠错到 conversation_messages
+                if db_msg_id and grammar_result:
+                    try:
+                        db.query(ConversationMessage).filter(
+                            ConversationMessage.id == db_msg_id
+                        ).update({"grammar_check": grammar_result})
+                        db.commit()
+                    except Exception as e:
+                        db.rollback()
+                        logger.warning(f"保存语法纠错失败: {e}")
+            except Exception as e:
+                logger.warning(f"语法纠错失败: {e}")
 
         except Exception as e:
             logger.error(f"流式 speak 失败: {e}")
@@ -755,8 +759,11 @@ async def conversation_end(
                     context = ""
                     for j in range(len(history)):
                         if history[j].get("role") == "user" and history[j]["text"] == fs["text"]:
-                            if j > 0 and history[j - 1]["role"] == "ai":
-                                context = history[j - 1]["text"]
+                            # 向前找最近的 AI 消息（跳过 grammar 条目）
+                            for k in range(j - 1, -1, -1):
+                                if history[k].get("role") in ("ai", "assistant"):
+                                    context = history[k]["text"]
+                                    break
                             break
                     llm_utterances.append({
                         "round": i + 1,

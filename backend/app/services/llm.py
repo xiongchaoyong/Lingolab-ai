@@ -139,6 +139,7 @@ class LLMService:
                         "messages": messages,
                         "max_tokens": 150,
                         "temperature": 0.9,
+                        "enable_thinking": False,
                     },
                 )
                 resp.raise_for_status()
@@ -199,6 +200,7 @@ class LLMService:
                         "max_tokens": 150,
                         "temperature": 0.9,
                         "stream": True,
+                        "enable_thinking": False,
                     },
                 ) as resp:
                     resp.raise_for_status()
@@ -232,8 +234,9 @@ class LLMService:
         """
         dialogue = ""
         for h in history:
-            role = "User" if h["role"] == "user" else "AI"
-            dialogue += f"{role}: {h['text']}\n"
+            if h["role"] in ("user", "ai", "assistant"):
+                role = "User" if h["role"] == "user" else "AI"
+                dialogue += f"{role}: {h['text']}\n"
 
         prompt = (
             f"You are an English teacher evaluating a student's conversation practice.\n"
@@ -274,6 +277,7 @@ class LLMService:
                         "messages": [{"role": "user", "content": prompt}],
                         "max_tokens": 800,
                         "temperature": 0.3,
+                        "enable_thinking": False,
                     },
                 )
                 resp.raise_for_status()
@@ -348,6 +352,7 @@ class LLMService:
                         "messages": messages,
                         "max_tokens": 150,
                         "temperature": 0.9,
+                        "enable_thinking": False,
                     },
                 )
                 resp.raise_for_status()
@@ -406,6 +411,7 @@ class LLMService:
                         "max_tokens": 150,
                         "temperature": 0.9,
                         "stream": True,
+                        "enable_thinking": False,
                     },
                 ) as resp:
                     resp.raise_for_status()
@@ -440,8 +446,9 @@ class LLMService:
         """
         dialogue = ""
         for h in history:
-            role = "User" if h["role"] == "user" else "AI"
-            dialogue += f"{role}: {h['text']}\n"
+            if h["role"] in ("user", "ai", "assistant"):
+                role = "User" if h["role"] == "user" else "AI"
+                dialogue += f"{role}: {h['text']}\n"
 
         prompt = (
             f"You are an English teacher evaluating a student's role-play performance.\n"
@@ -487,6 +494,7 @@ class LLMService:
                         "messages": [{"role": "user", "content": prompt}],
                         "max_tokens": 800,
                         "temperature": 0.3,
+                        "enable_thinking": False,
                     },
                 )
                 resp.raise_for_status()
@@ -539,6 +547,7 @@ class LLMService:
                     "messages": messages,
                     "max_tokens": max_tokens,
                     "temperature": temperature,
+                    "enable_thinking": False,
                 },
             )
             resp.raise_for_status()
@@ -565,91 +574,92 @@ class LLMService:
         return await self._call_bailian(messages, temperature=temperature, max_tokens=max_tokens)
 
 
-async def score_fluency(
-            self,
-            user_utterances: list[dict],
-            cefr_level: str = "B1",
-            scene_context: str = "",
-        ) -> list[dict]:
-            """
-            流利度 LLM 评估 — 对每轮用户发言评估语法正确性和内容相关性
+    async def score_fluency(
+        self,
+        user_utterances: list[dict],
+        cefr_level: str = "B1",
+        scene_context: str = "",
+    ) -> list[dict]:
+        """
+        流利度 LLM 评估 — 对每轮用户发言评估语法正确性和内容相关性
 
-            Args:
-                user_utterances: [{"round": 1, "text": "...", "context": "..."}, ...]
-                cefr_level: 用户 CEFR 等级
-                scene_context: 场景描述
+        Args:
+            user_utterances: [{"round": 1, "text": "...", "context": "..."}, ...]
+            cefr_level: 用户 CEFR 等级
+            scene_context: 场景描述
 
-            Returns:
-                [{"round": 1, "grammar": {"score": 16, "errors": [...], "max": 20},
-                  "relevance": {"score": 12, "max": 15}}, ...]
-            """
-            if not user_utterances:
-                return []
+        Returns:
+            [{"round": 1, "grammar": {"score": 16, "errors": [...], "max": 20},
+              "relevance": {"score": 12, "max": 15}}, ...]
+        """
+        if not user_utterances:
+            return []
 
-            # 构建对话文本
-            utterances_text = ""
-            for u in user_utterances:
-                utterances_text += (
-                    f"Round {u['round']}: \"{u['text']}\"\n"
-                    f"  Context: {u.get('context', 'N/A')}\n\n"
-                )
-
-            prompt = (
-                f"You are evaluating a student's English speaking fluency in a conversation.\n"
-                f"Student CEFR level: {cefr_level}\n"
-                f"Scene: {scene_context}\n\n"
-                f"Student utterances:\n{utterances_text}\n"
-                f"For EACH round, evaluate 2 dimensions:\n"
-                f"1. grammar_correctness (0-20): Check for grammar errors "
-                f"(tense, subject-verb agreement, articles, prepositions, word order, singular/plural).\n"
-                f"2. content_relevance (0-15): How relevant is the response to the conversation context?\n\n"
-                f"Return ONLY a JSON object (no markdown, no code fences):\n"
-                f'{{"rounds": [\n'
-                f'  {{"round": 1, "grammar": {{"score": 16, "errors": ["error description"], "max": 20}}, '
-                f'"relevance": {{"score": 12, "max": 15, "note": "brief note"}}}},\n'
-                f'  ...\n'
-                f'], "overall_suggestions": "brief Chinese fluency improvement advice"}}'
+        # 构建对话文本
+        utterances_text = ""
+        for u in user_utterances:
+            utterances_text += (
+                f"Round {u['round']}: \"{u['text']}\"\n"
+                f"  Context: {u.get('context', 'N/A')}\n\n"
             )
 
-            try:
-                async with httpx.AsyncClient(timeout=15.0) as client:
-                    resp = await client.post(
-                        BAILIAN_API_URL,
-                        headers={
-                            "Authorization": f"Bearer {self.api_key}",
-                            "Content-Type": "application/json",
-                        },
-                        json={
-                            "model": self.model,
-                            "messages": [{"role": "user", "content": prompt}],
-                            "max_tokens": 800,
-                            "temperature": 0.3,
-                        },
-                    )
-                    resp.raise_for_status()
-                    data = resp.json()
-                    content = data["choices"][0]["message"]["content"].strip()
-                    content = content.replace("```json", "").replace("```", "").strip()
-                    result = json.loads(content)
-                    logger.info(
-                        f"流利度 LLM 评估完成: {len(result.get('rounds', []))} 轮"
-                    )
-                    return result
+        prompt = (
+            f"You are evaluating a student's English speaking fluency in a conversation.\n"
+            f"Student CEFR level: {cefr_level}\n"
+            f"Scene: {scene_context}\n\n"
+            f"Student utterances:\n{utterances_text}\n"
+            f"For EACH round, evaluate 2 dimensions:\n"
+            f"1. grammar_correctness (0-20): Check for grammar errors "
+            f"(tense, subject-verb agreement, articles, prepositions, word order, singular/plural).\n"
+            f"2. content_relevance (0-15): How relevant is the response to the conversation context?\n\n"
+            f"Return ONLY a JSON object (no markdown, no code fences):\n"
+            f'{{"rounds": [\n'
+            f'  {{"round": 1, "grammar": {{"score": 16, "errors": ["error description"], "max": 20}}, '
+            f'"relevance": {{"score": 12, "max": 15, "note": "brief note"}}}},\n'
+            f'  ...\n'
+            f'], "overall_suggestions": "brief Chinese fluency improvement advice"}}'
+        )
 
-            except Exception as e:
-                logger.error(f"流利度 LLM 评估失败: {e}")
-                # 返回默认值
-                fallback = []
-                for u in user_utterances:
-                    fallback.append({
-                        "round": u["round"],
-                        "grammar": {"score": 15, "errors": [], "max": 20},
-                        "relevance": {"score": 10, "max": 15, "note": "评估暂不可用"},
-                    })
-                return {"rounds": fallback, "overall_suggestions": "继续练习，多说多练！"}
+        try:
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                resp = await client.post(
+                    BAILIAN_API_URL,
+                    headers={
+                        "Authorization": f"Bearer {self.api_key}",
+                        "Content-Type": "application/json",
+                    },
+                    json={
+                        "model": self.model,
+                        "messages": [{"role": "user", "content": prompt}],
+                        "max_tokens": 800,
+                        "temperature": 0.3,
+                        "enable_thinking": False,
+                    },
+                )
+                resp.raise_for_status()
+                data = resp.json()
+                content = data["choices"][0]["message"]["content"].strip()
+                content = content.replace("```json", "").replace("```", "").strip()
+                result = json.loads(content)
+                logger.info(
+                    f"流利度 LLM 评估完成: {len(result.get('rounds', []))} 轮"
+                )
+                return result
+
+        except Exception as e:
+            logger.error(f"流利度 LLM 评估失败: {e}")
+            # 返回默认值
+            fallback = []
+            for u in user_utterances:
+                fallback.append({
+                    "round": u["round"],
+                    "grammar": {"score": 15, "errors": [], "max": 20},
+                    "relevance": {"score": 10, "max": 15, "note": "评估暂不可用"},
+                })
+            return {"rounds": fallback, "overall_suggestions": "继续练习，多说多练！"}
 
 
-async def correct_grammar(self, text: str, cefr_level: str = "B1") -> dict:
+    async def correct_grammar(self, text: str, cefr_level: str = "B1") -> dict:
         """
         语法纠错与润色 — 独立纠错功能
 
@@ -701,6 +711,7 @@ async def correct_grammar(self, text: str, cefr_level: str = "B1") -> dict:
                         "messages": [{"role": "user", "content": prompt}],
                         "max_tokens": 800,
                         "temperature": 0.3,
+                        "enable_thinking": False,
                     },
                 )
                 resp.raise_for_status()
@@ -721,7 +732,7 @@ async def correct_grammar(self, text: str, cefr_level: str = "B1") -> dict:
             }
 
 
-async def score_speaking(self, transcript: str, cefr_level: str = "B1") -> dict:
+    async def score_speaking(self, transcript: str, cefr_level: str = "B1") -> dict:
         """
         口语题评分 — 四维度评估用户口语回答（0-25 分/维度，总分 0-100）
 
@@ -762,6 +773,7 @@ async def score_speaking(self, transcript: str, cefr_level: str = "B1") -> dict:
                         "messages": [{"role": "user", "content": prompt}],
                         "max_tokens": 500,
                         "temperature": 0.3,
+                        "enable_thinking": False,
                     },
                 )
                 resp.raise_for_status()

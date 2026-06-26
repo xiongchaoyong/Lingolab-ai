@@ -22,7 +22,7 @@ function handleLogout() {
       </el-badge>
       <el-dropdown trigger="click" @command="handleLogout">
         <span class="user-info">
-          <el-avatar :size="32" icon="UserFilled" />
+          <el-avatar :size="32" :src="authStore.userInfo?.avatar" icon="UserFilled" />
           <span class="username">{{ authStore.userInfo?.username || '用户' }}</span>
           <el-icon><ArrowDown /></el-icon>
         </span>

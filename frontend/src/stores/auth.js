@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { loginApi, registerApi, getProfileApi, updateProfileApi } from '@/api/auth'
+import { loginApi, registerApi, getProfileApi, updateProfileApi, uploadAvatarApi } from '@/api/auth'
 
 export const useAuthStore = defineStore('auth', () => {
   // ---- state ----
@@ -29,6 +29,7 @@ export const useAuthStore = defineStore('auth', () => {
       username: res.username,
       role: 'learner',
       assessment_completed: res.assessment_completed,
+      avatar: res.avatar,
     })
     return res
   }
@@ -72,16 +73,26 @@ export const useAuthStore = defineStore('auth', () => {
       level_final: res.level_final,
       assessment_completed: res.assessment_completed,
       role: res.role,
+      avatar: res.avatar,
     })
     return res
   }
 
   async function updateProfile(data) {
     const res = await updateProfileApi(data)
-    // 更新本地 userInfo 中的可修改字段
     if (userInfo.value) {
       userInfo.value.learning_goal = res.learning_goal
       userInfo.value.interests = res.interests
+    }
+    return res
+  }
+
+  async function uploadAvatar(file) {
+    const formData = new FormData()
+    formData.append('file', file)
+    const res = await uploadAvatarApi(formData)
+    if (userInfo.value) {
+      userInfo.value.avatar = res.avatar_url
     }
     return res
   }
@@ -98,5 +109,6 @@ export const useAuthStore = defineStore('auth', () => {
     logout,
     fetchProfile,
     updateProfile,
+    uploadAvatar,
   }
 })

@@ -24,3 +24,8 @@ export function adjustDifficultyApi(taskId, direction) {
 export function getHistoryApi(days = 7) {
   return request.get('/api/learning-path/history', { params: { days } })
 }
+
+/** 获取个人情况说明 */
+export function getProfileSummaryApi() {
+  return request.get('/api/learning-path/profile-summary')
+}

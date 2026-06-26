@@ -41,9 +41,9 @@ class ConversationEndResponse(BaseModel):
         default_factory=list,
         description="每句话的完整发音评分结果（含 viz 可视化数据）",
     )
-    transcript: List[Dict[str, str]] = Field(
+    transcript: List[Dict[str, Any]] = Field(
         default_factory=list,
-        description="对话完整记录 [{\"role\": \"user\"|\"ai\", \"text\": \"...\"}]",
+        description="对话完整记录 [{\"role\": \"user\"|\"ai\"|\"grammar\", \"text\": \"...\"}]",
     )
     text_dimension_details: List[Dict[str, Any]] = Field(
         default_factory=list,

@@ -81,6 +81,12 @@ const routes = [
         component: () => import('@/views/learning/RecommendationView.vue'),
         meta: { title: '资料推荐', auth: true },
       },
+      {
+        path: 'profile-summary',
+        name: 'ProfileSummary',
+        component: () => import('@/views/learning/ProfileSummaryView.vue'),
+        meta: { title: '个人情况说明', auth: true },
+      },
       // 模块四：激励服务
       {
         path: 'progress',

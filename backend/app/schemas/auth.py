@@ -70,6 +70,7 @@ class LoginResponse(BaseModel):
     token: str = Field(..., description="JWT Token")
     assessment_completed: bool = Field(..., description="是否已完成测评")
     redirect: str = Field(..., description="跳转路径：测评页或首页")
+    avatar: Optional[str] = Field(default=None, description="头像URL")
 
 
 class ProfileResponse(BaseModel):
@@ -86,6 +87,7 @@ class ProfileResponse(BaseModel):
     level_final: Optional[str] = Field(default=None, description="综合等级")
     assessment_completed: bool = Field(..., description="是否已完成测评")
     role: str = Field(..., description="用户角色")
+    avatar: Optional[str] = Field(default=None, description="头像URL")
 
 
 class ProfileUpdateRequest(BaseModel):

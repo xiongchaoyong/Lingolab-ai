@@ -1,5 +1,6 @@
 <script setup>
 import { ref, nextTick, onUnmounted } from 'vue'
+import { Promotion } from '@element-plus/icons-vue'
 import { chatText, chatVoice } from '@/api/help'
 
 const faqCategories = [
@@ -39,14 +40,6 @@ const faqCategories = [
     ],
   },
 ]
-
-const categoryLabels = {
-  product_use: '产品使用',
-  study_advice: '学习建议',
-  tech_issue: '技术问题',
-  refund: '付费相关',
-  off_topic: '其他',
-}
 
 const messages = ref([
   { role: 'ai', text: '你好！我是 Lingolab 智能客服小语，有什么可以帮你的？', time: '刚刚' },
@@ -107,31 +100,21 @@ async function callChatAPI(message) {
   loading.value = true
   try {
     const history = getHistory()
-    const res = await chatText(message, history.slice(0, -1)) // exclude current message
+    const res = await chatText(message, history.slice(0, -1))
     const data = res.data || res
-    const category = data.category || 'study_advice'
-    let reply = data.reply || '抱歉，我暂时无法处理你的问题。'
-
-    // 如果标记转人工，追加提示
-    if (data.escalate && !reply.includes('support@lingolab.com')) {
-      reply += '\n\n如需进一步帮助，请发送邮件至 support@lingolab.com 联系人工客服。'
-    }
+    const reply = data.reply || '抱歉，我暂时无法处理你的问题。'
 
     messages.value.push({
       role: 'ai',
       text: reply,
       time: formatTime(),
-      category,
-      escalate: data.escalate,
     })
   } catch (e) {
     console.error('客服 API 调用失败:', e)
     messages.value.push({
       role: 'ai',
-      text: '抱歉，我暂时无法处理你的问题。请尝试查看左侧的常见问题分类，或发送邮件至 support@lingolab.com 联系人工客服。',
+      text: '抱歉，我暂时无法处理你的问题。请稍后重试。',
       time: formatTime(),
-      category: 'tech_issue',
-      escalate: true,
     })
   } finally {
     loading.value = false
@@ -190,10 +173,8 @@ async function sendVoiceMessage(blob) {
     const res = await chatVoice(blob, history)
     const data = res.data || res
     const transcript = data.transcript || ''
-    const category = data.category || 'study_advice'
-    let reply = data.reply || '未能识别你的语音，请用文字输入问题。'
+    const reply = data.reply || '未能识别你的语音，请用文字输入问题。'
 
-    // 显示用户语音转写文本
     if (transcript) {
       messages.value.push({
         role: 'user',
@@ -202,16 +183,10 @@ async function sendVoiceMessage(blob) {
       })
     }
 
-    if (data.escalate && !reply.includes('support@lingolab.com')) {
-      reply += '\n\n如需进一步帮助，请发送邮件至 support@lingolab.com 联系人工客服。'
-    }
-
     messages.value.push({
       role: 'ai',
       text: reply,
       time: formatTime(),
-      category,
-      escalate: data.escalate,
     })
   } catch (e) {
     console.error('语音客服失败:', e)
@@ -219,8 +194,6 @@ async function sendVoiceMessage(blob) {
       role: 'ai',
       text: '语音识别失败，请用文字输入问题或重试。',
       time: formatTime(),
-      category: 'tech_issue',
-      escalate: false,
     })
   } finally {
     loading.value = false
@@ -297,14 +270,6 @@ onUnmounted(() => {
             <div class="msg-text">{{ msg.text }}</div>
             <div class="msg-meta">
               <span class="msg-time">{{ msg.time }}</span>
-              <el-tag
-                v-if="msg.role === 'ai' && msg.category"
-                size="small"
-                :type="msg.escalate ? 'warning' : 'info'"
-                class="msg-category-tag"
-              >
-                {{ categoryLabels[msg.category] || msg.category }}
-              </el-tag>
             </div>
           </div>
         </div>
@@ -401,27 +366,72 @@ onUnmounted(() => {
   flex: 1; overflow-y: auto; padding: var(--spacing-lg);
   display: flex; flex-direction: column; gap: var(--spacing-lg);
 }
-.msg-row { display: flex; gap: var(--spacing-sm);
-  &.ai { justify-content: flex-start; }
-  &.user { justify-content: flex-end; flex-direction: row-reverse; }
+.msg-row {
+  display: flex;
+  gap: var(--spacing-sm);
+  align-items: flex-end;
 }
+.msg-row.ai {
+  justify-content: flex-start;
+}
+.msg-row.user {
+  flex-direction: row-reverse;
+}
+
 .msg-avatar {
   width: 32px; height: 32px; border-radius: 50%;
   display: flex; align-items: center; justify-content: center; flex-shrink: 0;
 }
-.msg-row.ai .msg-avatar { background: rgba(var(--color-primary-rgb), 0.1); color: var(--color-primary); }
-.msg-row.user .msg-avatar { background: rgba(var(--color-success-rgb), 0.1); color: var(--color-success); }
+.msg-row.ai .msg-avatar {
+  background: rgba(var(--color-primary-rgb), 0.1);
+  color: var(--color-primary);
+}
+.msg-row.user .msg-avatar {
+  background: rgba(var(--color-success-rgb), 0.1);
+  color: var(--color-success);
+}
+
 .msg-bubble {
   max-width: 70%;
-  &.ai { background: var(--color-bg-primary); border: 1px solid var(--color-border); border-radius: var(--radius-md); border-top-left-radius: 0; }
-  &.user { background: var(--color-primary); color: #fff; border-radius: var(--radius-md); border-top-right-radius: 0; }
-  .msg-text { padding: var(--spacing-md); font-size: var(--font-size-base); line-height: 1.6; white-space: pre-line; }
-  .msg-meta { display: flex; align-items: center; gap: var(--spacing-sm); padding: 2px var(--spacing-md) var(--spacing-sm); }
-  .msg-time { font-size: 11px; opacity: 0.6; }
-  .msg-category-tag { font-size: 10px; }
 }
-.msg-row.user .msg-meta { justify-content: flex-end; }
-.msg-row.user .msg-time { opacity: 0.8; }
+.msg-bubble.ai {
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  border-top-left-radius: 0;
+}
+.msg-bubble.user {
+  background: var(--color-primary);
+  color: #fff;
+  border-radius: var(--radius-md);
+  border-top-right-radius: 0;
+}
+.msg-bubble .msg-text {
+  padding: var(--spacing-md);
+  font-size: var(--font-size-base);
+  line-height: 1.6;
+  white-space: pre-line;
+}
+.msg-bubble .msg-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: 2px var(--spacing-md) var(--spacing-sm);
+}
+.msg-row.user .msg-bubble .msg-meta {
+  justify-content: flex-end;
+}
+
+.msg-time {
+  font-size: 11px;
+  opacity: 0.6;
+}
+.msg-row.user .msg-time {
+  opacity: 0.8;
+}
+.msg-category-tag {
+  font-size: 10px;
+}
 
 // 打字动画
 .typing-bubble {

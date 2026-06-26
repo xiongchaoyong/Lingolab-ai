@@ -26,7 +26,7 @@ onUnmounted(() => {
 
 // ========== 导航定义（按需求文档七个模块） ==========
 
-const FULLSCREEN_ROUTES = ['/conversation']
+const FULLSCREEN_ROUTES = ['/conversation', '/role-play']
 
 const isFullscreenRoute = computed(() => FULLSCREEN_ROUTES.includes(route.path))
 
@@ -46,6 +46,7 @@ const learnerNavs = [
     children: [
       { path: '/learning-path', title: '路径规划' },
       { path: '/recommend', title: '资料推荐' },
+      { path: '/profile-summary', title: '个人情况说明' },
     ],
   },
   {
@@ -80,6 +81,7 @@ const teacherNavs = [
     children: [
       { path: '/learning-path', title: '路径规划' },
       { path: '/recommend', title: '资料推荐' },
+      { path: '/profile-summary', title: '个人情况说明' },
     ],
   },
   {
@@ -122,6 +124,7 @@ const adminNavs = [
     children: [
       { path: '/learning-path', title: '路径规划' },
       { path: '/recommend', title: '资料推荐' },
+      { path: '/profile-summary', title: '个人情况说明' },
     ],
   },
   {
@@ -184,9 +187,13 @@ function onParentClick(item) {
   }
 }
 
-function handleLogout() {
-  authStore.logout()
-  router.push('/')
+function handleCommand(command) {
+  if (command === 'profile') {
+    router.push('/profile')
+  } else if (command === 'logout') {
+    authStore.logout()
+    router.push('/')
+  }
 }
 </script>
 
@@ -247,9 +254,9 @@ function handleLogout() {
           </el-badge>
 
           <!-- 用户下拉 -->
-          <el-dropdown trigger="click" @command="handleLogout">
+          <el-dropdown trigger="click" @command="handleCommand">
             <span class="tn-user">
-              <el-avatar :size="32" icon="UserFilled" />
+              <el-avatar :size="32" :src="authStore.userInfo?.avatar" icon="UserFilled" />
               <span class="tn-username">{{ authStore.userInfo?.username || '用户' }}</span>
               <el-icon><ArrowDown /></el-icon>
             </span>

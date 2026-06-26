@@ -6,6 +6,7 @@ import {
   replaceTaskApi,
   adjustDifficultyApi,
   getHistoryApi,
+  getProfileSummaryApi,
 } from '@/api/learning_path'
 
 export const useLearningPathStore = defineStore('learning_path', () => {
@@ -14,6 +15,7 @@ export const useLearningPathStore = defineStore('learning_path', () => {
   const taskDate = ref('')
   const historyRecords = ref([])
   const loading = ref(false)
+  const profileSummary = ref(null)
 
   const isAllDone = computed(() => progress.value.done >= progress.value.total && progress.value.total > 0)
 
@@ -66,8 +68,17 @@ export const useLearningPathStore = defineStore('learning_path', () => {
     historyRecords.value = res.records || []
   }
 
+  async function fetchProfileSummary() {
+    try {
+      const res = await getProfileSummaryApi()
+      profileSummary.value = res
+    } catch {
+      profileSummary.value = null
+    }
+  }
+
   return {
-    tasks, progress, taskDate, historyRecords, loading, isAllDone,
-    fetchDailyTasks, skipTask, replaceTask, adjustDifficulty, fetchHistory,
+    tasks, progress, taskDate, historyRecords, loading, isAllDone, profileSummary,
+    fetchDailyTasks, skipTask, replaceTask, adjustDifficulty, fetchHistory, fetchProfileSummary,
   }
 })

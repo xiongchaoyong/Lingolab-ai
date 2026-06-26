@@ -1,6 +1,13 @@
 import request from './index'
+import { useAuthStore } from '@/stores/auth'
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || ''
+
+function authHeaders(extra = {}) {
+  const authStore = useAuthStore()
+  const token = authStore.token
+  return token ? { Authorization: `Bearer ${token}`, ...extra } : extra
+}
 
 /**
  * 流式开始新对话 — SSE 逐 token 返回
@@ -11,7 +18,7 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL || ''
 export async function streamStartConversation(scene, cefrLevel, callbacks) {
   const resp = await fetch(`${API_BASE}/api/conversation/stream/start`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify({ scene, cefr_level: cefrLevel }),
   })
   await readSSEStream(resp, callbacks)
@@ -31,6 +38,7 @@ export async function streamSpeakConversation(sessionId, scene, audioBlob, callb
   form.append('audio', audioBlob, 'recording.wav')
   const resp = await fetch(`${API_BASE}/api/conversation/stream/speak`, {
     method: 'POST',
+    headers: authHeaders(),
     body: form,
   })
   await readSSEStream(resp, callbacks)
@@ -116,10 +124,14 @@ export function speakConversation(sessionId, scene, audioBlob) {
  * @returns {Promise<{overall: number, dimensions: Array, suggestions: string}>}
  */
 export function endConversation(sessionId) {
+  console.log('[END] session_id:', sessionId)
   const form = new FormData()
   form.append('session_id', sessionId)
   return request.post('/api/conversation/end', form, {
     timeout: 120000,  // 评分耗时较长（wav2vec2 + LLM），2分钟超时
+  }).catch(e => {
+    console.error('[END] request failed:', e.response?.status, e.response?.data)
+    throw e
   })
 }
 
