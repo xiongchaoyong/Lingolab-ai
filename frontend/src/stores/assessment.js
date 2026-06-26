@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { startAssessmentApi, answerQuestionApi, completeAssessmentApi } from '@/api/assessment'
+import { startAssessmentApi, answerQuestionApi, completeAssessmentApi, restoreSessionApi } from '@/api/assessment'
 import { useAuthStore } from '@/stores/auth'
 
 const TYPE_LABELS = {
@@ -37,21 +37,30 @@ export const useAssessmentStore = defineStore('assessment', () => {
 
   // ------- actions -------
   async function startAssessment() {
-    // 尝试从 localStorage 恢复
+    // 尝试从 localStorage 恢复 + 重建后端会话
     const saved = localStorage.getItem('assessment_progress')
     if (saved) {
       try {
         const data = JSON.parse(saved)
         if (data.sessionId && data.currentQuestion) {
-          sessionId.value = data.sessionId
-          currentQuestion.value = data.currentQuestion
-          answeredCount.value = data.answeredCount || 0
-          totalQuestions.value = data.totalQuestions || 10
-          currentDifficulty.value = data.currentDifficulty || 'B1'
-          startTime.value = data.startTime || Date.now()
-          return
+          // 调用后端 restore 接口，重建内存中的会话状态
+          const res = await restoreSessionApi(data.sessionId)
+          if (res.status === 'restored') {
+            sessionId.value = data.sessionId
+            currentQuestion.value = res.next_question || data.currentQuestion
+            answeredCount.value = res.answered_count ?? data.answeredCount ?? 0
+            totalQuestions.value = res.total_questions ?? data.totalQuestions ?? 10
+            currentDifficulty.value = res.current_difficulty ?? data.currentDifficulty ?? 'B1'
+            startTime.value = data.startTime || Date.now()
+            saveProgress()
+            return
+          }
+          // 如果 restore 失败（session 过期等），清除旧数据，走新建流程
+          localStorage.removeItem('assessment_progress')
         }
-      } catch {}
+      } catch {
+        localStorage.removeItem('assessment_progress')
+      }
     }
 
     // 从后端获取第一题

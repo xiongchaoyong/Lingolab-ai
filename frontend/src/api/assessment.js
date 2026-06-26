@@ -27,3 +27,11 @@ export function completeAssessmentApi(sessionId) {
     headers: { 'Content-Type': 'multipart/form-data' },
   })
 }
+
+export function restoreSessionApi(sessionId) {
+  const formData = new FormData()
+  formData.append('session_id', sessionId)
+  return request.post('/api/assessment/restore', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
+}

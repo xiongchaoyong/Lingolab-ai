@@ -1,4 +1,4 @@
-"""英语水平测评 API 路由 — 自适应难度 + 逐题提交"""
+"""英语水平测评 API 路由 — 自适应难度 + 逐题提交 + 会话持久化"""
 
 import os
 import uuid
@@ -7,6 +7,7 @@ import tempfile
 import logging
 import subprocess
 import shutil
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, UploadFile, File, Form, Depends, HTTPException
 from sqlalchemy.orm import Session
@@ -66,7 +67,12 @@ SUGGESTIONS = {
 }
 
 # ========== 会话存储 ==========
+# 注意：正式环境应使用数据库存储，当前使用内存字典 + DB 记录双写
 _sessions: dict[str, dict] = {}
+
+# 全对/全错追加题阈值
+BONUS_THRESHOLD_CORRECT = 10   # 全对（10 题全答对）追加 C2 确认题
+BONUS_THRESHOLD_WRONG = 0      # 全错（10 题全答错）追加 A1 兜底题
 
 # ========== 工具函数 ==========
 
@@ -131,7 +137,24 @@ async def start_assessment(
     """
     开始自适应测评 — 返回第一题。
     起始难度基于用户自评等级，默认 B1。
+    限制：30 天内只能重新测评一次。
     """
+    # 30 天重测评限制
+    if current_user.assessment_completed:
+        last_record = (
+            db.query(AssessmentRecord)
+            .filter(AssessmentRecord.user_id == current_user.id)
+            .order_by(AssessmentRecord.created_at.desc())
+            .first()
+        )
+        if last_record:
+            days_since = (datetime.now(timezone.utc) - last_record.created_at.replace(tzinfo=timezone.utc)).days
+            if days_since < 30:
+                raise HTTPException(
+                    status_code=429,
+                    detail=f"测评完成后 30 天内不可重新测评，距离上次测评已过 {days_since} 天",
+                )
+
     session_id = str(uuid.uuid4())
 
     # 起始难度：自评等级 → CEFR，默认 B1
@@ -153,6 +176,7 @@ async def start_assessment(
         "question_order": 0,
         "answered_ids": set(),
         "start_time": None,
+        "bonus_added": False,
     }
 
     question = QuestionItem(
@@ -300,8 +324,58 @@ async def answer_assessment(
 
     # 检查是否还有下一题
     next_index = session["question_order"]
-    if next_index >= len(DIMENSION_SEQUENCE):
-        # 全部完成
+
+    # 全对/全错追加题逻辑
+    base_questions = len(DIMENSION_SEQUENCE)
+    if next_index == base_questions:
+        # 基础 10 题答完，检查是否需要追加
+        all_scores = []
+        for dim_scores in session["dimension_totals"].values():
+            all_scores.extend(dim_scores)
+
+        if len(all_scores) >= base_questions:
+            correct_count = sum(1 for s in all_scores if s >= 60)
+
+            if correct_count >= BONUS_THRESHOLD_CORRECT and not session.get("bonus_added"):
+                # 全对 → 追加 1 题 C2 确认题
+                bonus_q = _select_question(db, "speaking", "C2", session["answered_ids"])
+                if bonus_q:
+                    session["bonus_added"] = True
+                    bonus_item = QuestionItem(
+                        id=bonus_q.id,
+                        type=bonus_q.dimension,
+                        difficulty=bonus_q.difficulty,
+                        content=bonus_q.question_text,
+                        options=bonus_q.options if bonus_q.options else [],
+                    )
+                    logger.info(f"全对追加 C2 确认题: session={session_id}")
+                    return AssessmentAnswerResponse(
+                        complete=False,
+                        next_question=bonus_item,
+                        current_difficulty="C2",
+                    )
+
+            elif correct_count <= BONUS_THRESHOLD_WRONG and not session.get("bonus_added"):
+                # 全错 → 追加 1 题 A1 兜底题
+                bonus_q = _select_question(db, "listening", "A1", session["answered_ids"])
+                if bonus_q:
+                    session["bonus_added"] = True
+                    bonus_item = QuestionItem(
+                        id=bonus_q.id,
+                        type=bonus_q.dimension,
+                        difficulty=bonus_q.difficulty,
+                        content=bonus_q.question_text,
+                        options=bonus_q.options if bonus_q.options else [],
+                    )
+                    logger.info(f"全错追加 A1 兜底题: session={session_id}")
+                    return AssessmentAnswerResponse(
+                        complete=False,
+                        next_question=bonus_item,
+                        current_difficulty="A1",
+                    )
+
+    if next_index >= base_questions and (not session.get("bonus_added") or next_index > base_questions):
+        # 全部完成（含追加题）
         return AssessmentAnswerResponse(
             complete=True,
             next_question=None,
@@ -341,6 +415,81 @@ async def answer_assessment(
         next_question=next_question,
         current_difficulty=target_cefr,
     )
+
+
+@router.post("/restore")
+async def restore_session(
+    session_id: str = Form(..., description="测评会话 UUID"),
+    current_user: UserProfile = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    恢复测评会话 — 从数据库记录重建中断的会话。
+    前端刷新页面后调用此接口恢复进度。
+    """
+    # 查询该会话的所有记录
+    records = (
+        db.query(AssessmentRecord)
+        .filter(
+            AssessmentRecord.session_id == session_id,
+            AssessmentRecord.user_id == current_user.id,
+        )
+        .order_by(AssessmentRecord.question_order)
+        .all()
+    )
+
+    if not records:
+        raise HTTPException(status_code=404, detail="测评会话不存在或无答题记录")
+
+    # 重建会话状态
+    dimension_totals = {"listening": [], "speaking": [], "reading": [], "grammar": []}
+    answered_ids = set()
+    current_level = 3.0  # 默认 B1
+
+    for rec in records:
+        answered_ids.add(rec.question_id)
+        question = db.query(AssessmentQuestion).filter(AssessmentQuestion.id == rec.question_id).first()
+        if question and rec.score is not None:
+            dimension_totals[question.dimension].append(float(rec.score))
+            # 反推当前难度
+            current_level = _adjust_level(current_level, float(rec.score))
+
+    _sessions[session_id] = {
+        "user_id": current_user.id,
+        "current_level": current_level,
+        "dimension_totals": dimension_totals,
+        "question_order": len(records),
+        "answered_ids": answered_ids,
+        "start_time": None,
+        "bonus_added": len(records) > len(DIMENSION_SEQUENCE),
+    }
+
+    # 选下一题
+    next_index = len(records)
+    if next_index >= len(DIMENSION_SEQUENCE):
+        return {"complete": True, "answered_count": len(records)}
+
+    next_dim = DIMENSION_SEQUENCE[next_index]
+    target_cefr = _level_to_cefr(current_level)
+    next_q = _select_question(db, next_dim, target_cefr, answered_ids)
+
+    if not next_q:
+        return {"complete": True, "answered_count": len(records)}
+
+    next_question = QuestionItem(
+        id=next_q.id,
+        type=next_q.dimension,
+        difficulty=next_q.difficulty,
+        content=next_q.question_text,
+        options=next_q.options if next_q.options else [],
+    )
+
+    return {
+        "complete": False,
+        "answered_count": len(records),
+        "next_question": next_question.model_dump(),
+        "current_difficulty": target_cefr,
+    }
 
 
 @router.post("/complete", response_model=AssessmentSubmitResponse)
