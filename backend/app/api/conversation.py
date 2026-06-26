@@ -375,6 +375,7 @@ async def conversation_stream_speak(
             session["round"] += 1
 
             # 持久化用户消息
+            db_msg_id = None
             try:
                 db_sid = session.get("db_session_id")
                 if db_sid:
@@ -386,22 +387,37 @@ async def conversation_stream_speak(
                     )
                     db.add(db_msg)
                     db.commit()
+                    db.refresh(db_msg)
+                    db_msg_id = db_msg.id
             except Exception as e:
                 db.rollback()
                 logger.warning(f"保存用户消息失败: {e}")
 
             # 算法流利度计算（维度1-3，静默存储）
+            fluency_data = None
             try:
                 words = asr_result.get("words", [])
                 segments = asr_result.get("segments", [])
                 audio_duration = segments[-1].get("end", 5.0) if segments else 5.0
                 fluency_algo = assess_algorithmic(user_text, words, audio_duration)
-                session["fluency_scores"].append({
+                fluency_data = {
                     "text": user_text,
                     "wpm": fluency_algo["wpm"],
                     "pause_frequency": fluency_algo["pause_frequency"],
                     "repetition": fluency_algo["repetition"],
-                })
+                }
+                session["fluency_scores"].append(fluency_data)
+
+                # 持久化流利度到 conversation_messages
+                if db_msg_id:
+                    try:
+                        db.query(ConversationMessage).filter(
+                            ConversationMessage.id == db_msg_id
+                        ).update({"fluency_scores": fluency_algo})
+                        db.commit()
+                    except Exception as e:
+                        db.rollback()
+                        logger.warning(f"保存流利度失败: {e}")
             except Exception as e:
                 logger.warning(f"流利度算法计算失败: {e}")
 
@@ -441,6 +457,17 @@ async def conversation_stream_speak(
                 grammar_result = await grammar_task
                 if grammar_result.get("errors"):
                     yield f"data: {json.dumps({'type': 'grammar', 'data': grammar_result})}\n\n"
+
+                # 持久化语法纠错到 conversation_messages
+                if db_msg_id and grammar_result:
+                    try:
+                        db.query(ConversationMessage).filter(
+                            ConversationMessage.id == db_msg_id
+                        ).update({"grammar_check": grammar_result})
+                        db.commit()
+                    except Exception as e:
+                        db.rollback()
+                        logger.warning(f"保存语法纠错失败: {e}")
             except Exception as e:
                 logger.warning(f"语法纠错失败: {e}")
 
