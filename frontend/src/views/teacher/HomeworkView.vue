@@ -104,6 +104,11 @@ function getStatusTag(status) {
 function getStatusLabel(status) {
   return status === 'reviewed' ? '已点评' : '待点评'
 }
+
+function playAudio(url) {
+  const audio = new Audio(url)
+  audio.play().catch(() => ElMessage.warning('播放失败'))
+}
 </script>
 
 <template>
@@ -176,6 +181,12 @@ function getStatusLabel(status) {
     <el-dialog v-model="showSubmissionsDialog" title="作业提交" width="700px">
       <el-table :data="store.submissions" stripe max-height="400">
         <el-table-column prop="username" label="学生" width="120" />
+        <el-table-column prop="audio_url" label="录音" width="80">
+          <template #default="{ row }">
+            <el-button v-if="row.audio_url" size="small" text type="primary" @click="playAudio(row.audio_url)">播放</el-button>
+            <span v-else style="color: var(--color-text-disabled);">-</span>
+          </template>
+        </el-table-column>
         <el-table-column prop="score" label="AI评分" width="80">
           <template #default="{ row }">{{ row.score != null ? Math.round(row.score) : '-' }}</template>
         </el-table-column>

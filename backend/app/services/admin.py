@@ -54,6 +54,7 @@ class TeacherService:
             description=description,
             teacher_id=teacher_id,
             invite_code=invite_code,
+            invite_expires_at=datetime.utcnow() + timedelta(hours=24),
             level_range=level_range,
         )
         db.add(cls)
@@ -62,6 +63,7 @@ class TeacherService:
             "id": cls.id, "name": cls.name, "description": cls.description or "",
             "level_range": cls.level_range or "", "student_count": 0,
             "invite_code": cls.invite_code, "is_active": cls.is_active,
+            "invite_expires_at": cls.invite_expires_at.isoformat() if cls.invite_expires_at else None,
             "created_at": cls.created_at.isoformat() if cls.created_at else "",
         }
 
@@ -100,6 +102,10 @@ class TeacherService:
         if not cls:
             raise ValueError("邀请码无效")
 
+        # 检查邀请码是否过期
+        if cls.invite_expires_at and cls.invite_expires_at < datetime.utcnow():
+            raise ValueError("邀请码已过期，请联系教师刷新")
+
         existing = (
             db.query(ClassStudent)
             .filter(ClassStudent.class_id == cls.id, ClassStudent.user_id == user_id)
@@ -112,6 +118,16 @@ class TeacherService:
         cls.student_count += 1
         db.flush()
         return {"class_id": cls.id, "class_name": cls.name, "joined": True}
+
+    def refresh_invite_code(self, class_id: int, teacher_id: int, db: Session) -> Dict:
+        """刷新邀请码"""
+        cls = db.query(Class).filter(Class.id == class_id, Class.teacher_id == teacher_id).first()
+        if not cls:
+            raise ValueError("班级不存在")
+        cls.invite_code = "LINGO-" + secrets.token_hex(3).upper()
+        cls.invite_expires_at = datetime.utcnow() + timedelta(hours=24)
+        db.flush()
+        return {"invite_code": cls.invite_code, "invite_expires_at": cls.invite_expires_at.isoformat()}
 
     # ===== 作业管理 =====
 
@@ -383,6 +399,9 @@ class AdminService:
 
     def set_user_status(self, user_id: int, is_active: int, admin_id: int, db: Session) -> Dict:
         """启用/禁用用户"""
+        if user_id == admin_id:
+            raise ValueError("不能禁用自己的账号")
+
         user = db.query(UserProfile).filter(UserProfile.id == user_id).first()
         if not user:
             raise ValueError("用户不存在")
@@ -512,6 +531,34 @@ class AdminService:
             ) or 0
             retention_d7 = round(today_from_seven / seven_ago_active * 100, 1)
 
+        # 总学习时长（分钟）
+        total_duration = (
+            db.query(func.count(UserSkillScore.id)).scalar()
+        ) or 0
+        total_duration_minutes = total_duration * 5  # 每条记录约5分钟
+
+        # 人均时长
+        active_user_count = db.query(func.count(func.distinct(UserSkillScore.user_id))).scalar() or 1
+        avg_duration_minutes = round(total_duration_minutes / active_user_count, 1)
+
+        # 对话完成率
+        total_sessions = (
+            db.query(func.count(AssignmentSubmission.id)).scalar()
+        ) or 0
+        completed_sessions = (
+            db.query(func.count(AssignmentSubmission.id))
+            .filter(AssignmentSubmission.status == "reviewed")
+            .scalar()
+        ) or 0
+        conversation_completion = round(completed_sessions / total_sessions * 100, 1) if total_sessions > 0 else 0.0
+
+        # 日新增
+        daily_new_users = (
+            db.query(func.count(UserProfile.id))
+            .filter(func.date(UserProfile.created_at) == today)
+            .scalar()
+        ) or 0
+
         return {
             "metrics": {
                 "dau": dau,
@@ -520,6 +567,10 @@ class AdminService:
                 "retention_d7": retention_d7,
                 "total_users": total_users,
                 "active_users": active_users,
+                "total_duration_minutes": total_duration_minutes,
+                "avg_duration_minutes": avg_duration_minutes,
+                "conversation_completion_rate": conversation_completion,
+                "daily_new_users": daily_new_users,
             },
             "user_trend": user_trend,
             "content_type_distribution": type_dist,
@@ -534,7 +585,7 @@ class AdminService:
             items = db.query(AssessmentQuestion).order_by(AssessmentQuestion.id).all()
             return [{
                 "id": q.id, "content": q.question_text,
-                "type": q.question_type, "difficulty": q.difficulty,
+                "type": q.dimension, "difficulty": q.difficulty,
                 "dimension": q.dimension,
             } for q in items]
 
@@ -725,7 +776,7 @@ class AdminService:
 
         # 字段映射
         field_map = {
-            "questions": {"content": "question_text", "type": "question_type", "difficulty": "difficulty", "dimension": "dimension"},
+            "questions": {"content": "question_text", "type": "dimension", "difficulty": "difficulty", "dimension": "dimension"},
             "shadow": {"word": "content_text", "type": "content_type", "difficulty": "cefr_level", "ipa": "phonetic_ipa"},
             "materials": {"title": "title", "type": "material_type", "level": "cefr_level", "category": "category", "description": "description"},
             "dubbing": {"title": "title", "line": "subtitle", "difficulty": "difficulty", "source": "source"},

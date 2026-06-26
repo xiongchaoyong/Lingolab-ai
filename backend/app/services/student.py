@@ -95,6 +95,10 @@ class StudentService:
         if not assignment:
             raise ValueError("作业不存在")
 
+        # 检查截止时间
+        if assignment.due_date and assignment.due_date < datetime.utcnow():
+            raise ValueError("作业已截止，无法提交")
+
         # 验证学生在班级中
         is_member = (
             db.query(ClassStudent)

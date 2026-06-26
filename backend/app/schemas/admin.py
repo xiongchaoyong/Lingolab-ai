@@ -28,8 +28,8 @@ class ClassListResponse(BaseModel):
 
 class CreateClassRequest(BaseModel):
     """创建班级"""
-    name: str = Field(..., max_length=100)
-    description: str = ""
+    name: str = Field(..., max_length=50)
+    description: str = Field(default="", max_length=200)
     level_range: str = ""
 
 
@@ -149,6 +149,10 @@ class DashboardMetrics(BaseModel):
     retention_d7: float = 0.0
     total_users: int = 0
     active_users: int = 0
+    total_duration_minutes: int = 0
+    avg_duration_minutes: float = 0.0
+    conversation_completion_rate: float = 0.0
+    daily_new_users: int = 0
 
 
 class TrendPoint(BaseModel):

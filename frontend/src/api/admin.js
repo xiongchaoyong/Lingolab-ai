@@ -18,6 +18,10 @@ export function joinClassApi(inviteCode) {
   return request.post('/api/admin/classes/join', { invite_code: inviteCode })
 }
 
+export function refreshInviteCodeApi(classId) {
+  return request.post(`/api/admin/classes/${classId}/refresh-code`)
+}
+
 // ===== 作业管理 =====
 
 export function getAssignmentsApi() {

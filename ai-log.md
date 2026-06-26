@@ -13,6 +13,15 @@
 4. **修复配音内容字段映射**：dubbing 查询中 dialogue_text → subtitle, difficulty_level → difficulty
 5. **修复内容管理字段映射**：`get_content_list` 中 questions 引用不存在的 `question_type` → 改为 `dimension`
 6. **学生端班级+作业**：新增 `StudentService` + `/api/student/*` 接口 + 前端 `MyClassesView` / `MyHomeworkView` + 导航栏「班级作业」入口
+7. **模块六全面审计修复**：
+   - 班级名称/描述字段长度校验（50/200字符）
+   - 邀请码24h过期 + 过期刷新接口 + 前端刷新按钮
+   - 加入班级时检查邀请码过期 + "邀请码已过期"错误提示
+   - 作业提交截止时间检查 + "作业已截止"错误提示
+   - 管理员不能禁用自己（后端校验）
+   - 禁用用户需二次确认弹窗
+   - 仪表盘补全10项指标（总时长/人均时长/对话完成率/日新增）
+   - 作业提交列表增加录音播放按钮
 
 ## 2026-05-25
 

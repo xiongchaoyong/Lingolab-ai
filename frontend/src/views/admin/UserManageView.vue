@@ -2,7 +2,7 @@
 import { ref, onMounted, watch } from 'vue'
 import { Search } from '@element-plus/icons-vue'
 import { useAdminStore } from '@/stores/admin'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 
 const store = useAdminStore()
 const loading = ref(false)
@@ -42,12 +42,17 @@ watch([currentPage, pageSize], () => {
 async function toggleStatus(user) {
   const newStatus = user.is_active ? 0 : 1
   const action = newStatus ? '启用' : '禁用'
+  if (!newStatus) {
+    try {
+      await ElMessageBox.confirm(`确定要禁用用户「${user.username}」吗？`, '确认操作', { type: 'warning' })
+    } catch { return }
+  }
   try {
     await store.setUserStatus(user.id, newStatus)
     user.is_active = newStatus
     ElMessage.success(`${action}成功`)
   } catch (e) {
-    ElMessage.error(`${action}失败`)
+    ElMessage.error(e.response?.data?.detail || `${action}失败`)
   }
 }
 

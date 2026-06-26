@@ -2,6 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { Plus } from '@element-plus/icons-vue'
 import { useAdminStore } from '@/stores/admin'
+import { refreshInviteCodeApi } from '@/api/admin'
 import { ElMessage } from 'element-plus'
 
 const store = useAdminStore()
@@ -66,6 +67,16 @@ async function copyInviteCode(code) {
   ElMessage.success('邀请码已复制')
 }
 
+async function refreshInviteCode(cls) {
+  try {
+    const res = await refreshInviteCodeApi(cls.id)
+    cls.invite_code = res.data.invite_code
+    ElMessage.success('邀请码已刷新')
+  } catch (e) {
+    ElMessage.error('刷新失败')
+  }
+}
+
 function getLevelTag(level) {
   if (!level) return 'info'
   if (level.startsWith('A')) return 'success'
@@ -93,11 +104,12 @@ function getLevelTag(level) {
         </template>
       </el-table-column>
       <el-table-column prop="student_count" label="学生数" width="80" />
-      <el-table-column prop="invite_code" label="邀请码" width="150">
+      <el-table-column prop="invite_code" label="邀请码" width="200">
         <template #default="{ row }">
           <el-tag type="success" style="cursor:pointer" @click="copyInviteCode(row.invite_code)">
             {{ row.invite_code }}
           </el-tag>
+          <el-button size="small" text type="warning" @click="refreshInviteCode(row)" style="margin-left:4px">刷新</el-button>
         </template>
       </el-table-column>
       <el-table-column prop="created_at" label="创建时间" width="120">

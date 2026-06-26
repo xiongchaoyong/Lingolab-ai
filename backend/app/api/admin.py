@@ -108,6 +108,22 @@ def join_class(
         raise HTTPException(status_code=400, detail=str(e))
 
 
+@router.post("/classes/{class_id}/refresh-code", response_model=dict)
+def refresh_invite_code(
+    class_id: int,
+    teacher: UserProfile = Depends(require_teacher),
+    db: Session = Depends(get_db),
+):
+    """刷新班级邀请码"""
+    try:
+        result = teacher_service.refresh_invite_code(class_id, teacher.id, db)
+        db.commit()
+        return {"code": 0, "data": result, "message": "邀请码已刷新"}
+    except ValueError as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 # ============================================================
 # 教师端 — 作业管理
 # ============================================================
