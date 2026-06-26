@@ -557,7 +557,24 @@ CREATE TABLE security_logs (
     INDEX idx_created (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='安全日志表';
 
--- 31. 系统配置表（文档多处引用但数据字典未定义，根据需求补充）
+-- 31. 用户反馈表
+CREATE TABLE IF NOT EXISTS user_feedbacks (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL COMMENT '用户ID',
+    content TEXT NOT NULL COMMENT '反馈内容',
+    feedback_type ENUM('bug','feature','scene','other') NOT NULL DEFAULT 'other' COMMENT '反馈类型',
+    status ENUM('pending','resolved') NOT NULL DEFAULT 'pending' COMMENT '处理状态',
+    admin_reply TEXT DEFAULT NULL COMMENT '管理员回复',
+    replied_at DATETIME DEFAULT NULL COMMENT '回复时间',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    INDEX idx_user (user_id),
+    INDEX idx_status (status),
+    INDEX idx_created (created_at),
+    FOREIGN KEY (user_id) REFERENCES user_profiles(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户反馈表';
+
+-- 32. 系统配置表（文档多处引用但数据字典未定义，根据需求补充）
 CREATE TABLE system_config (
     id INT AUTO_INCREMENT PRIMARY KEY,
     config_key VARCHAR(100) NOT NULL COMMENT '配置键名',

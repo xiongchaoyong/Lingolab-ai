@@ -76,6 +76,28 @@ class AssignmentSubmission(Base):
     assignment = relationship("Assignment", backref="submissions")
 
 
+class UserFeedback(Base):
+    """用户反馈表"""
+    __tablename__ = "user_feedbacks"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("user_profiles.id"), nullable=False)
+    content = Column(Text, nullable=False, comment="反馈内容")
+    feedback_type = Column(
+        SAEnum("bug", "feature", "scene", "other", name="feedback_type_enum"),
+        default="other", nullable=False, comment="反馈类型",
+    )
+    status = Column(
+        SAEnum("pending", "resolved", name="feedback_status_enum"),
+        default="pending", nullable=False, comment="处理状态",
+    )
+    admin_reply = Column(Text, default=None, comment="管理员回复")
+    replied_at = Column(DateTime, default=None, comment="回复时间")
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    user = relationship("UserProfile", backref="feedbacks")
+
+
 class AdminLog(Base):
     """管理员操作日志表"""
     __tablename__ = "admin_logs"

@@ -163,3 +163,36 @@ class DashboardResponse(BaseModel):
     user_trend: List[TrendPoint] = Field(default_factory=list)
     content_type_distribution: dict = Field(default_factory=dict)
     level_distribution: dict = Field(default_factory=dict)
+
+
+# ============================================================
+# 反馈管理
+# ============================================================
+
+class FeedbackItem(BaseModel):
+    """反馈条目"""
+    id: int
+    user_id: int
+    username: str = ""
+    content: str
+    feedback_type: str = "other"
+    status: str = "pending"
+    admin_reply: Optional[str] = None
+    replied_at: Optional[str] = None
+    created_at: str = ""
+
+
+class FeedbackListResponse(BaseModel):
+    """反馈列表"""
+    feedbacks: List[FeedbackItem] = Field(default_factory=list)
+    total: int = 0
+
+
+class FeedbackReplyRequest(BaseModel):
+    """回复反馈"""
+    reply: str = Field(..., min_length=1)
+
+
+class FeedbackStatusRequest(BaseModel):
+    """修改反馈状态"""
+    status: str = Field(..., pattern="^(pending|resolved)$")

@@ -1,31 +1,17 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted, watch } from 'vue'
+import { ElMessage } from 'element-plus'
+import { getContentListApi } from '@/api/admin'
 
 const activeTab = ref('questions')
+const loading = ref(false)
 
-// 题库
-const questions = ref([
-  { id: 1, content: 'What does the woman mean?', type: '听力', difficulty: 'B1', dimension: '听力' },
-  { id: 2, content: 'Describe your favorite food', type: '口语', difficulty: 'B1', dimension: '口语' },
-  { id: 3, content: 'Choose the best word to fill...', type: '阅读', difficulty: 'B1', dimension: '阅读' },
-])
-
-// 跟读内容
-const shadowContents = ref([
-  { id: 1, word: 'restaurant', ipa: '/ˈres.trɒnt/', difficulty: 'A2', type: '单词' },
-  { id: 2, word: 'I like to play football.', ipa: '', difficulty: 'A1', type: '句子' },
-])
-
-// 推荐资料
-const materials = ref([
-  { id: 1, title: 'Master English TH Sound', type: '视频', category: '发音', level: 'B1' },
-  { id: 2, title: 'The History of English', type: '文章', category: '阅读', level: 'B1' },
-])
-
-// 配音片段
-const dubbingClips = ref([
-  { id: 1, title: 'Toy Story', line: 'To infinity and beyond!', difficulty: '简单' },
-])
+const contentData = ref({
+  questions: [],
+  shadow: [],
+  materials: [],
+  dubbing: [],
+})
 
 const tabs = [
   { name: 'questions', label: '测评题库' },
@@ -33,8 +19,6 @@ const tabs = [
   { name: 'materials', label: '推荐资料' },
   { name: 'dubbing', label: '配音片段' },
 ]
-
-const dataMap = { questions, shadow: shadowContents, materials, dubbing: dubbingClips }
 
 const columns = {
   questions: [
@@ -61,18 +45,34 @@ const columns = {
     { prop: 'difficulty', label: '难度', width: 80 },
   ],
 }
+
+onMounted(() => { loadContent(activeTab.value) })
+
+watch(activeTab, (tab) => { loadContent(tab) })
+
+async function loadContent(type) {
+  if (contentData.value[type]?.length > 0) return // 已加载
+  loading.value = true
+  try {
+    const res = await getContentListApi(type)
+    contentData.value[type] = res.items || []
+  } catch {
+    ElMessage.error('加载内容失败')
+  } finally {
+    loading.value = false
+  }
+}
 </script>
 
 <template>
   <div class="content-card">
     <div class="flex-between" style="margin-bottom: var(--spacing-xl);">
       <h2 class="page-title" style="margin-bottom:0;">内容管理</h2>
-      <el-button type="primary" :icon="Plus">新增</el-button>
     </div>
 
     <el-tabs v-model="activeTab">
       <el-tab-pane v-for="tab in tabs" :key="tab.name" :label="tab.label" :name="tab.name">
-        <el-table :data="dataMap[tab.name]" stripe>
+        <el-table v-loading="loading" :data="contentData[tab.name]" stripe empty-text="暂无数据">
           <el-table-column
             v-for="col in columns[tab.name]"
             :key="col.prop"
@@ -85,12 +85,6 @@ const columns = {
             </template>
             <template v-else-if="col.prop === 'type'" #default="{ row }">
               <el-tag size="small" effect="plain">{{ row.type }}</el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column label="操作" width="160">
-            <template #default>
-              <el-button size="small" text type="primary">编辑</el-button>
-              <el-button size="small" text type="danger">删除</el-button>
             </template>
           </el-table-column>
         </el-table>

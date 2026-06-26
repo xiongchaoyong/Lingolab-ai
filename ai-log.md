@@ -144,3 +144,5 @@
 | 11:00 | 发音持久化 | 发音评测模块增强：评测结果写入pronunciation_records表+GET /content跟读内容库API+GET /records评测历史API+前端替换硬编码为后端API加载+历史记录弹窗 | XCY | ✅ |
 | 12:00 | 对话持久化 | 对话模块增强：会话/消息持久化到DB+MAX_CONVERSATION_ROUNDS=10+GET /sessions历史API | XCY | ✅ |
 | 13:00 | 角色扮演持久化 | 角色扮演模块DB持久化：/start创建会话、/stream/speak保存每轮消息、/end更新四维评分到DB | XCY | ✅ |
+| 20:00 | 答辩文档 | 生成答辩梳理文档(docs/答辩梳理-功能模块与技术链路.md)，涵盖系统架构、16模块业务功能/技术实现/数据链路、核心AI技术链路详解、数据库表结构总览、前端架构、项目亮点总结 | XCY | ✅ |
+| 21:00 | 管理页面真实API | 3个管理页面对接真实API：①学生报告（GET /admin/students + GET /admin/students/{id}，ECharts雷达图+活动时间线）；②内容管理（GET /admin/content/{type}，4个tab按需加载测评题/跟读/资料/配音）；③反馈管理（新建user_feedbacks表+UserFeedback ORM+GET /feedbacks+POST reply+PUT resolve，前端FeedbackView替换mock数据+状态筛选+分页+回复弹窗）+ seed_feedback.py测试数据 | XCY | ✅ |

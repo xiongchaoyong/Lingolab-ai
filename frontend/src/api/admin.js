@@ -51,3 +51,33 @@ export function setUserStatusApi(userId, isActive) {
 export function getDashboardApi() {
   return request.get('/api/admin/dashboard')
 }
+
+// ===== 学生报告 =====
+
+export function getAllStudentsApi() {
+  return request.get('/api/admin/students')
+}
+
+export function getStudentDetailApi(studentId) {
+  return request.get(`/api/admin/students/${studentId}`)
+}
+
+// ===== 内容管理 =====
+
+export function getContentListApi(contentType) {
+  return request.get(`/api/admin/content/${contentType}`)
+}
+
+// ===== 反馈管理 =====
+
+export function getFeedbacksApi(params = {}) {
+  return request.get('/api/admin/feedbacks', { params })
+}
+
+export function replyFeedbackApi(feedbackId, reply) {
+  return request.post(`/api/admin/feedbacks/${feedbackId}/reply`, { reply })
+}
+
+export function resolveFeedbackApi(feedbackId) {
+  return request.put(`/api/admin/feedbacks/${feedbackId}/resolve`)
+}
