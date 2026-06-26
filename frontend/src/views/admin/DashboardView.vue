@@ -22,6 +22,8 @@ const metrics = computed(() => {
     { label: 'MAU', value: String(d.mau), color: '#C4B5FD' },
     { label: '总用户', value: String(d.total_users), color: '#FDBA74' },
     { label: '活跃用户', value: String(d.active_users), color: '#FDA4AF' },
+    { label: '次日留存', value: d.retention_d1 != null ? d.retention_d1 + '%' : '-', color: '#86EFAC' },
+    { label: '7日留存', value: d.retention_d7 != null ? d.retention_d7 + '%' : '-', color: '#67E8F9' },
   ]
 })
 
@@ -73,7 +75,7 @@ const typeDist = computed(() => {
 
     <template v-else-if="store.dashboard">
       <el-row :gutter="16" class="metrics-row">
-        <el-col :span="6" v-for="m in metrics" :key="m.label">
+        <el-col :span="4" v-for="m in metrics" :key="m.label">
           <div class="metric-card" :style="{ borderTopColor: m.color }">
             <div class="metric-value" :style="{ color: m.color }">{{ m.value }}</div>
             <div class="metric-label">{{ m.label }}</div>

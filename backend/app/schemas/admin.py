@@ -196,3 +196,19 @@ class FeedbackReplyRequest(BaseModel):
 class FeedbackStatusRequest(BaseModel):
     """修改反馈状态"""
     status: str = Field(..., pattern="^(pending|resolved)$")
+
+
+# ============================================================
+# 内容管理 CRUD
+# ============================================================
+
+class ContentCreateRequest(BaseModel):
+    """通用内容创建"""
+    content_type: str = Field(..., description="questions/shadow/materials/dubbing")
+    data: dict = Field(..., description="内容数据（根据类型不同字段不同）")
+
+
+class ContentUpdateRequest(BaseModel):
+    """通用内容更新"""
+    content_type: str = Field(..., description="questions/shadow/materials/dubbing")
+    data: dict = Field(..., description="更新的字段")

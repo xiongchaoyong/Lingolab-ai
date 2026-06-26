@@ -60,6 +60,12 @@ async function handleSave() {
       interests: form.value.interests,
     })
     ElMessage.success('画像已更新')
+    // 返回上一页，无历史记录则回首页
+    if (window.history.length > 1) {
+      router.back()
+    } else {
+      router.push('/')
+    }
   } catch (e) {
     const detail = e?.response?.data?.detail
     ElMessage.error(typeof detail === 'string' ? detail : '更新失败')
@@ -144,7 +150,7 @@ async function uploadAvatar(file) {
         </el-descriptions>
 
         <!-- 可编辑字段 -->
-        <el-form label-position="top">
+        <el-form label-position="top" @submit.prevent>
           <el-form-item label="学习目标">
             <el-select v-model="form.learning_goal" placeholder="请选择学习目标" style="width: 100%">
               <el-option

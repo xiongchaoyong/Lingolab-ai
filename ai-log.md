@@ -4,6 +4,15 @@
 
 ---
 
+## 2026-06-26: 后台管理服务模块完善
+
+### 变更内容
+1. **教师端前端接入**：修改路由守卫 + TopNavLayout，admin 角色可访问教师端 3 个页面（班级管理/作业管理/学生报告），教师端页面已存在只需导航接入
+2. **内容管理 CRUD**：后端新增 POST/PUT/DELETE 接口 + AdminService 方法 + Pydantic Schema，前端 ContentManageView 增加新增/编辑/删除功能
+3. **仪表盘留存率**：实现 D1/D7 留存率计算（基于 UserSkillScore 活跃用户交叉统计），前端新增 2 个指标卡片
+4. **修复配音内容字段映射**：dubbing 查询中 dialogue_text → subtitle, difficulty_level → difficulty
+5. **个人设置保存后跳转**：ProfileView 保存成功后 router.back() 返回上一页
+
 ## 2026-05-25
 
 | 时间 | 操作 | 描述 | 成员 | AI 生成部分已通读 |

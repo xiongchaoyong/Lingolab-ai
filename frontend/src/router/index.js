@@ -223,8 +223,12 @@ router.beforeEach((to, from, next) => {
     return next('/assessment')
   }
 
-  // 角色检查：教师/管理员路由
+  // 角色检查：教师/管理员路由（admin 可访问教师路由）
   if (to.meta.role && authStore.userInfo?.role !== to.meta.role) {
+    // admin 可访问 teacher 路由
+    if (to.meta.role === 'teacher' && authStore.userInfo?.role === 'admin') {
+      return next()
+    }
     return next('/')
   }
 

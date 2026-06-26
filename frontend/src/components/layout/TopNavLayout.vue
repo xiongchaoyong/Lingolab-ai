@@ -15,6 +15,10 @@ let noticeTimer = null
 
 onMounted(() => {
   if (authStore.isLoggedIn) {
+    // 加载完整用户信息（头像、用户名等）
+    if (!authStore.userInfo?.avatar || !authStore.userInfo?.email) {
+      authStore.fetchProfile()
+    }
     predStore.fetchUnreadCount()
     noticeTimer = setInterval(() => predStore.fetchUnreadCount(), 60000)
   }
@@ -142,7 +146,15 @@ const adminNavs = [
   },
   { path: '/help', title: '智能客服' },
   {
-    title: '后台管理',
+    title: '教师管理',
+    children: [
+      { path: '/teacher/classes', title: '班级管理' },
+      { path: '/teacher/reports', title: '学生报告' },
+      { path: '/teacher/homework', title: '作业管理' },
+    ],
+  },
+  {
+    title: '运营管理',
     children: [
       { path: '/admin/dashboard', title: '运营看板' },
       { path: '/admin/users', title: '用户管理' },

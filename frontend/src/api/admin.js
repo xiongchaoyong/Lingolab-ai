@@ -68,6 +68,18 @@ export function getContentListApi(contentType) {
   return request.get(`/api/admin/content/${contentType}`)
 }
 
+export function createContentApi(data) {
+  return request.post('/api/admin/content', data)
+}
+
+export function updateContentApi(contentType, itemId, data) {
+  return request.put(`/api/admin/content/${contentType}/${itemId}`, { content_type: contentType, data })
+}
+
+export function deleteContentApi(contentType, itemId) {
+  return request.delete(`/api/admin/content/${contentType}/${itemId}`)
+}
+
 // ===== 反馈管理 =====
 
 export function getFeedbacksApi(params = {}) {

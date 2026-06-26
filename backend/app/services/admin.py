@@ -460,12 +460,64 @@ class AdminService:
             .all()
         )
 
+        # 留存率计算
+        retention_d1 = 0.0
+        retention_d7 = 0.0
+
+        yesterday = today - timedelta(days=1)
+        yesterday_active = (
+            db.query(func.count(func.distinct(UserSkillScore.user_id)))
+            .filter(func.date(UserSkillScore.created_at) == yesterday)
+            .scalar()
+        ) or 0
+
+        if yesterday_active > 0:
+            # D1 留存：昨天活跃用户中，今天也活跃的比例
+            yesterday_users = (
+                db.query(func.distinct(UserSkillScore.user_id))
+                .filter(func.date(UserSkillScore.created_at) == yesterday)
+                .subquery()
+            )
+            today_from_yesterday = (
+                db.query(func.count(func.distinct(UserSkillScore.user_id)))
+                .filter(
+                    func.date(UserSkillScore.created_at) == today,
+                    UserSkillScore.user_id.in_(yesterday_users)
+                )
+                .scalar()
+            ) or 0
+            retention_d1 = round(today_from_yesterday / yesterday_active * 100, 1)
+
+        seven_days_ago = today - timedelta(days=7)
+        seven_ago_active = (
+            db.query(func.count(func.distinct(UserSkillScore.user_id)))
+            .filter(func.date(UserSkillScore.created_at) == seven_days_ago)
+            .scalar()
+        ) or 0
+
+        if seven_ago_active > 0:
+            # D7 留存：7天前活跃用户中，今天也活跃的比例
+            seven_ago_users = (
+                db.query(func.distinct(UserSkillScore.user_id))
+                .filter(func.date(UserSkillScore.created_at) == seven_days_ago)
+                .subquery()
+            )
+            today_from_seven = (
+                db.query(func.count(func.distinct(UserSkillScore.user_id)))
+                .filter(
+                    func.date(UserSkillScore.created_at) == today,
+                    UserSkillScore.user_id.in_(seven_ago_users)
+                )
+                .scalar()
+            ) or 0
+            retention_d7 = round(today_from_seven / seven_ago_active * 100, 1)
+
         return {
             "metrics": {
                 "dau": dau,
                 "mau": mau,
-                "retention_d1": 0.0,
-                "retention_d7": 0.0,
+                "retention_d1": retention_d1,
+                "retention_d7": retention_d7,
                 "total_users": total_users,
                 "active_users": active_users,
             },
@@ -506,7 +558,7 @@ class AdminService:
             items = db.query(DubbingContent).filter(DubbingContent.is_active == 1).order_by(DubbingContent.id).all()
             return [{
                 "id": d.id, "title": d.title,
-                "line": d.dialogue_text or "", "difficulty": d.difficulty_level or "",
+                "line": d.subtitle or "", "difficulty": d.difficulty or "",
             } for d in items]
 
         return []
@@ -601,6 +653,131 @@ class AdminService:
             "replied_at": fb.replied_at.isoformat() if fb.replied_at else None,
             "created_at": fb.created_at.isoformat() if fb.created_at else "",
         }
+
+
+# ===== 内容管理 CRUD =====
+
+    def create_content(self, content_type: str, data: dict, admin_id: int, db: Session) -> Dict:
+        """创建内容项"""
+        if content_type == "questions":
+            item = AssessmentQuestion(
+                question_text=data["content"],
+                options=data.get("options", []),
+                correct_option=data.get("correct_option", 1),
+                dimension=data.get("dimension", "speaking"),
+                difficulty=data.get("difficulty", "A1"),
+            )
+        elif content_type == "shadow":
+            item = PronunciationContent(
+                title=data.get("title", data.get("word", "")),
+                content_text=data["word"],
+                content_type=data.get("type", "word"),
+                cefr_level=data.get("difficulty", "A1"),
+                phonetic_ipa=data.get("ipa", ""),
+            )
+        elif content_type == "materials":
+            item = LearningMaterial(
+                title=data["title"],
+                description=data.get("description", ""),
+                material_type=data.get("type", "article"),
+                url=data.get("url", ""),
+                cefr_level=data.get("level", "A1"),
+                category=data.get("category", ""),
+            )
+        elif content_type == "dubbing":
+            item = DubbingContent(
+                title=data["title"],
+                source=data.get("source", ""),
+                difficulty=data.get("difficulty", "easy"),
+                duration=data.get("duration", 10),
+                subtitle=data.get("line", ""),
+                audio_url=data.get("audio_url", ""),
+            )
+        else:
+            raise ValueError("无效的内容类型")
+
+        db.add(item)
+        db.flush()
+
+        db.add(AdminLog(
+            admin_id=admin_id, action="content_create",
+            target_type=content_type, target_id=item.id,
+            detail=f"创建内容: {data.get('title', data.get('word', data.get('content', '')))}",
+        ))
+        db.flush()
+        return {"id": item.id, "message": "创建成功"}
+
+    def update_content(self, content_type: str, item_id: int, data: dict, admin_id: int, db: Session) -> Dict:
+        """更新内容项"""
+        model_map = {
+            "questions": AssessmentQuestion,
+            "shadow": PronunciationContent,
+            "materials": LearningMaterial,
+            "dubbing": DubbingContent,
+        }
+        model = model_map.get(content_type)
+        if not model:
+            raise ValueError("无效的内容类型")
+
+        item = db.query(model).filter(model.id == item_id).first()
+        if not item:
+            raise ValueError("内容不存在")
+
+        # 字段映射
+        field_map = {
+            "questions": {"content": "question_text", "type": "question_type", "difficulty": "difficulty", "dimension": "dimension"},
+            "shadow": {"word": "content_text", "type": "content_type", "difficulty": "cefr_level", "ipa": "phonetic_ipa"},
+            "materials": {"title": "title", "type": "material_type", "level": "cefr_level", "category": "category", "description": "description"},
+            "dubbing": {"title": "title", "line": "subtitle", "difficulty": "difficulty", "source": "source"},
+        }
+
+        mapping = field_map.get(content_type, {})
+        for key, value in data.items():
+            db_field = mapping.get(key, key)
+            if hasattr(item, db_field):
+                setattr(item, db_field, value)
+
+        db.flush()
+
+        db.add(AdminLog(
+            admin_id=admin_id, action="content_update",
+            target_type=content_type, target_id=item_id,
+            detail=f"更新内容 ID={item_id}",
+        ))
+        db.flush()
+        return {"id": item_id, "message": "更新成功"}
+
+    def delete_content(self, content_type: str, item_id: int, admin_id: int, db: Session) -> Dict:
+        """删除内容项（软删除）"""
+        model_map = {
+            "questions": AssessmentQuestion,
+            "shadow": PronunciationContent,
+            "materials": LearningMaterial,
+            "dubbing": DubbingContent,
+        }
+        model = model_map.get(content_type)
+        if not model:
+            raise ValueError("无效的内容类型")
+
+        item = db.query(model).filter(model.id == item_id).first()
+        if not item:
+            raise ValueError("内容不存在")
+
+        # 软删除：设置 is_active = 0
+        if hasattr(item, "is_active"):
+            item.is_active = 0
+        else:
+            db.delete(item)
+
+        db.flush()
+
+        db.add(AdminLog(
+            admin_id=admin_id, action="content_delete",
+            target_type=content_type, target_id=item_id,
+            detail=f"删除内容 ID={item_id}",
+        ))
+        db.flush()
+        return {"id": item_id, "message": "删除成功"}
 
 
 # 单例
