@@ -146,4 +146,5 @@
 | 13:00 | 角色扮演持久化 | 角色扮演模块DB持久化：/start创建会话、/stream/speak保存每轮消息、/end更新四维评分到DB | XCY | ✅ |
 | 20:00 | 答辩文档 | 生成答辩梳理文档(docs/答辩梳理-功能模块与技术链路.md)，涵盖系统架构、16模块业务功能/技术实现/数据链路、核心AI技术链路详解、数据库表结构总览、前端架构、项目亮点总结 | XCY | ✅ |
 | 21:00 | 管理页面真实API | 3个管理页面对接真实API：①学生报告（GET /admin/students + GET /admin/students/{id}，ECharts雷达图+活动时间线）；②内容管理（GET /admin/content/{type}，4个tab按需加载测评题/跟读/资料/配音）；③反馈管理（新建user_feedbacks表+UserFeedback ORM+GET /feedbacks+POST reply+PUT resolve，前端FeedbackView替换mock数据+状态筛选+分页+回复弹窗）+ seed_feedback.py测试数据 | XCY | ✅ |
+| 22:00 | 模块审查+测试 | 逐模块功能审查+流程文档+单元测试：①模块1-16功能实现审查（全部完成度100%）；②模块流程链路文档（模块1-3功能流程+技术架构）；③模块1测试（test_auth.py 41用例）；④模块2测试（test_assessment.py 44用例）；⑤模块3审查+修复（新颖度纳入评分+刷新限3次）+测试（test_learning_path.py 46用例）；分支 feat/module-1~3-test | XCY | ✅ |
 | 22:00 | 模块审查+测试 | 逐模块功能审查+流程文档+单元测试：①模块1-16功能实现审查（全部完成度100%）；②模块流程链路文档（7模块功能流程+技术架构）；③模块1测试（test_auth.py 41用例：Schema校验23+密码工具4+年龄分组6+学习目标映射3+JWT 5）；④模块2测试（test_assessment.py 44用例：Schema校验9+CEFR定级13+等级转换10+自适应难度9+映射完整性3）；分支 feat/module-1-test + feat/module-2-test | XCY | ✅ |

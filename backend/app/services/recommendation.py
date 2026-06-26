@@ -154,7 +154,7 @@ class RecommendationService:
         self, mat: dict, weakness_dim: str, user_level: str,
         user_interests: List[str], user_id: int, db: Session,
     ) -> float:
-        """三因子评分"""
+        """四因子评分：短板40% + 难度35% + 兴趣25% + 新颖度(去重)"""
         extra = mat.get("extra_data", {})
 
         # 1. 短板匹配 (40%)
@@ -168,11 +168,16 @@ class RecommendationService:
         mat_tags = extra.get("tags", [])
         interest_score = self._calc_interest_match(mat_tags, user_interests)
 
-        return (
+        # 4. 新颖度 — 7天内推荐过扣分，disliked 直接归零
+        novelty_score = self._calc_novelty(mat["id"], user_id, db)
+
+        base = (
             weakness_score * 0.40
             + level_score * 0.35
             + interest_score * 0.25
-        ) * 100
+        )
+        # 新颖度作为乘性因子：disliked→0，最近推荐过→打折
+        return base * novelty_score * 100
 
     def _calc_weakness_match(self, mat: dict, weakness_dim: str) -> float:
         """计算资料与短板维度的匹配度
@@ -713,6 +718,24 @@ class RecommendationService:
                 )
                 db.add(rec)
         db.commit()
+
+    def get_today_refresh_count(self, user_id: int, db: Session) -> int:
+        """获取今日手动刷新次数
+
+        每次 GET / 或 POST /refresh 都会写入 6 条记录。
+        首次加载（GET /）不算手动刷新，所以总批次 - 1 = 手动刷新次数。
+        """
+        today = date.today()
+        count = (
+            db.query(MaterialRecommendation)
+            .filter(
+                MaterialRecommendation.user_id == user_id,
+                MaterialRecommendation.recommend_date == today,
+            )
+            .count()
+        )
+        batches = count // 6  # 总批次数
+        return max(0, batches - 1)  # 减去首次加载
 
 
 # 全局单例
