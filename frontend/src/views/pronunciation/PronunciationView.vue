@@ -1,47 +1,13 @@
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import VoiceRecorder from '@/components/common/VoiceRecorder.vue'
 import DimensionBars from '@/components/common/DimensionBars.vue'
-import { scorePronunciation } from '@/api/pronunciation'
+import { scorePronunciation, getContentList, getRecordList } from '@/api/pronunciation'
 
-// 练习内容库
-const CONTENT_WORDS = {
-  A1: [
-    { word: 'apple', ipa: '/ˈæp.əl/', chinese: '苹果' },
-    { word: 'hello', ipa: '/həˈloʊ/', chinese: '你好' },
-    { word: 'water', ipa: '/ˈwɔː.tər/', chinese: '水' },
-    { word: 'family', ipa: '/ˈfæm.əl.i/', chinese: '家庭' },
-  ],
-  A2: [
-    { word: 'restaurant', ipa: '/ˈres.trɒnt/', chinese: '餐厅' },
-    { word: 'beautiful', ipa: '/ˈbjuː.tɪ.fəl/', chinese: '美丽的' },
-  ],
-  B1: [
-    { word: 'environment', ipa: '/ɪnˈvaɪ.rən.mənt/', chinese: '环境' },
-    { word: 'technology', ipa: '/tekˈnɒl.ə.dʒi/', chinese: '科技' },
-  ],
-  B2: [
-    { word: 'sophisticated', ipa: '/səˈfɪs.tɪ.keɪ.tɪd/', chinese: '精密的' },
-    { word: 'entrepreneur', ipa: '/ˌɒn.trə.prəˈnɜːr/', chinese: '企业家' },
-  ],
-}
-
-const CONTENT_SENTENCES = {
-  A1: [
-    { text: 'I like to play football.', chinese: '我喜欢踢足球。' },
-    { text: 'She has a big family.', chinese: '她有一个大家庭。' },
-  ],
-  A2: [
-    { text: 'Could you tell me how to get to the station?', chinese: '你能告诉我怎么去车站吗？' },
-  ],
-  B1: [
-    { text: 'The environment is a topic that concerns everyone.', chinese: '环境是每个人都关心的话题。' },
-  ],
-  B2: [
-    { text: 'The sophisticated technology revolutionized the industry.', chinese: '这项精密技术彻底改变了这个行业。' },
-  ],
-}
+// 后端内容库
+const contentList = ref([])
+const contentLoading = ref(false)
 
 // 状态
 const mode = ref('word')
@@ -56,6 +22,11 @@ const showDetail = ref(false)
 const recordingBlob = ref(null)
 const recordingUrl = ref('')
 const referenceUrl = ref('')
+
+// 历史记录
+const showHistory = ref(false)
+const historyRecords = ref([])
+const historyLoading = ref(false)
 
 // 自定义播放器状态
 const userAudioRef = ref(null)
@@ -109,6 +80,7 @@ function waveLoop() {
 
 onMounted(() => {
   waveRaf = requestAnimationFrame(waveLoop)
+  loadContent()
 })
 
 onUnmounted(() => {
@@ -125,18 +97,46 @@ function waveStyle(side, i) {
 
 const difficultyOptions = ['A1', 'A2', 'B1', 'B2']
 
-const currentItem = computed(() => {
-  if (mode.value === 'word') {
-    const words = CONTENT_WORDS[difficulty.value] || CONTENT_WORDS.A1
-    return words[contentIndex.value % words.length]
-  } else {
-    const sentences = CONTENT_SENTENCES[difficulty.value] || CONTENT_SENTENCES.A1
-    return sentences[contentIndex.value % sentences.length]
+// 加载跟读内容
+async function loadContent() {
+  contentLoading.value = true
+  try {
+    const list = await getContentList(mode.value, difficulty.value)
+    contentList.value = list || []
+    contentIndex.value = 0
+  } catch {
+    contentList.value = []
+  } finally {
+    contentLoading.value = false
   }
+}
+
+// 加载历史记录
+async function loadHistory() {
+  historyLoading.value = true
+  try {
+    historyRecords.value = await getRecordList(20) || []
+  } catch {
+    historyRecords.value = []
+  } finally {
+    historyLoading.value = false
+  }
+}
+
+function openHistory() {
+  showHistory.value = true
+  loadHistory()
+}
+
+const currentItem = computed(() => {
+  if (contentList.value.length === 0) return null
+  const item = contentList.value[contentIndex.value % contentList.value.length]
+  return item
 })
 
 const currentText = computed(() => {
-  return mode.value === 'word' ? currentItem.value.word : currentItem.value.text
+  if (!currentItem.value) return ''
+  return currentItem.value.content_text || ''
 })
 
 const isWordMode = computed(() => mode.value === 'word')
@@ -151,10 +151,12 @@ const scoreLevel = computed(() => {
 function switchMode(newMode) {
   mode.value = newMode
   resetState()
+  loadContent()
 }
 
 function handleDifficultyChange() {
   resetState()
+  loadContent()
 }
 
 function resetState() {
@@ -371,20 +373,30 @@ const rhythmSummary = computed(() => {
         >
           <el-option v-for="d in difficultyOptions" :key="d" :label="d" :value="d" />
         </el-select>
+        <el-button size="small" @click="openHistory">
+          <el-icon><Clock /></el-icon> 历史记录
+        </el-button>
       </div>
     </div>
 
     <!-- 跟读内容卡片 -->
-    <div class="content-display">
+    <div class="content-display" v-if="currentItem">
       <div class="content-main">
-        <span v-if="isWordMode" class="word-text">{{ currentItem.word }}</span>
-        <span v-else class="sentence-text">{{ currentItem.text }}</span>
+        <span v-if="isWordMode" class="word-text">{{ currentItem.content_text }}</span>
+        <span v-else class="sentence-text">{{ currentItem.content_text }}</span>
       </div>
-      <div v-if="isWordMode" class="content-ipa">{{ currentItem.ipa }}</div>
-      <div class="content-chinese">{{ currentItem.chinese }}</div>
-      <el-button size="small" text type="primary" class="play-btn">
+      <div v-if="isWordMode && currentItem.phonetic_ipa" class="content-ipa">{{ currentItem.phonetic_ipa }}</div>
+      <div v-if="currentItem.title" class="content-chinese">{{ currentItem.title }}</div>
+      <el-button size="small" text type="primary" class="play-btn" @click="fetchReferenceAudio">
         <el-icon><VideoPlay /></el-icon> 播放标准音
       </el-button>
+    </div>
+    <div v-else-if="contentLoading" class="content-display">
+      <el-icon class="is-loading" :size="24"><Loading /></el-icon>
+      <p style="color: var(--color-text-secondary); margin-top: 8px;">加载跟读内容...</p>
+    </div>
+    <div v-else class="content-display">
+      <p style="color: var(--color-text-disabled);">暂无{{ difficulty }}级{{ mode === 'word' ? '单词' : '句子' }}内容</p>
     </div>
 
     <!-- 录音区域 -->
@@ -468,6 +480,56 @@ const rhythmSummary = computed(() => {
     <!-- ============================================================ -->
     <!-- 详细评分弹窗 -->
     <!-- ============================================================ -->
+
+    <!-- ============================================================ -->
+    <!-- 历史记录弹窗 -->
+    <!-- ============================================================ -->
+    <el-dialog
+      v-model="showHistory"
+      title="评测历史记录"
+      width="700px"
+      destroy-on-close
+    >
+      <el-table
+        v-loading="historyLoading"
+        :data="historyRecords"
+        size="small"
+        stripe
+        empty-text="暂无评测记录"
+      >
+        <el-table-column label="内容" min-width="160">
+          <template #default="{ row }">
+            <span>{{ row.content_text || row.content_title || '自由跟读' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="mode" label="模式" width="80" align="center">
+          <template #default="{ row }">
+            <el-tag size="small" :type="row.mode === 'word' ? 'primary' : 'success'">
+              {{ row.mode === 'word' ? '单词' : '句子' }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="综合分" width="100" align="center">
+          <template #default="{ row }">
+            <span :style="{ color: row.overall_score >= 80 ? 'var(--color-success)' : row.overall_score >= 60 ? 'var(--color-warning)' : 'var(--color-danger)', fontWeight: 700 }">
+              {{ row.overall_score }}
+            </span>
+          </template>
+        </el-table-column>
+        <el-table-column label="音素分" width="90" align="center">
+          <template #default="{ row }">
+            <span>{{ row.phoneme_score ?? '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="时间" width="160">
+          <template #default="{ row }">
+            <span style="font-size: 12px; color: var(--color-text-secondary);">
+              {{ row.created_at ? new Date(row.created_at).toLocaleString('zh-CN') : '-' }}
+            </span>
+          </template>
+        </el-table-column>
+      </el-table>
+    </el-dialog>
     <el-dialog
       v-model="showDetail"
       title="发音详细评分报告"

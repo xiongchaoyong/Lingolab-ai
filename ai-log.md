@@ -141,3 +141,4 @@
 | 时间  | 操作     | 描述                                                         | 成员 |      |
 | ----- | -------- | :----------------------------------------------------------- | :--: | :--: |
 | 10:00 | 测评增强 | 测评模块3项增强：①30天重测评限制（start端点检查last_assessment_at，未满30天返回403+剩余天数）；②全对/全错追加题（10题全对→追加C2口语确认题、全错→追加A1听力基础题，total_questions动态调整）；③会话持久化（POST /restore端点从AssessmentRecord重建内存会话、前端store调restoreSessionApi恢复localStorage+后端双端同步） | XCY | ✅ |
+| 11:00 | 发音持久化 | 发音评测模块3项增强：①评测结果写入pronunciation_records表（五维分数+错误音素JSON+纠音建议）；②新增GET /content跟读内容库API（按类型/难度筛选）+ GET /records评测历史API；③前端替换硬编码内容为后端API加载+新增历史记录弹窗 | XCY | ✅ |

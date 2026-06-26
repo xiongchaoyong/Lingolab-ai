@@ -87,3 +87,33 @@ class PronunciationResponse(BaseModel):
     intonation_viz: Optional[IntonationVizData] = Field(default=None, description="语调可视化数据")
     linking_viz: Optional[LinkingVizData] = Field(default=None, description="连读可视化数据")
     rhythm_viz: Optional[RhythmVizData] = Field(default=None, description="节奏可视化数据")
+
+
+class ContentItem(BaseModel):
+    """跟读内容条目"""
+    id: int
+    title: str
+    content_text: str
+    content_type: str
+    cefr_level: str
+    category: Optional[str] = None
+    phonetic_ipa: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+class RecordItem(BaseModel):
+    """评测历史记录"""
+    id: int
+    content_id: int
+    mode: str
+    overall_score: float
+    phoneme_score: Optional[float] = None
+    stress_score: Optional[float] = None
+    created_at: Any = None
+    content_title: Optional[str] = None
+    content_text: Optional[str] = None
+
+    class Config:
+        from_attributes = True
