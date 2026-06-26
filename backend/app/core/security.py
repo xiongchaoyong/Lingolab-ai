@@ -48,10 +48,15 @@ def create_access_token(user_id: int, username: str) -> str:
     return jwt.encode(payload, settings.jwt_secret_key, algorithm="HS256")
 
 
-def decode_access_token(token: str) -> Optional[dict]:
-    """解析 JWT 令牌，返回 payload；失败返回 None"""
+def decode_access_token(token: str, verify_exp: bool = True) -> Optional[dict]:
+    """解析 JWT 令牌，返回 payload；失败返回 None
+
+    Args:
+        verify_exp: 是否验证过期时间。刷新 Token 时传 False 允许过期令牌续期。
+    """
     try:
-        return jwt.decode(token, settings.jwt_secret_key, algorithms=["HS256"])
+        options = {"verify_exp": verify_exp} if not verify_exp else None
+        return jwt.decode(token, settings.jwt_secret_key, algorithms=["HS256"], options=options)
     except JWTError:
         return None
 

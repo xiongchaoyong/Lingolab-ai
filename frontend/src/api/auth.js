@@ -15,3 +15,7 @@ export function getProfileApi() {
 export function updateProfileApi(data) {
   return request.put('/api/auth/profile', data)
 }
+
+export function refreshTokenApi() {
+  return request.post('/api/auth/token/refresh')
+}

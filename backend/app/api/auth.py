@@ -25,6 +25,29 @@ from app.schemas.auth import (
 )
 from app.schemas.profile import ProfileScoresResponse, ProfileRefreshResponse
 
+
+class RefreshResponse:
+    """刷新 Token 响应"""
+    def __init__(self):
+        pass
+
+
+# 手动定义 refresh 响应 schema，避免新建文件
+from pydantic import BaseModel, Field
+
+
+class TokenRefreshResponse(BaseModel):
+    """Token 刷新响应"""
+    token: str = Field(..., description="新的 JWT Token")
+    user_id: int = Field(..., description="用户 ID")
+    username: str = Field(..., description="用户名")
+
+
+class AccountStatusRequest(BaseModel):
+    """账号状态变更请求"""
+    user_id: int = Field(..., description="目标用户 ID")
+    is_active: int = Field(..., description="1-启用 0-禁用")
+
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
@@ -267,3 +290,48 @@ async def refresh_profile(
         dimension_scores=dim_avgs,
         message="Profile refreshed successfully",
     )
+
+
+@router.post("/token/refresh", response_model=TokenRefreshResponse)
+async def refresh_token(
+    current_user: UserProfile = Depends(get_current_user),
+):
+    """
+    刷新 JWT Token — 用当前有效 Token 换取新 Token。
+    前端在 Token 即将过期时调用，实现无感续期。
+    """
+    new_token = create_access_token(current_user.id, current_user.username)
+    logger.info(f"Token 刷新: {current_user.username} (id={current_user.id})")
+    return TokenRefreshResponse(
+        token=new_token,
+        user_id=current_user.id,
+        username=current_user.username,
+    )
+
+
+@router.post("/admin/toggle-status")
+async def toggle_account_status(
+    req: AccountStatusRequest,
+    current_user: UserProfile = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    管理员禁用/恢复用户账号。
+    仅 admin 角色可调用，不能禁用自己。
+    """
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="仅管理员可执行此操作")
+
+    if current_user.id == req.user_id:
+        raise HTTPException(status_code=400, detail="不能禁用自己的账号")
+
+    target_user = db.query(UserProfile).filter(UserProfile.id == req.user_id).first()
+    if not target_user:
+        raise HTTPException(status_code=404, detail="用户不存在")
+
+    target_user.is_active = req.is_active
+    db.commit()
+
+    action = "恢复" if req.is_active else "禁用"
+    logger.info(f"管理员 {current_user.username} {action}了用户 {target_user.username}")
+    return {"message": f"用户 {target_user.username} 已{action}", "user_id": req.user_id, "is_active": req.is_active}
