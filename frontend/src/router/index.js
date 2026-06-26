@@ -128,6 +128,12 @@ const routes = [
         meta: { title: '智能客服', auth: true },
       },
       {
+        path: 'notices',
+        name: 'Notices',
+        component: () => import('@/views/notice/NoticeView.vue'),
+        meta: { title: '通知中心', auth: true },
+      },
+      {
         path: 'conversation',
         name: 'Conversation',
         component: () => import('@/views/conversation/VoiceCallView.vue'),

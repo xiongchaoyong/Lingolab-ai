@@ -267,7 +267,7 @@ function handleCommand(command) {
         </template>
         <template v-else>
           <!-- 通知 -->
-          <el-badge :value="predStore.unreadCount" :max="99" :hidden="!predStore.unreadCount" class="tn-notice">
+          <el-badge :value="predStore.unreadCount" :max="99" :hidden="!predStore.unreadCount" class="tn-notice" @click="router.push('/notices')">
             <el-icon :size="20"><Bell /></el-icon>
           </el-badge>
 
