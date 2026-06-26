@@ -107,6 +107,19 @@ const routes = [
         component: () => import('@/views/community/CommunityView.vue'),
         meta: { title: '社区', auth: true },
       },
+      // 学生端：我的班级 & 我的作业
+      {
+        path: 'my-classes',
+        name: 'MyClasses',
+        component: () => import('@/views/student/MyClassesView.vue'),
+        meta: { title: '我的班级', auth: true },
+      },
+      {
+        path: 'my-homework',
+        name: 'MyHomework',
+        component: () => import('@/views/student/MyHomeworkView.vue'),
+        meta: { title: '我的作业', auth: true },
+      },
       // 模块七：智能客服
       {
         path: 'help',

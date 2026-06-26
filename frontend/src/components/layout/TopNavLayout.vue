@@ -66,6 +66,13 @@ const learnerNavs = [
       { path: '/community', title: '社区广场' },
     ],
   },
+  {
+    title: '班级作业',
+    children: [
+      { path: '/my-classes', title: '我的班级' },
+      { path: '/my-homework', title: '我的作业' },
+    ],
+  },
   { path: '/help', title: '智能客服' },
 ]
 
@@ -102,6 +109,13 @@ const teacherNavs = [
     ],
   },
   { path: '/help', title: '智能客服' },
+  {
+    title: '班级作业',
+    children: [
+      { path: '/my-classes', title: '我的班级' },
+      { path: '/my-homework', title: '我的作业' },
+    ],
+  },
   {
     title: '后台管理',
     children: [
@@ -145,6 +159,13 @@ const adminNavs = [
     ],
   },
   { path: '/help', title: '智能客服' },
+  {
+    title: '班级作业',
+    children: [
+      { path: '/my-classes', title: '我的班级' },
+      { path: '/my-homework', title: '我的作业' },
+    ],
+  },
   {
     title: '教师管理',
     children: [

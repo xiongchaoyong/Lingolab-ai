@@ -89,6 +89,7 @@ from app.api.learning_path import router as learning_path_router
 from app.api.recommendation import router as recommendation_router
 from app.api.grammar import router as grammar_router
 from app.api.admin import router as admin_router
+from app.api.student import router as student_router
 from app.api.community import router as community_router
 from app.api.gamification import router as gamification_router
 from app.api.progress import router as progress_router
@@ -104,6 +105,7 @@ app.include_router(learning_path_router, prefix="/api/learning-path", tags=["学
 app.include_router(recommendation_router, prefix="/api/recommendations", tags=["资料推荐"])
 app.include_router(grammar_router, prefix="/api/grammar", tags=["语法纠错"])
 app.include_router(admin_router, prefix="/api/admin", tags=["后台管理"])
+app.include_router(student_router, prefix="/api/student", tags=["学生端"])
 app.include_router(community_router, prefix="/api/community", tags=["社区服务"])
 app.include_router(gamification_router, prefix="/api/gamification", tags=["游戏化闯关"])
 app.include_router(progress_router, prefix="/api/progress", tags=["学习进度"])

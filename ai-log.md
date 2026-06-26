@@ -11,7 +11,8 @@
 2. **内容管理 CRUD**：后端新增 POST/PUT/DELETE 接口 + AdminService 方法 + Pydantic Schema，前端 ContentManageView 增加新增/编辑/删除功能
 3. **仪表盘留存率**：实现 D1/D7 留存率计算（基于 UserSkillScore 活跃用户交叉统计），前端新增 2 个指标卡片
 4. **修复配音内容字段映射**：dubbing 查询中 dialogue_text → subtitle, difficulty_level → difficulty
-5. **个人设置保存后跳转**：ProfileView 保存成功后 router.back() 返回上一页
+5. **修复内容管理字段映射**：`get_content_list` 中 questions 引用不存在的 `question_type` → 改为 `dimension`
+6. **学生端班级+作业**：新增 `StudentService` + `/api/student/*` 接口 + 前端 `MyClassesView` / `MyHomeworkView` + 导航栏「班级作业」入口
 
 ## 2026-05-25
 
