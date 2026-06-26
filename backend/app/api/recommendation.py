@@ -26,8 +26,6 @@ def get_recommendations(
 ):
     """获取今日个性化资料推荐（视频/文章/音频各2条）"""
     materials = recommendation_service.recommend_materials(current_user, db)
-
-    # 保存推荐记录
     recommendation_service.save_recommendations(current_user.id, materials, db)
 
     def to_items(group: str) -> list:
@@ -94,7 +92,11 @@ def refresh_recommendations(
     current_user: UserProfile = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """换一批推荐（重新计算）"""
+    """换一批推荐（重新计算），每日限 3 次"""
+    refresh_count = recommendation_service.get_today_refresh_count(current_user.id, db)
+    if refresh_count >= 3:
+        raise HTTPException(status_code=429, detail="今日刷新次数已用完（每日限3次）")
+
     materials = recommendation_service.recommend_materials(current_user, db)
     recommendation_service.save_recommendations(current_user.id, materials, db)
 
