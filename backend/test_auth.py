@@ -6,6 +6,8 @@ from app.core.security import (
     hash_password,
     verify_password,
     get_age_group,
+    create_access_token,
+    decode_access_token,
     LEARNING_GOAL_MAP,
 )
 
@@ -152,22 +154,35 @@ class TestRegisterRequest:
         assert req.age == 6
 
     def test_age_below_min(self):
-        with pytest.raises(ValueError):
-            RegisterRequest(
-                username="test_user",
-                email="test@example.com",
-                password="pass1234",
-                age=5,
-                learning_goal="daily",
-            )
+        """后端 Schema 允许 age>=1，age=5 应通过（前端限制 6-99）"""
+        req = RegisterRequest(
+            username="test_user",
+            email="test@example.com",
+            password="pass1234",
+            age=5,
+            learning_goal="daily",
+        )
+        assert req.age == 5
 
     def test_age_above_max(self):
+        """后端 Schema 允许 age<=150，age=100 应通过（前端限制 6-99）"""
+        req = RegisterRequest(
+            username="test_user",
+            email="test@example.com",
+            password="pass1234",
+            age=100,
+            learning_goal="daily",
+        )
+        assert req.age == 100
+
+    def test_age_zero_rejected(self):
+        """age=0 应被 ge=1 拒绝"""
         with pytest.raises(ValueError):
             RegisterRequest(
                 username="test_user",
                 email="test@example.com",
                 password="pass1234",
-                age=100,
+                age=0,
                 learning_goal="daily",
             )
 
@@ -300,3 +315,59 @@ class TestLearningGoalMap:
 
     def test_exam_maps_to_chinese(self):
         assert LEARNING_GOAL_MAP["exam"] == "考试"
+
+
+# ============================================================
+# security.py — JWT 令牌测试
+# ============================================================
+
+class TestJWTToken:
+    """JWT 创建与解析测试"""
+
+    def test_create_and_decode(self):
+        """创建 Token 后解析应返回正确的 user_id 和 username"""
+        token = create_access_token(42, "testuser")
+        payload = decode_access_token(token)
+        assert payload is not None
+        assert payload["user_id"] == 42
+        assert payload["username"] == "testuser"
+
+    def test_token_contains_exp(self):
+        """Token 应包含过期时间"""
+        token = create_access_token(1, "user")
+        payload = decode_access_token(token)
+        assert "exp" in payload
+
+    def test_decode_invalid_token(self):
+        """无效 Token 应返回 None"""
+        assert decode_access_token("invalid.token.string") is None
+
+    def test_decode_expired_token_verify_true(self):
+        """过期 Token + verify_exp=True 应返回 None"""
+        from datetime import datetime, timedelta, timezone
+        import jwt as jose_jwt
+        from app.core.config import settings
+
+        payload = {
+            "user_id": 1,
+            "username": "user",
+            "exp": datetime.now(timezone.utc) - timedelta(hours=1),
+        }
+        expired_token = jose_jwt.encode(payload, settings.jwt_secret_key, algorithm="HS256")
+        assert decode_access_token(expired_token, verify_exp=True) is None
+
+    def test_decode_expired_token_verify_false(self):
+        """过期 Token + verify_exp=False 应返回 payload（用于刷新）"""
+        from datetime import datetime, timedelta, timezone
+        import jwt as jose_jwt
+        from app.core.config import settings
+
+        payload = {
+            "user_id": 1,
+            "username": "user",
+            "exp": datetime.now(timezone.utc) - timedelta(hours=1),
+        }
+        expired_token = jose_jwt.encode(payload, settings.jwt_secret_key, algorithm="HS256")
+        result = decode_access_token(expired_token, verify_exp=False)
+        assert result is not None
+        assert result["user_id"] == 1
