@@ -13,7 +13,8 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.security import get_current_user
 from app.models.user import UserProfile
-from app.schemas.pronunciation import PronunciationResponse
+from app.schemas.pronunciation import PronunciationResponse, ContentItem, RecordItem
+from app.models.pronunciation import PronunciationContent, PronunciationRecord
 from app.services.pronunciation import score_audio
 from app.services.profile_updater import profile_updater
 
@@ -92,6 +93,31 @@ async def pronunciation_score(
         except Exception as e:
             logger.warning(f"持久化发音分数失败: {e}")
 
+        # 保存评测记录到 pronunciation_records
+        try:
+            dim_map = {d["label"]: d["score"] for d in result.get("dimensions", [])}
+            record = PronunciationRecord(
+                user_id=current_user.id,
+                content_id=0,  # 自由跟读，无关联内容
+                mode=mode,
+                overall_score=result["overall"],
+                phoneme_score=dim_map.get("音素准确度"),
+                stress_score=dim_map.get("重音位置"),
+                linking_score=dim_map.get("连读表现"),
+                intonation_score=dim_map.get("语调曲线"),
+                rhythm_score=dim_map.get("节奏感"),
+                error_phonemes=result.get("errors", []),
+                correction_advice="; ".join(
+                    e["tip"] for e in result.get("errors", []) if e.get("tip")
+                ) or None,
+            )
+            db.add(record)
+            db.commit()
+            logger.info(f"评测记录已保存: user={current_user.id}, score={result['overall']}")
+        except Exception as e:
+            db.rollback()
+            logger.warning(f"保存评测记录失败: {e}")
+
         return PronunciationResponse(**result)
 
     except subprocess.CalledProcessError as e:
@@ -158,3 +184,52 @@ async def get_reference_audio(
     except Exception as e:
         logger.error(f"Edge TTS 失败: {e}")
         raise HTTPException(status_code=500, detail=f"参考音频生成失败: {str(e)}")
+
+
+@router.get("/content", response_model=list[ContentItem])
+async def list_content(
+    content_type: str = None,
+    cefr_level: str = None,
+    db: Session = Depends(get_db),
+):
+    """获取跟读内容库列表，支持按类型和难度筛选"""
+    query = db.query(PronunciationContent).filter(PronunciationContent.is_active == 1)
+    if content_type:
+        query = query.filter(PronunciationContent.content_type == content_type)
+    if cefr_level:
+        query = query.filter(PronunciationContent.cefr_level == cefr_level)
+    items = query.order_by(PronunciationContent.cefr_level, PronunciationContent.id).all()
+    return items
+
+
+@router.get("/records", response_model=list[RecordItem])
+async def list_records(
+    limit: int = 20,
+    current_user: UserProfile = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """获取当前用户的评测历史记录"""
+    records = (
+        db.query(PronunciationRecord)
+        .filter(PronunciationRecord.user_id == current_user.id)
+        .order_by(PronunciationRecord.created_at.desc())
+        .limit(limit)
+        .all()
+    )
+    result = []
+    for r in records:
+        content = None
+        if r.content_id:
+            content = db.query(PronunciationContent).get(r.content_id)
+        result.append(RecordItem(
+            id=r.id,
+            content_id=r.content_id,
+            mode=r.mode,
+            overall_score=float(r.overall_score),
+            phoneme_score=float(r.phoneme_score) if r.phoneme_score else None,
+            stress_score=float(r.stress_score) if r.stress_score else None,
+            created_at=r.created_at,
+            content_title=content.title if content else None,
+            content_text=content.content_text if content else None,
+        ))
+    return result
