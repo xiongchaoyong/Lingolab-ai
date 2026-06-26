@@ -17,3 +17,25 @@ export function scorePronunciation(audioBlob, text, mode = 'word') {
     timeout: 30000,
   })
 }
+
+/**
+ * 获取跟读内容库
+ * @param {string} contentType — 'word' 或 'sentence'
+ * @param {string} cefrLevel — CEFR 难度：A1/A2/B1/B2
+ * @returns {Promise<Array>} 内容列表
+ */
+export function getContentList(contentType = null, cefrLevel = null) {
+  const params = {}
+  if (contentType) params.content_type = contentType
+  if (cefrLevel) params.cefr_level = cefrLevel
+  return request.get('/api/pronunciation/content', { params })
+}
+
+/**
+ * 获取评测历史记录
+ * @param {number} limit — 返回条数
+ * @returns {Promise<Array>} 评测记录列表
+ */
+export function getRecordList(limit = 20) {
+  return request.get('/api/pronunciation/records', { params: { limit } })
+}
