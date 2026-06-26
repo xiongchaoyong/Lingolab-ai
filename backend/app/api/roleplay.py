@@ -11,8 +11,15 @@ import asyncio
 
 import json
 
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Query
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Query, Depends
 from fastapi.responses import StreamingResponse
+from sqlalchemy import func
+from sqlalchemy.orm import Session
+
+from app.core.database import get_db
+from app.core.security import get_current_user
+from app.models.user import UserProfile
+from app.models.conversation import ConversationSession, ConversationMessage
 
 from app.schemas.roleplay import (
     RoleplayStartRequest,
@@ -57,7 +64,11 @@ async def _tts_to_base64(text: str, voice: str = "en-US-JennyNeural") -> str:
 
 
 @router.post("/start", response_model=RoleplayStartResponse)
-async def roleplay_start(req: RoleplayStartRequest):
+async def roleplay_start(
+    req: RoleplayStartRequest,
+    current_user: UserProfile = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     """
     开始角色扮演
 
@@ -77,6 +88,23 @@ async def roleplay_start(req: RoleplayStartRequest):
         "fluency_scores": [],  # 每轮流利度算法评分
         "tts_cache": {},  # TTS 预取缓存
     }
+
+    # 持久化到 DB（复用 conversation_sessions 表，scene 设为 roleplay 角色名）
+    try:
+        db_session = ConversationSession(
+            user_id=current_user.id,
+            session_uuid=session_id,
+            scene="free",  # roleplay 复用 free 场景
+            role_id=list(ROLE_NAMES.keys()).index(role) + 1 if role in ROLE_NAMES else 0,
+            cefr_level=cefr_level,
+            status="active",
+        )
+        db.add(db_session)
+        db.commit()
+        _sessions[session_id]["db_session_id"] = db_session.id
+    except Exception as e:
+        db.rollback()
+        logger.warning(f"保存角色扮演会话到 DB 失败: {e}")
 
     # 生成 AI 角色开场白
     opener = ROLE_OPENERS.get(role, ROLE_OPENERS["interviewee"])
@@ -203,7 +231,11 @@ async def roleplay_speak(
 
 
 @router.post("/stream/start")
-async def roleplay_stream_start(req: RoleplayStartRequest):
+async def roleplay_stream_start(
+    req: RoleplayStartRequest,
+    current_user: UserProfile = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     """
     流式开始角色扮演 — SSE 逐 token 返回 AI 开场白
     """
@@ -220,6 +252,23 @@ async def roleplay_stream_start(req: RoleplayStartRequest):
         "fluency_scores": [],  # 每轮流利度算法评分
         "tts_cache": {},  # TTS 预取缓存
     }
+
+    # 持久化到 DB
+    try:
+        db_session = ConversationSession(
+            user_id=current_user.id,
+            session_uuid=session_id,
+            scene="free",
+            role_id=list(ROLE_NAMES.keys()).index(role) + 1 if role in ROLE_NAMES else 0,
+            cefr_level=cefr_level,
+            status="active",
+        )
+        db.add(db_session)
+        db.commit()
+        _sessions[session_id]["db_session_id"] = db_session.id
+    except Exception as e:
+        db.rollback()
+        logger.warning(f"保存角色扮演会话到 DB 失败: {e}")
 
     opener = ROLE_OPENERS.get(role, ROLE_OPENERS["interviewee"])
     llm = get_llm_service()
@@ -320,6 +369,19 @@ async def roleplay_stream_speak(
             session["history"].append({"role": "user", "text": user_text})
             session["round"] += 1
 
+            # 持久化用户消息
+            try:
+                db_sid = session.get("db_session_id")
+                if db_sid:
+                    db.add(ConversationMessage(
+                        session_id=db_sid, round_number=session["round"],
+                        role="user", content_text=user_text,
+                    ))
+                    db.commit()
+            except Exception as e:
+                db.rollback()
+                logger.warning(f"保存角色扮演用户消息失败: {e}")
+
             # 算法流利度计算（维度1-3，静默存储）
             try:
                 words = asr_result.get("words", [])
@@ -348,6 +410,19 @@ async def roleplay_stream_speak(
 
             session["history"].append({"role": "ai", "text": full_text})
             conversation_complete = session["round"] >= MAX_CONVERSATION_ROUNDS
+
+            # 持久化 AI 回复
+            try:
+                db_sid = session.get("db_session_id")
+                if db_sid:
+                    db.add(ConversationMessage(
+                        session_id=db_sid, round_number=session["round"],
+                        role="assistant", content_text=full_text,
+                    ))
+                    db.commit()
+            except Exception as e:
+                db.rollback()
+                logger.warning(f"保存角色扮演 AI 消息失败: {e}")
 
             # 等待语法纠错结果（后台已并行执行）
             try:
@@ -677,6 +752,31 @@ async def roleplay_end(
                     os.unlink(wav_path)
             except Exception:
                 pass
+
+        # 更新 DB 会话评分
+        try:
+            db_session_id = session.get("db_session_id") if session else None
+            if db_session_id:
+                role_score = next((d["score"] for d in dimensions if d["label"] == "角色贴合度"), None)
+                pron_score = round(sum(d["score"] for d in pronunciation) / len(pronunciation), 2) if pronunciation else None
+                db.query(ConversationSession).filter(
+                    ConversationSession.id == db_session_id
+                ).update({
+                    "round_count": session.get("round", 0),
+                    "status": "completed",
+                    "score_pronunciation": pron_score,
+                    "score_grammar": next((d["score"] for d in dimensions if d["label"] == "场景礼仪"), None),
+                    "score_vocabulary": next((d["score"] for d in dimensions if d["label"] == "专业术语"), None),
+                    "score_engagement": next((d["score"] for d in dimensions if d["label"] == "应对能力"), None),
+                    "score_overall": overall,
+                    "improvement_suggestions": suggestions,
+                    "ended_at": func.now(),
+                })
+                db.commit()
+        except Exception as e:
+            db.rollback()
+            logger.warning(f"保存角色扮演评分到 DB 失败: {e}")
+
         if session_id in _sessions:
             del _sessions[session_id]
 
