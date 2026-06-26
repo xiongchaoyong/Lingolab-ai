@@ -140,22 +140,17 @@ const adminNavs = [
     children: [
       { path: '/progress', title: '进度追踪' },
       { path: '/challenge', title: '闯关挑战' },
+      { path: '/my-homework', title: '我的作业' },
     ],
   },
   {
     title: '社区',
     children: [
       { path: '/community', title: '社区广场' },
+      { path: '/my-classes', title: '我的班级' },
     ],
   },
   { path: '/help', title: '智能客服' },
-  {
-    title: '班级作业',
-    children: [
-      { path: '/my-classes', title: '我的班级' },
-      { path: '/my-homework', title: '我的作业' },
-    ],
-  },
   {
     title: '教师管理',
     children: [
