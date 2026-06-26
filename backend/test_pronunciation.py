@@ -1,268 +1,250 @@
-"""
-wav2vec2 发音评测 — 完整流程测试
-基于 GOP (Goodness of Pronunciation) 算法
+"""发音评测模块单元测试 — Schema 验证 + 评分权重 + 音素建议"""
 
-流程:
-  1. 用 macOS say 生成标准音（参考）
-  2. 用 say 生成「错误发音」版本（模拟学习者）
-  3. wav2vec2 提取特征 + CTC 强制对齐
-  4. 比较音素级后验概率 → 打分
-"""
-
+import pytest
+import sys
 import os
-import time
-import subprocess
-import torch
-import torchaudio
-import numpy as np
+
+sys.path.insert(0, os.path.dirname(__file__))
+
+from app.schemas.pronunciation import (
+    DimensionScore,
+    PronunciationError,
+    CharScore,
+    F0Point,
+    StressVizData,
+    IntonationVizData,
+    AnalysisDetail,
+    RhythmVizData,
+    LinkingPair,
+    LinkingVizData,
+    PronunciationResponse,
+    ContentItem,
+    RecordItem,
+)
+from app.services.pronunciation import PHONEME_TIPS
+
 
 # ============================================================
-# 0. 环境配置
+# Schema 验证
 # ============================================================
-if "HF_ENDPOINT" not in os.environ:
-    os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
 
-DEVICE = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
-print(f"设备: {DEVICE}")
+class TestDimensionScoreSchema:
+    """DimensionScore 字段验证"""
 
-# ============================================================
-# 1. 生成测试音频（模拟标准音 vs 学习者发音）
-# ============================================================
-TEST_SENTENCE = "The cat sat on the mat."
+    def test_valid(self):
+        d = DimensionScore(label="音素准确度", score=85.5)
+        assert d.label == "音素准确度"
+        assert d.score == 85.5
 
-def generate_audio(text, filename, voice="Samantha"):
-    """用 macOS say 生成音频"""
-    if not os.path.exists(filename):
-        cmd = ["say", text, "-v", voice, "-o", filename.replace(".wav", ".aiff")]
-        subprocess.run(cmd, check=True)
-        subprocess.run(
-            ["ffmpeg", "-y", "-i", filename.replace(".wav", ".aiff"),
-             "-ac", "1", "-ar", "16000", filename],
-            check=True, capture_output=True,
+    def test_five_dimensions(self):
+        """五维评分标签"""
+        labels = ["音素准确度", "重音位置", "语调曲线", "连读表现", "节奏感"]
+        for label in labels:
+            d = DimensionScore(label=label, score=80)
+            assert d.label == label
+
+
+class TestPronunciationErrorSchema:
+    """PronunciationError 字段验证"""
+
+    def test_valid(self):
+        err = PronunciationError(
+            phoneme="TH", actual="T", tip="舌尖轻触上齿", score=30.0
         )
-        os.remove(filename.replace(".wav", ".aiff"))
+        assert err.phoneme == "TH"
+        assert err.actual == "T"
+        assert err.tip == "舌尖轻触上齿"
+        assert err.score == 30.0
 
-print("\n生成测试音频...")
-generate_audio(TEST_SENTENCE, "test_native.wav")
-generate_audio(TEST_SENTENCE, "test_native.wav")  # 作为「学习者」版本（实际用真实录音时替换）
-print("测试音频就绪")
 
-# ============================================================
-# 2. 加载 wav2vec2 模型
-# ============================================================
-print("\n加载 wav2vec2 模型...")
-bundle = torchaudio.pipelines.WAV2VEC2_ASR_BASE_960H
-model = bundle.get_model().to(DEVICE)
-labels = bundle.get_labels()  # [<s>, A, B, C, ..., Z, ', |, </s>]
-print(f"模型参数: {sum(p.numel() for p in model.parameters()) / 1e6:.0f}M")
-print(f"输出类别: {len(labels)}  (字符级 CTC: A-Z, ', |, 空格)")
+class TestVisualizationSchemas:
+    """可视化数据 Schema 验证"""
 
-# ============================================================
-# 3. 音频 → wav2vec2 特征
-# ============================================================
-def extract_features(audio_path):
-    """加载音频,提取 wav2vec2 特征"""
-    waveform, sr = torchaudio.load(audio_path)
-    if sr != 16000:
-        waveform = torchaudio.functional.resample(waveform, sr, 16000)
-    waveform = waveform.to(DEVICE)
+    def test_stress_viz(self):
+        viz = StressVizData(
+            chars=["h", "e", "l", "o"],
+            energies=[0.5, 0.8, 0.3, 0.6],
+            durations=[100, 120, 80, 110],
+            is_stressed=[False, True, False, False],
+            energy_cv=0.25,
+            dur_cv=0.15,
+        )
+        assert len(viz.chars) == 4
+        assert viz.energy_cv == 0.25
 
-    with torch.no_grad():
-        emission, _ = model(waveform)
-    # emission: (1, time_frames, num_labels) — CTC softmax 后验概率
-    emission = torch.log_softmax(emission, dim=-1)
-    return emission.cpu(), waveform
+    def test_intonation_viz(self):
+        viz = IntonationVizData(
+            direction="falling",
+            range_st=5.0,
+            f0_points=[F0Point(t=0.0, hz=200), F0Point(t=1.0, hz=150)],
+            sentence_type="statement",
+            slope_st_per_sec=-2.5,
+        )
+        assert viz.direction == "falling"
+        assert len(viz.f0_points) == 2
 
-emission, waveform = extract_features("test_native.wav")
-print(f"\n音频长度: {waveform.shape[1] / 16000:.1f}s")
-print(f"特征帧数: {emission.shape[1]}, 每帧 {(waveform.shape[1] / emission.shape[1] / 16000 * 1000):.0f}ms")
+    def test_rhythm_viz(self):
+        viz = RhythmVizData(
+            durations_ms=[50, 60, 55, 200],
+            chars=["h", "e", "l", "o"],
+            mean_ms=91.25,
+            std_ms=62.5,
+            cv=0.685,
+            pause_count=1,
+            is_pause=[False, False, False, True],
+        )
+        assert viz.pause_count == 1
+        assert viz.is_pause[3] is True
 
-# ============================================================
-# 4. 文本 → 音素（G2P）
-# ============================================================
-print("\n=== 音素转换 (G2P) ===")
+    def test_linking_pair(self):
+        pair = LinkingPair(
+            word_pair="not at",
+            linkable=True,
+            last_phoneme="T",
+            first_phoneme="AE",
+            gap_ms=25.0,
+            score=85.0,
+        )
+        assert pair.linkable is True
+        assert pair.score == 85.0
 
-from g2p_en import G2p
-g2p = G2p()
+    def test_linking_viz(self):
+        viz = LinkingVizData(
+            pairs=[
+                LinkingPair(word_pair="not at", linkable=True, gap_ms=25.0, score=85.0),
+                LinkingPair(word_pair="pick it", linkable=True, gap_ms=40.0, score=60.0),
+            ],
+            linkable_count=2,
+            linked_count=1,
+            avg_gap_ms=32.5,
+        )
+        assert viz.linkable_count == 2
+        assert viz.linked_count == 1
 
-# 转换为音素序列
-text_clean = TEST_SENTENCE.lower().strip()
-phonemes = g2p(text_clean)
-print(f"文本:   {text_clean}")
-print(f"音素:   {' '.join(phonemes)}")
 
-# ============================================================
-# 5. CTC 强制对齐 — 核心算法
-# ============================================================
-print("\n=== CTC 强制对齐 ===")
+class TestPronunciationResponseSchema:
+    """PronunciationResponse 完整响应验证"""
 
-def ctc_forced_alignment(emission, text, labels):
-    """
-    CTC 强制对齐：给定音频的后验概率和期望文本，
-    找出文本中每个字符对应的音频帧范围。
+    def test_full_response(self):
+        resp = PronunciationResponse(
+            overall=82.5,
+            dimensions=[
+                DimensionScore(label="音素准确度", score=85),
+                DimensionScore(label="重音位置", score=80),
+                DimensionScore(label="语调曲线", score=78),
+                DimensionScore(label="连读表现", score=82),
+                DimensionScore(label="节奏感", score=80),
+            ],
+            errors=[PronunciationError(phoneme="TH", actual="T", tip="舌尖轻触上齿")],
+            char_scores=[],
+            analysis_detail=AnalysisDetail(stress="good", intonation="falling", linking="ok"),
+        )
+        assert resp.overall == 82.5
+        assert len(resp.dimensions) == 5
+        assert len(resp.errors) == 1
 
-    算法: 在 CTC 标签序列上做 Viterbi 对齐
-    """
-    # 构建 CTC token 序列（允许 blank 插入）
-    # labels[0] = <s> (blank)，实际字母从 index 1 开始
-    char_to_index = {c: i for i, c in enumerate(labels)}
+    def test_minimal_response(self):
+        resp = PronunciationResponse(
+            overall=50.0,
+            dimensions=[DimensionScore(label="音素准确度", score=50)],
+            errors=[],
+        )
+        assert resp.overall == 50.0
+        assert resp.stress_viz is None
+        assert resp.intonation_viz is None
 
-    target = []
-    for ch in text.upper():
-        if ch in char_to_index:
-            target.append(char_to_index[ch])
-        elif ch == ' ':
-            target.append(char_to_index['|'])  # 空格用 | 表示
-
-    # Viterbi 对齐 — 在 CTC 格上找最优路径
-    T = emission.shape[1]  # 帧数
-    S = len(target)        # 目标序列长度
-
-    # CTC 扩展：每个 token 间可以插入 blank
-    # 扩展序列: blank, t0, blank, t1, blank, ...
-    extended = [0]  # labels[0] = blank
-    for t in target:
-        extended.append(t)
-        extended.append(0)  # blank
-
-    # 对数概率
-    log_prob = emission[0]  # (T, num_labels)
-
-    # Viterbi DP
-    dp = torch.full((T, len(extended)), float('-inf'))
-    backtrack = torch.zeros((T, len(extended)), dtype=torch.long)
-
-    # 初始化: 第 0 帧可以是 blank 或第一个 token
-    dp[0, 0] = log_prob[0, 0]  # blank
-    dp[0, 1] = log_prob[0, extended[1]]  # first char
-
-    for t in range(1, T):
-        for s in range(len(extended)):
-            if dp[t-1, s] == float('-inf'):
-                continue
-
-            # 路径 1: 停留在同一点 (blank → blank, char → char)
-            prob = dp[t-1, s] + log_prob[t, extended[s]]
-            if prob > dp[t, s]:
-                dp[t, s] = prob
-                backtrack[t, s] = s
-
-            # 路径 2: 前进一个 (blank → char，可跳过)
-            if s + 1 < len(extended):
-                prob = dp[t-1, s] + log_prob[t, extended[s+1]]
-                if prob > dp[t, s+1]:
-                    dp[t, s+1] = prob
-                    backtrack[t, s+1] = s
-
-            # 路径 3: 前进两个 (char → blank → next_char，跳过 blank)
-            if s + 2 < len(extended):
-                prob = dp[t-1, s] + log_prob[t, extended[s+2]]
-                if prob > dp[t, s+2]:
-                    dp[t, s+2] = prob
-                    backtrack[t, s+2] = s
-
-    # 回溯 — 从最后一帧的最佳结束点开始
-    # 结束点: 最后一个字符 或 blank
-    end_idx = len(extended) - 1
-    if dp[T-1, end_idx-1] > dp[T-1, end_idx]:
-        end_idx = end_idx - 1
-
-    best_path = []
-    idx = end_idx
-    for t in range(T-1, -1, -1):
-        best_path.append(idx)
-        idx = backtrack[t, idx].item()
-    best_path.reverse()
-
-    # 将路径映射回目标序列
-    alignments = []  # [(char, start_frame, end_frame)]
-    current_char_idx = None
-    current_start = 0
-
-    for t, s in enumerate(best_path):
-        # 判断 s 对应的是原序列中的哪个位置
-        char_pos = None
-        if s > 0:
-            # 在 extended 序列中奇数位置是真实字符
-            orig_idx = (s - 1) // 2
-            if s % 2 == 1 and orig_idx < len(target):  # 是字符不是 blank
-                char_pos = orig_idx
-
-        if char_pos != current_char_idx:
-            if current_char_idx is not None and current_start < t:
-                alignments.append((current_char_idx, current_start, t))
-            current_char_idx = char_pos
-            current_start = t
-
-    if current_char_idx is not None:
-        alignments.append((current_char_idx, current_start, T))
-
-    return target, alignments, log_prob, best_path
-
-target_indices, alignments, log_prob, best_path = ctc_forced_alignment(emission, text_clean, labels)
-
-# 打印对齐结果
-print("帧级对齐结果:")
-for char_idx, start_f, end_f in alignments:
-    ch = labels[target_indices[char_idx]]
-    dur_ms = (end_f - start_f) * (waveform.shape[1] / emission.shape[1] / 16000 * 1000)
-    # 该字符在区间内的平均对数概率
-    seg_prob = log_prob[start_f:end_f, target_indices[char_idx]].mean().exp().item()
-    print(f"  {ch}  [{start_f:3d}→{end_f:3d}]  {dur_ms:5.0f}ms  置信度: {seg_prob:.2f}")
 
 # ============================================================
-# 6. 发音评分（简化版 GOP）
+# 评分权重验证
 # ============================================================
-print("\n=== 发音评分 ===")
 
-def compute_gop_scores(target_indices, alignments, log_prob, labels):
-    """
-    计算每个音素的 GOP (Goodness of Pronunciation) 分数
+class TestScoringWeights:
+    """模式加权综合分验证"""
 
-    GOP = log(p(phoneme|acoustic)) / duration
-    高分 = 发音接近母语者
-    """
-    scores = []
-    for char_idx, start_f, end_f in alignments:
-        ch = labels[target_indices[char_idx]]
-        dur = end_f - start_f
-        if dur == 0:
-            continue
-        # 平均对数后验概率
-        avg_log_prob = log_prob[start_f:end_f, target_indices[char_idx]].mean()
-        # 归一化到 0~100
-        gop_score = float(avg_log_prob.exp() * 100)
-        scores.append({
-            "char": ch,
-            "duration_ms": round(dur * 20, 1),  # 近似: 每帧 ~20ms
-            "score": round(gop_score, 1),
-            "level": "优秀" if gop_score > 80 else "良好" if gop_score > 60 else "一般" if gop_score > 40 else "需练习"
-        })
-    return scores
+    # 单词模式：音素50% + 重音25% + 节奏25%
+    WORD_WEIGHTS = {"音素准确度": 0.50, "重音位置": 0.25, "节奏感": 0.25}
 
-scores = compute_gop_scores(target_indices, alignments, log_prob, labels)
+    # 句子模式：音素40% + 重音15% + 连读15% + 语调15% + 节奏15%
+    SENTENCE_WEIGHTS = {
+        "音素准确度": 0.40, "重音位置": 0.15,
+        "连读表现": 0.15, "语调曲线": 0.15, "节奏感": 0.15,
+    }
 
-print(f"{'字符':<8} {'时长':<10} {'得分':<8} {'评级'}")
-print("-" * 40)
-total_score = 0
-for s in scores:
-    print(f"  {s['char']:<8} {s['duration_ms']:<5.0f}ms   {s['score']:<5.1f}     {s['level']}")
-    total_score += s['score']
+    def test_word_weights_sum(self):
+        """单词模式权重和 = 1.0"""
+        assert abs(sum(self.WORD_WEIGHTS.values()) - 1.0) < 1e-9
 
-avg_score = total_score / len(scores) if scores else 0
-print("-" * 40)
-print(f"  综合得分: {avg_score:.0f}/100")
+    def test_sentence_weights_sum(self):
+        """句子模式权重和 = 1.0"""
+        assert abs(sum(self.SENTENCE_WEIGHTS.values()) - 1.0) < 1e-9
+
+    def test_word_mode_calculation(self):
+        """单词模式综合分计算"""
+        scores = {"音素准确度": 80, "重音位置": 70, "节奏感": 90}
+        overall = sum(scores[k] * v for k, v in self.WORD_WEIGHTS.items())
+        # 80*0.5 + 70*0.25 + 90*0.25 = 40 + 17.5 + 22.5 = 80
+        assert overall == 80.0
+
+    def test_sentence_mode_calculation(self):
+        """句子模式综合分计算"""
+        scores = {
+            "音素准确度": 80, "重音位置": 70,
+            "连读表现": 60, "语调曲线": 75, "节奏感": 85,
+        }
+        overall = sum(scores[k] * v for k, v in self.SENTENCE_WEIGHTS.items())
+        # 80*0.4 + 70*0.15 + 60*0.15 + 75*0.15 + 85*0.15
+        # = 32 + 10.5 + 9 + 11.25 + 12.75 = 75.5
+        assert overall == 75.5
+
 
 # ============================================================
-# 7. 总结
+# 音素纠错建议
 # ============================================================
-print("\n" + "=" * 50)
-print("发音评测流程总结")
-print("=" * 50)
-print(f"  模型: wav2vec2 ASR Base (960h fine-tuned)")
-print(f"  算法: GOP (Goodness of Pronunciation)")
-print(f"  设备: {DEVICE}")
-print(f"  测试文本: {TEST_SENTENCE}")
-print(f"  综合得分: {avg_score:.0f}/100")
-print()
-print("架构: 音频 → wav2vec2 → CTC强制对齐 → 逐帧后验概率 → GOP分数")
+
+class TestPhonemeTips:
+    """常见音素纠错建议完整性"""
+
+    def test_common_phonemes_covered(self):
+        """常见英语音素都有纠错建议"""
+        common = ["TH", "R", "L", "V", "W", "S", "Z", "SH", "CH"]
+        for p in common:
+            assert p in PHONEME_TIPS, f"缺少音素 {p} 的纠错建议"
+            assert len(PHONEME_TIPS[p]) > 5, f"音素 {p} 的建议过短"
+
+    def test_tip_count(self):
+        """至少 20 个音素有建议"""
+        assert len(PHONEME_TIPS) >= 20
+
+    def test_tips_are_chinese(self):
+        """纠错建议为中文"""
+        for phoneme, tip in list(PHONEME_TIPS.items())[:5]:
+            assert any('\u4e00' <= c <= '\u9fff' for c in tip), f"{phoneme} 的建议不是中文"
+
+
+# ============================================================
+# ContentItem / RecordItem Schema
+# ============================================================
+
+class TestContentItemSchema:
+    """ContentItem 字段验证"""
+
+    def test_valid(self):
+        item = ContentItem(
+            id=1, title="Hello", content_text="Hello world",
+            content_type="word", cefr_level="A1",
+            category="日常", phonetic_ipa="həˈloʊ",
+        )
+        assert item.id == 1
+        assert item.cefr_level == "A1"
+
+
+class TestRecordItemSchema:
+    """RecordItem 字段验证"""
+
+    def test_valid(self):
+        item = RecordItem(
+            id=1, content_id=1, mode="word",
+            overall_score=85.5, phoneme_score=80.0, stress_score=75.0,
+        )
+        assert item.overall_score == 85.5
+        assert item.phoneme_score == 80.0
