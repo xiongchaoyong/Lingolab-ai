@@ -1,8 +1,12 @@
 """智能客服 API 路由"""
 
+import json
 import logging
+import tempfile
+import os
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -33,6 +37,33 @@ async def chat_text(
         )
 
 
+@router.post("/chat/stream")
+async def chat_stream(
+    req: ChatRequest,
+    current_user: UserProfile = Depends(get_current_user),
+):
+    """文字客服（流式）：SSE 逐 token 返回 AI 回复"""
+    async def generate():
+        try:
+            async for token in help_service.chat_stream(req.message, req.history):
+                yield f"data: {json.dumps({'content': token})}\n\n"
+            yield "data: [DONE]\n\n"
+        except Exception as e:
+            logger.error(f"客服流式接口异常: {e}")
+            yield f"data: {json.dumps({'content': '抱歉，我暂时无法处理你的问题。请稍后重试。'})}\n\n"
+            yield "data: [DONE]\n\n"
+
+    return StreamingResponse(
+        generate(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
 @router.post("/chat/voice", response_model=ChatResponse)
 async def chat_voice(
     audio: UploadFile = File(...),
@@ -40,10 +71,6 @@ async def chat_voice(
     current_user: UserProfile = Depends(get_current_user),
 ):
     """语音客服：上传录音 → Whisper 转写 → AI 回复"""
-    import json
-    import tempfile
-    import os
-
     try:
         history_list = json.loads(history)
     except json.JSONDecodeError:

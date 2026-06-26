@@ -1,9 +1,11 @@
 """智能客服服务 — LLM 驱动的自由对话"""
 
+import json
 import logging
-from typing import Dict
+from typing import Dict, AsyncIterator
 
-from app.services.llm import get_llm_service
+import httpx
+from app.services.llm import get_llm_service, BAILIAN_API_URL
 
 logger = logging.getLogger(__name__)
 
@@ -49,9 +51,14 @@ class HelpService:
 
     async def _ask_llm(self, message: str, history: list) -> str:
         """调用 LLM 生成客服回复"""
+        messages = self._build_messages(message, history)
+        llm = get_llm_service()
+        return await llm._raw_chat_messages(messages, temperature=0.7, max_tokens=300)
+
+    def _build_messages(self, message: str, history: list) -> list:
+        """构建 LLM 消息列表"""
         messages = [{"role": "system", "content": HELP_SYSTEM_PROMPT}]
 
-        # 最近 10 轮对话历史
         for h in history[-10:]:
             if h.get("role") == "user":
                 messages.append({"role": "user", "content": h.get("text", "")})
@@ -59,9 +66,48 @@ class HelpService:
                 messages.append({"role": "assistant", "content": h.get("text", "")})
 
         messages.append({"role": "user", "content": message})
+        return messages
 
+    async def chat_stream(self, message: str, history: list) -> AsyncIterator[str]:
+        """流式生成客服回复（SSE 逐 token 返回）"""
+        messages = self._build_messages(message, history)
         llm = get_llm_service()
-        return await llm._raw_chat_messages(messages, temperature=0.7, max_tokens=300)
+
+        try:
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                async with client.stream(
+                    "POST",
+                    BAILIAN_API_URL,
+                    headers={
+                        "Authorization": f"Bearer {llm.api_key}",
+                        "Content-Type": "application/json",
+                    },
+                    json={
+                        "model": llm.model,
+                        "messages": messages,
+                        "max_tokens": 300,
+                        "temperature": 0.7,
+                        "stream": True,
+                        "enable_thinking": False,
+                    },
+                ) as resp:
+                    resp.raise_for_status()
+                    async for line in resp.aiter_lines():
+                        if line.startswith("data: "):
+                            data_str = line[6:]
+                            if data_str == "[DONE]":
+                                break
+                            try:
+                                chunk = json.loads(data_str)
+                                delta = chunk["choices"][0].get("delta", {})
+                                content = delta.get("content", "")
+                                if content:
+                                    yield content
+                            except json.JSONDecodeError:
+                                continue
+        except Exception as e:
+            logger.error(f"客服流式 LLM 调用失败: {e}")
+            yield "抱歉，我暂时无法处理你的问题。请稍后重试。"
 
 
 help_service = HelpService()

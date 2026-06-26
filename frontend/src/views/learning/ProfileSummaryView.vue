@@ -36,7 +36,7 @@ onMounted(() => {
           <span v-if="lastUpdated" class="update-time">· 更新于 {{ lastUpdated }}</span>
         </p>
       </div>
-      <el-button :icon="'Refresh'" :loading="refreshing" @click="refresh" circle size="small" />
+      <el-button :loading="refreshing" @click="refresh" size="small" text>刷新</el-button>
     </div>
 
     <div v-if="!store.profileSummary" class="summary-loading" v-loading="true">

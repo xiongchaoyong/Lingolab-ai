@@ -1,11 +1,13 @@
 <script setup>
 import { ref, computed, onUnmounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
 import { ArrowLeft, InfoFilled } from '@element-plus/icons-vue'
 import { streamStartConversation, streamSpeakConversation, ttsStreamUrl, ttsCachedUrl, endConversation } from '@/api/conversation'
 import UtteranceDetailPanel from '@/components/pronunciation/UtteranceDetailPanel.vue'
 
 const router = useRouter()
+const authStore = useAuthStore()
 
 // ========== 场景配置 ==========
 const SCENARIOS = [
@@ -487,7 +489,10 @@ onUnmounted(() => {
             class="chat-bubble"
             :class="msg.role"
           >
-            <span class="bubble-avatar">{{ msg.role === 'user' ? '😊' : '🐱' }}</span>
+            <span class="bubble-avatar" v-if="msg.role === 'user'">
+                <el-avatar :size="32" :src="authStore.userInfo?.avatar" icon="UserFilled" />
+              </span>
+              <span class="bubble-avatar" v-else>🐱</span>
             <div class="bubble-content">
               <p class="bubble-text">{{ msg.text }}</p>
               <!-- 语法检测中 -->

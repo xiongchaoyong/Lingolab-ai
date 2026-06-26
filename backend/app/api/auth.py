@@ -143,6 +143,7 @@ async def login(req: LoginRequest, db: Session = Depends(get_db)):
         token=token,
         assessment_completed=bool(user.assessment_completed),
         redirect=redirect,
+        role=user.role,
         avatar=user.avatar_url,
     )
 

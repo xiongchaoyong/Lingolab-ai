@@ -1,7 +1,10 @@
 <script setup>
 import { ref, nextTick, onUnmounted } from 'vue'
+import { useAuthStore } from '@/stores/auth'
 import { Promotion } from '@element-plus/icons-vue'
-import { chatText, chatVoice } from '@/api/help'
+import { chatText, chatVoice, chatStream } from '@/api/help'
+
+const authStore = useAuthStore()
 
 const faqCategories = [
   {
@@ -98,19 +101,52 @@ async function sendMessage() {
 
 async function callChatAPI(message) {
   loading.value = true
-  try {
-    const history = getHistory()
-    const res = await chatText(message, history.slice(0, -1))
-    const data = res.data || res
-    const reply = data.reply || '抱歉，我暂时无法处理你的问题。'
+  scrollToBottom()
 
-    messages.value.push({
-      role: 'ai',
-      text: reply,
-      time: formatTime(),
-    })
+  try {
+    const history = getHistory().slice(0, -1)
+    const response = await chatStream(message, history)
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`)
+    }
+
+    const reader = response.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ''
+    let aiMsg = null
+
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+
+      buffer += decoder.decode(value, { stream: true })
+      const lines = buffer.split('\n')
+      buffer = lines.pop() || ''
+
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          const data = line.slice(6)
+          if (data === '[DONE]') continue
+          try {
+            const parsed = JSON.parse(data)
+            if (parsed.content) {
+              // 第一个 token 到达时创建消息气泡，loading 变为 false 隐藏打字动画
+              if (!aiMsg) {
+                loading.value = false
+                messages.value.push({ role: 'ai', text: '', time: formatTime() })
+                aiMsg = messages.value[messages.value.length - 1]
+              }
+              aiMsg.text += parsed.content
+              scrollToBottom()
+            }
+          } catch { /* ignore parse errors */ }
+        }
+      }
+    }
   } catch (e) {
-    console.error('客服 API 调用失败:', e)
+    console.error('客服流式 API 调用失败:', e)
+    loading.value = false
     messages.value.push({
       role: 'ai',
       text: '抱歉，我暂时无法处理你的问题。请稍后重试。',
@@ -118,7 +154,6 @@ async function callChatAPI(message) {
     })
   } finally {
     loading.value = false
-    scrollToBottom()
   }
 }
 
@@ -264,7 +299,7 @@ onUnmounted(() => {
         <div v-for="(msg, i) in messages" :key="i" :class="['msg-row', msg.role]">
           <div class="msg-avatar">
             <el-icon v-if="msg.role === 'ai'" :size="18"><Service /></el-icon>
-            <el-icon v-else :size="18"><UserFilled /></el-icon>
+            <el-avatar v-else :size="28" :src="authStore.userInfo?.avatar" icon="UserFilled" />
           </div>
           <div class="msg-bubble" :class="msg.role">
             <div class="msg-text">{{ msg.text }}</div>

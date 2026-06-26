@@ -360,7 +360,7 @@ function handleCommand(command) {
 
 .tn-logo {
   font-family: var(--font-heading);
-  font-size: var(--font-size-lg);
+  font-size: 24px;
   font-weight: 700;
   background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
   -webkit-background-clip: text;

@@ -5,7 +5,14 @@ import { loginApi, registerApi, getProfileApi, updateProfileApi, uploadAvatarApi
 export const useAuthStore = defineStore('auth', () => {
   // ---- state ----
   const token = ref(localStorage.getItem('token') || '')
-  const userInfo = ref(null)
+
+  // 从 localStorage 恢复 userInfo
+  let savedInfo = null
+  try {
+    const raw = localStorage.getItem('userInfo')
+    if (raw) savedInfo = JSON.parse(raw)
+  } catch { /* ignore */ }
+  const userInfo = ref(savedInfo)
 
   // ---- getters ----
   const isLoggedIn = computed(() => !!token.value)
@@ -19,6 +26,9 @@ export const useAuthStore = defineStore('auth', () => {
 
   function setUserInfo(info) {
     userInfo.value = info
+    if (info) {
+      localStorage.setItem('userInfo', JSON.stringify(info))
+    }
   }
 
   async function login(username, password) {
@@ -27,7 +37,7 @@ export const useAuthStore = defineStore('auth', () => {
     setUserInfo({
       id: res.user_id,
       username: res.username,
-      role: 'learner',
+      role: res.role || 'learner',
       assessment_completed: res.assessment_completed,
       avatar: res.avatar,
     })
@@ -58,6 +68,7 @@ export const useAuthStore = defineStore('auth', () => {
     token.value = ''
     userInfo.value = null
     localStorage.removeItem('token')
+    localStorage.removeItem('userInfo')
   }
 
   async function fetchProfile() {
