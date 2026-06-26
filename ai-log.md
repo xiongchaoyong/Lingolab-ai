@@ -135,3 +135,9 @@
 | 10:00 | 模块5 | 社区服务模块全栈实现：①后端 models/community.py 7个ORM模型（复用groups/group_members表）+ schemas/community.py 16个Pydantic Schema + services/community.py CommunityService + api/community.py 9个REST端点；②前端 CommunityView.vue 重写（语音挑战广场+排行榜+讨论区+点赞+评论+学习小组+加入/退出），全部接入真实API；③种子数据：3挑战+3帖子+6评论+4小组 | XCY | ✅ |
 | 10:30 | 模块6 | 后台管理服务模块全栈实现：①后端 models/admin.py 5个ORM模型（classes/class_students/assignments/assignment_submissions/admin_logs）+ schemas/admin.py Pydantic Schema + services/admin.py（TeacherService班级+作业+点评 / AdminService用户管理+仪表盘）+ api/admin.py 12个REST端点（教师端8个+运营端4个）+ role-based access control；②前端 api/admin.js 11个API函数 + stores/admin.js Pinia Store + 重写4个页面（ClassManageView班级CRUD+邀请码+学生列表、HomeworkView作业布置+提交查看+教师点评、UserManageView分页搜索筛选+启用禁用、DashboardView ECharts指标卡片+趋势图+饼图+类型分布）；③种子数据：教师+管理员账号+3班级+6学生+3作业+10提交 | XCY | ✅ |
 | 11:00 | 模块7 | 智能客服与帮助系统全栈实现：①后端 schemas/help.py（ChatRequest/ChatResponse）+ services/help.py（HelpService：LLM问题分类5类别+重复检测3次转人工+固定话术降级）+ api/help.py（POST /chat 文字客服、POST /chat/voice 语音客服→WhisperX转写→LLM回复）；②llm.py 新增 _call_bailian/_raw_chat/_raw_chat_messages 底层方法供客服服务调用；③前端 api/help.js（chatText/chatVoice）+ HelpView.vue 接入真实API（LLM聊天+分类标签+转人工提示+语音输入+打字动画+加载状态） | XCY | ✅ |
+
+## 2026-06-26
+
+| 时间  | 操作     | 描述                                                         | 成员 |      |
+| ----- | -------- | :----------------------------------------------------------- | :--: | :--: |
+| 10:00 | 测评增强 | 测评模块3项增强：①30天重测评限制（start端点检查last_assessment_at，未满30天返回403+剩余天数）；②全对/全错追加题（10题全对→追加C2口语确认题、全错→追加A1听力基础题，total_questions动态调整）；③会话持久化（POST /restore端点从AssessmentRecord重建内存会话、前端store调restoreSessionApi恢复localStorage+后端双端同步） | XCY | ✅ |
