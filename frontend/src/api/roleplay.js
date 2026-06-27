@@ -11,7 +11,7 @@ function authHeaders(extra = {}) {
 
 /**
  * 流式开始角色扮演 — SSE 逐 token 返回
- * @param {string} role - interviewee/waiter/guide
+ * @param {string} role - interviewee/waiter/guide/doctor/teacher/customer_service/receptionist/colleague
  * @param {string} cefrLevel
  * @param {object} callbacks - { onToken(text), onDone(data), onError(err) }
  */

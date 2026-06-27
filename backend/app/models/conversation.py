@@ -15,6 +15,7 @@ class ConversationSession(Base):
     session_uuid = Column(String(36), unique=True, nullable=False, comment="会话 UUID")
     scene = Column(
         Enum("self_intro", "directions", "shopping", "restaurant", "free",
+             "hotel", "airport", "hospital", "school",
              name="conversation_scene_enum"),
         nullable=False, comment="对话场景",
     )

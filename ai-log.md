@@ -4,6 +4,22 @@
 
 ---
 
+## 2026-06-27: 场景扩展 + 布局优化 + 教师端修复 + 排行榜数据
+
+### 变更内容
+1. **对话场景扩展**：MySQL `conversation_sessions` 表新增 4 个场景枚举值（hotel/airport/hospital/school），前后端同步更新场景映射
+2. **游戏化闯关卡片水平布局**：每日闯关/配音挑战/勋章墙从竖直排列改为 CSS Grid 4 列布局，修复 el-row/el-col 缓存问题
+3. **配音挑战+勋章墙数据加载修复**：`tab-change` 事件从 `el-tab-pane` 移至 `el-tabs`，切 tab 时触发数据请求
+4. **对话+角色扮演场景卡片**：VoiceCallView 和 RolePlayView 场景卡片改为 4×2 CSS Grid 布局
+5. **社区语音挑战评分修复**：`asyncio.run()` 在 FastAPI 事件循环中报错，改为同步 `pron_service.score()` 调用，修复分数映射（overall/dimensions 结构）
+6. **社区挑战提交音频转码**：上传音频增加 ffmpeg 转 16kHz WAV 步骤，与游戏化接口保持一致
+7. **排行榜模拟数据**：创建 `seed_leaderboard_teacher.py`，为 7 个用户生成 208 条积分记录 + 28 条挑战提交记录
+8. **教师端模拟数据**：为 xxxcy 用户创建 3 个班级 + 学生 + 作业 + 提交记录
+9. **教师端三页面高度修复**：ClassManageView/HomeworkView/StudentReportView 添加固定高度 + flex 布局 + `:close-on-click-modal="false"` 防止弹窗 bug
+10. **学生端页面高度修复**：MyClassesView/MyHomeworkView 同样固定高度 + 弹窗修复
+11. **学生详情后端报错修复**：`admin.py` 中 `s.source_type` → `s.source`（UserSkillScore 模型字段名修正）
+12. **README.md 全面更新**：技术栈更新（千问/WhisperX/wav2vec2/Edge TTS）、16 模块全部标记已实现、新增 6 大核心竞争力、项目结构同步实际布局
+
 ## 2026-06-26: 后台管理服务模块完善
 
 ### 变更内容

@@ -47,6 +47,11 @@ ROLE_OPENERS = {
     "interviewee": "Start the job interview. Greet the candidate and ask them to introduce themselves.",
     "waiter": "Enter the restaurant as a customer. Greet the waiter and ask for a table.",
     "guide": "Meet your tour guide at the attraction. Greet them and ask about the site's history.",
+    "doctor": "Enter the clinic as a patient. Greet the doctor and describe your symptoms.",
+    "teacher": "Enter the classroom as a student. Greet the teacher and ask a question about today's lesson.",
+    "customer_service": "Call the customer service hotline. Greet the representative and explain your product issue.",
+    "receptionist": "Approach the hotel front desk as a guest. Greet the receptionist and ask to check in.",
+    "colleague": "Meet the new team member at the office. Greet them and offer to show them around.",
 }
 
 # 角色中文名
@@ -54,6 +59,11 @@ ROLE_NAMES = {
     "interviewee": "面试者",
     "waiter": "服务员",
     "guide": "导游",
+    "doctor": "医生",
+    "teacher": "老师",
+    "customer_service": "客服",
+    "receptionist": "前台接待",
+    "colleague": "同事",
 }
 
 

@@ -63,18 +63,27 @@ class CommunityService:
         if not challenge:
             raise ValueError("挑战不存在")
 
-        # 语音评分（复用发音评测服务）
+        # 语音评分（复用发音评测服务 — 同步版本）
         pronunciation_score = None
         fluency_score = None
         total_score = None
         try:
             from app.services.pronunciation import get_pronunciation_service
             pron_service = get_pronunciation_service()
-            score_result = pron_service.score(audio_url, challenge.sample_text)
+            score_result = pron_service.score(audio_url, challenge.sample_text, "sentence")
             if score_result:
-                pronunciation_score = int(score_result.get("pronunciation_score", 0))
-                fluency_score = int(score_result.get("fluency_score", 0))
-                total_score = int(score_result.get("total_score", 0))
+                total_score = int(score_result.get("overall", 0))
+                dimensions = score_result.get("dimensions", [])
+                for d in dimensions:
+                    label = d.get("label", "")
+                    if "音素" in label:
+                        pronunciation_score = int(d["score"])
+                    if "节奏" in label:
+                        fluency_score = int(d["score"])
+                if pronunciation_score is None:
+                    pronunciation_score = total_score
+                if fluency_score is None:
+                    fluency_score = total_score
         except Exception as e:
             logger.warning(f"挑战评分失败: {e}")
 

@@ -56,24 +56,54 @@ async def submit_challenge(
 ):
     """提交挑战录音"""
     import os
+    import tempfile
+    import subprocess
 
-    # 保存录音文件
-    upload_dir = os.path.join("uploads", "challenges")
-    os.makedirs(upload_dir, exist_ok=True)
-    ext = os.path.splitext(audio.filename or "audio.webm")[1] or ".webm"
-    file_path = os.path.join(upload_dir, f"user_{current_user.id}_challenge_{challenge_id}_{int(os.times().elapsed * 1000)}{ext}")
-    content = await audio.read()
-    with open(file_path, "wb") as f:
-        f.write(content)
+    suffix = ".webm"
+    if audio.filename and "." in audio.filename:
+        suffix = os.path.splitext(audio.filename)[1] or ".webm"
 
-    result = community_service.submit_challenge(
-        current_user.id, challenge_id, file_path, db
-    )
-    db.commit()
-    return SubmissionResult(
-        submission=SubmissionItem(**result["submission"]),
-        rank=result.get("rank"),
-    )
+    tmp_path = None
+    converted_path = None
+
+    try:
+        with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
+            content = await audio.read()
+            tmp.write(content)
+            tmp_path = tmp.name
+
+        if len(content) < 1000:
+            from fastapi import HTTPException
+            raise HTTPException(status_code=422, detail="录音太短，请重新录制")
+
+        # 转码为 16kHz WAV
+        converted_path = tmp_path + "_converted.wav"
+        subprocess.run(
+            ["ffmpeg", "-y", "-i", tmp_path,
+             "-ac", "1", "-ar", "16000", "-sample_fmt", "s16",
+             converted_path],
+            check=True, capture_output=True,
+        )
+
+        result = community_service.submit_challenge(
+            current_user.id, challenge_id, converted_path, db
+        )
+        db.commit()
+        return SubmissionResult(
+            submission=SubmissionItem(**result["submission"]),
+            rank=result.get("rank"),
+        )
+
+    except subprocess.CalledProcessError:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=422, detail="音频格式无法识别，请确认录音正常")
+    finally:
+        for path in (tmp_path, converted_path):
+            try:
+                if path and os.path.exists(path):
+                    os.unlink(path)
+            except Exception:
+                pass
 
 
 @router.get("/challenges/{challenge_id}/leaderboard", response_model=LeaderboardResponse)

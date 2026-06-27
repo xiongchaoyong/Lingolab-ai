@@ -11,6 +11,11 @@ const ROLES = [
   { id: 'interviewee', title: '面试者', subtitle: 'AI 扮演面试官', emoji: '💼', color: '#A78BFA' },
   { id: 'waiter', title: '服务员', subtitle: 'AI 扮演顾客', emoji: '🍽️', color: '#5AD8A6' },
   { id: 'guide', title: '导游', subtitle: 'AI 扮演游客', emoji: '🗺️', color: '#5B8FF9' },
+  { id: 'doctor', title: '医生', subtitle: 'AI 扮演患者', emoji: '🩺', color: '#E74C3C' },
+  { id: 'teacher', title: '老师', subtitle: 'AI 扮演学生', emoji: '📚', color: '#F39C12' },
+  { id: 'customer_service', title: '客服', subtitle: 'AI 扮演顾客', emoji: '📞', color: '#3498DB' },
+  { id: 'receptionist', title: '前台接待', subtitle: 'AI 扮演酒店客人', emoji: '🛎️', color: '#1ABC9C' },
+  { id: 'colleague', title: '同事', subtitle: 'AI 扮演新同事', emoji: '🤝', color: '#9B59B6' },
 ]
 
 const phase = ref('select')
@@ -513,7 +518,7 @@ onUnmounted(() => { hangUp() })
   .select-subtitle { color: #999; font-size: 15px; }
 }
 @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
-.rp-role-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; padding: 28px 20px; max-width: 440px; margin: 0 auto; }
+.rp-role-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; padding: 28px 20px; max-width: 900px; margin: 0 auto; }
 .rp-role-card { background: #fff; border: 2px solid #F0E8FF; border-radius: 20px; padding: 24px 16px; text-align: center; cursor: pointer; transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1); box-shadow: 0 2px 12px rgba(0,0,0,0.04);
   &:hover { border-color: var(--accent); transform: translateY(-3px); box-shadow: 0 8px 24px rgba(0,0,0,0.08); }
   .rrc-emoji { font-size: 40px; margin-bottom: 10px; }

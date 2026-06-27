@@ -112,13 +112,14 @@ function playAudio(url) {
 </script>
 
 <template>
-  <div class="content-card">
+  <div class="content-card homework-page">
     <div class="flex-between" style="margin-bottom: var(--spacing-xl);">
       <h2 class="page-title" style="margin-bottom:0;">作业管理</h2>
       <el-button type="primary" :icon="Plus" @click="showAssignDialog = true">布置作业</el-button>
     </div>
 
-    <el-table :data="store.assignments" stripe v-loading="loading">
+    <div class="homework-table-wrap">
+      <el-table :data="store.assignments" stripe v-loading="loading" height="100%">
       <el-table-column prop="title" label="作业标题" min-width="160" />
       <el-table-column prop="class_name" label="班级" width="140" />
       <el-table-column prop="content_type" label="类型" width="100">
@@ -145,11 +146,12 @@ function playAudio(url) {
         </template>
       </el-table-column>
     </el-table>
+    </div>
 
     <el-empty v-if="store.assignments.length === 0 && !loading" description="暂无作业" />
 
     <!-- 布置作业对话框 -->
-    <el-dialog v-model="showAssignDialog" title="布置作业" width="480px">
+    <el-dialog v-model="showAssignDialog" title="布置作业" width="480px" :close-on-click-modal="false">
       <el-form label-position="top">
         <el-form-item label="作业标题">
           <el-input v-model="newHomework.title" placeholder="如：Unit 3 跟读练习" maxlength="200" />
@@ -178,7 +180,7 @@ function playAudio(url) {
     </el-dialog>
 
     <!-- 提交列表对话框 -->
-    <el-dialog v-model="showSubmissionsDialog" title="作业提交" width="700px">
+    <el-dialog v-model="showSubmissionsDialog" title="作业提交" width="700px" :close-on-click-modal="false">
       <el-table :data="store.submissions" stripe max-height="400">
         <el-table-column prop="username" label="学生" width="120" />
         <el-table-column prop="audio_url" label="录音" width="80">
@@ -214,7 +216,7 @@ function playAudio(url) {
     </el-dialog>
 
     <!-- 点评对话框 -->
-    <el-dialog v-model="showReviewDialog" title="作业点评" width="480px">
+    <el-dialog v-model="showReviewDialog" title="作业点评" width="480px" :close-on-click-modal="false">
       <el-form label-position="top">
         <el-form-item label="教师评分">
           <el-input-number v-model="reviewForm.teacher_score" :min="0" :max="100" />
@@ -230,3 +232,17 @@ function playAudio(url) {
     </el-dialog>
   </div>
 </template>
+
+<style lang="scss" scoped>
+.homework-page {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 56px - var(--spacing-xl) * 2);
+}
+
+.homework-table-wrap {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+</style>

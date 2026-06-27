@@ -112,7 +112,7 @@ async def submit_challenge_level(
         # 持久化分数到画像
         try:
             profile_updater.ingest_pronunciation_scores(
-                current_user.id, result.get("dimensions", {}), source_id=0, db=db
+                current_user.id, result.get("dimensions_list", []), source_id=0, db=db
             )
             db.commit()
         except Exception as e:

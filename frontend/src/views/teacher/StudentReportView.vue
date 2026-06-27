@@ -66,10 +66,11 @@ const radarOption = computed(() => {
 </script>
 
 <template>
-  <div class="content-card">
+  <div class="content-card report-page">
     <h2 class="page-title">学生报告</h2>
 
-    <el-table v-loading="loading" :data="students" stripe empty-text="暂无学生数据">
+    <div class="report-table-wrap">
+      <el-table v-loading="loading" :data="students" stripe empty-text="暂无学生数据" height="100%">
       <el-table-column prop="username" label="姓名" width="120" />
       <el-table-column prop="level_final" label="CEFR" width="80">
         <template #default="{ row }"><el-tag size="small">{{ row.level_final }}</el-tag></template>
@@ -84,8 +85,9 @@ const radarOption = computed(() => {
         </template>
       </el-table-column>
     </el-table>
+    </div>
 
-    <el-dialog v-model="showDetail" :title="`${selectedStudent?.username} 学习详情`" width="600px" destroy-on-close>
+    <el-dialog v-model="showDetail" :title="`${selectedStudent?.username} 学习详情`" width="600px" destroy-on-close :close-on-click-modal="false">
       <div v-if="detailLoading" v-loading="true" style="height: 200px;"></div>
       <template v-else-if="studentDetail">
         <div style="margin-bottom: var(--spacing-md); display: flex; gap: var(--spacing-lg);">
@@ -123,3 +125,17 @@ const radarOption = computed(() => {
     </el-dialog>
   </div>
 </template>
+
+<style lang="scss" scoped>
+.report-page {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 56px - var(--spacing-xl) * 2);
+}
+
+.report-table-wrap {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+</style>

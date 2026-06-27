@@ -134,9 +134,11 @@ class DailyChallengeService:
         from app.services.pronunciation import score_audio
 
         result = await score_audio(audio_path, text, mode)
+        dimensions_list = result.get("dimensions", [])
         return {
             "overall": result.get("overall", 0),
-            "dimensions": {d["name"]: d["score"] for d in result.get("dimensions", [])},
+            "dimensions": {d["label"]: d["score"] for d in dimensions_list},
+            "dimensions_list": dimensions_list,  # 供 ingest_pronunciation_scores 使用
         }
 
     def award_daily_points(

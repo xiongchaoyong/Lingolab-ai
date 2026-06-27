@@ -52,8 +52,11 @@ function backToClipList() {
 
 // ===== 勋章墙 =====
 
-function handleBadgeTab() {
-  if (store.badges.length === 0) {
+function handleTabChange(tabName) {
+  if (tabName === 'dubbing' && store.dubbingContent.length === 0) {
+    store.fetchDubbingContent()
+  }
+  if (tabName === 'badges' && store.badges.length === 0) {
     store.fetchBadges()
   }
 }
@@ -63,7 +66,7 @@ function handleBadgeTab() {
   <div class="content-card">
     <h2 class="page-title">游戏化闯关</h2>
 
-    <el-tabs v-model="tabActive">
+    <el-tabs v-model="tabActive" @tab-change="handleTabChange">
       <!-- 每日闯关 -->
       <el-tab-pane label="每日闯关" name="daily">
         <div class="points-banner">
@@ -131,23 +134,19 @@ function handleBadgeTab() {
       </el-tab-pane>
 
       <!-- 配音挑战 -->
-      <el-tab-pane label="配音挑战" name="dubbing" @tab-change="handleBadgeTab">
+      <el-tab-pane label="配音挑战" name="dubbing">
         <!-- 内容列表 -->
-        <el-row v-if="!selectedClip" :gutter="16">
-          <el-col :span="12" v-for="clip in store.dubbingContent" :key="clip.id">
-            <div class="dubbing-card" @click="startDubbing(clip)">
-              <h4>{{ clip.title }}</h4>
-              <p class="dubbing-line">"{{ clip.subtitle }}"</p>
-              <div class="dubbing-meta">
-                <el-tag size="small">{{ clip.difficulty === 'easy' ? '简单' : clip.difficulty === 'medium' ? '中等' : '困难' }}</el-tag>
-                <span>{{ clip.duration }}s</span>
-              </div>
+        <div v-if="!selectedClip" class="dubbing-grid">
+          <div v-for="clip in store.dubbingContent" :key="clip.id" class="dubbing-card" @click="startDubbing(clip)">
+            <h4>{{ clip.title }}</h4>
+            <p class="dubbing-line">"{{ clip.subtitle }}"</p>
+            <div class="dubbing-meta">
+              <el-tag size="small">{{ clip.difficulty === 'easy' ? '简单' : clip.difficulty === 'medium' ? '中等' : '困难' }}</el-tag>
+              <span>{{ clip.duration }}s</span>
             </div>
-          </el-col>
-          <el-col :span="24" v-if="store.dubbingContent.length === 0 && !store.dubbingLoading">
-            <el-empty description="暂无配音内容" />
-          </el-col>
-        </el-row>
+          </div>
+          <el-empty v-if="store.dubbingContent.length === 0 && !store.dubbingLoading" description="暂无配音内容" style="grid-column: 1 / -1;" />
+        </div>
 
         <!-- 配音详情 -->
         <div v-else class="dubbing-active">
@@ -186,24 +185,20 @@ function handleBadgeTab() {
       </el-tab-pane>
 
       <!-- 勋章墙 -->
-      <el-tab-pane label="勋章墙" name="badges" @tab-change="handleBadgeTab">
+      <el-tab-pane label="勋章墙" name="badges">
         <div v-if="store.badgesLoading" v-loading="store.badgesLoading" style="min-height: 200px;" />
-        <el-row v-else :gutter="12">
-          <el-col :span="8" v-for="badge in store.badges" :key="badge.badge_type">
-            <div class="badge-card" :class="{ earned: badge.earned }">
-              <el-icon :size="36" :color="badge.earned ? 'var(--color-warning)' : 'var(--color-text-disabled)'">
-                <Medal />
-              </el-icon>
-              <h4>{{ badge.badge_name }}</h4>
-              <p>{{ badge.description }}</p>
-              <el-tag v-if="badge.earned" type="warning" size="small">已获得</el-tag>
-              <el-tag v-else type="info" size="small">未获得</el-tag>
-            </div>
-          </el-col>
-          <el-col :span="24" v-if="store.badges.length === 0">
-            <el-empty description="暂无勋章数据" />
-          </el-col>
-        </el-row>
+        <div v-else class="badge-grid">
+          <div v-for="badge in store.badges" :key="badge.badge_type" class="badge-card" :class="{ earned: badge.earned }">
+            <el-icon :size="36" :color="badge.earned ? 'var(--color-warning)' : 'var(--color-text-disabled)'">
+              <Medal />
+            </el-icon>
+            <h4>{{ badge.badge_name }}</h4>
+            <p>{{ badge.description }}</p>
+            <el-tag v-if="badge.earned" type="warning" size="small">已获得</el-tag>
+            <el-tag v-else type="info" size="small">未获得</el-tag>
+          </div>
+          <el-empty v-if="store.badges.length === 0" description="暂无勋章数据" style="grid-column: 1 / -1;" />
+        </div>
       </el-tab-pane>
     </el-tabs>
   </div>
@@ -217,26 +212,32 @@ function handleBadgeTab() {
   strong { font-size: var(--font-size-xl); color: var(--color-warning); }
 }
 
+.level-list {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: var(--spacing-md);
+}
+
 .level-card {
-  display: flex; align-items: center; gap: var(--spacing-lg);
+  display: flex; flex-direction: column; align-items: center; gap: var(--spacing-md);
   padding: var(--spacing-lg); border: 2px solid var(--color-border); border-radius: var(--radius-md);
-  margin-bottom: var(--spacing-md); transition: border-color 0.2s;
+  text-align: center; transition: border-color 0.2s;
   &.active { border-color: var(--color-primary); }
   &.passed { border-color: var(--color-success); background: rgba(var(--color-success-rgb), 0.04); }
   &.failed { border-color: var(--color-danger); }
 }
 
-.level-left { text-align: center; min-width: 48px;
-  .level-num { font-size: var(--font-size-xl); font-weight: 700; }
-  .level-stars { font-size: 12px; color: var(--color-warning); }
+.level-left { text-align: center;
+  .level-num { font-size: var(--font-size-xxl); font-weight: 700; }
+  .level-stars { font-size: 12px; color: var(--color-warning); display: block; }
 }
 
 .level-body { flex: 1;
-  .level-text { font-weight: 500; margin-bottom: var(--spacing-xs); }
-  .level-requirement { font-size: var(--font-size-sm); color: var(--color-text-secondary); margin-left: var(--spacing-sm); }
+  .level-text { font-weight: 500; margin-bottom: var(--spacing-xs); font-size: var(--font-size-sm); }
+  .level-requirement { font-size: var(--font-size-xs); color: var(--color-text-secondary); display: block; margin-top: var(--spacing-xs); }
 }
 
-.level-action { min-width: 120px; text-align: right; }
+.level-action { min-width: auto; }
 
 .scoring-hint {
   display: flex; align-items: center; gap: var(--spacing-xs); color: var(--color-text-secondary);
@@ -249,9 +250,15 @@ function handleBadgeTab() {
   font-weight: 600; color: var(--color-success);
 }
 
+.dubbing-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--spacing-base);
+}
+
 .dubbing-card {
   padding: var(--spacing-xl); background: var(--color-bg-primary); border: 1px solid var(--color-border);
-  border-radius: var(--radius-md); cursor: pointer; margin-bottom: var(--spacing-base);
+  border-radius: var(--radius-md); cursor: pointer;
   &:hover { box-shadow: var(--shadow-hover); }
   h4 { margin-bottom: var(--spacing-sm); }
   .dubbing-line { color: var(--color-text-secondary); font-style: italic; margin-bottom: var(--spacing-md); }
@@ -272,9 +279,15 @@ function handleBadgeTab() {
   .score-overall { text-align: center; font-size: var(--font-size-xl); font-weight: 700; margin-bottom: var(--spacing-lg); }
 }
 
+.badge-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--spacing-base);
+}
+
 .badge-card {
   text-align: center; padding: var(--spacing-xl); background: var(--color-bg-primary);
-  border: 1px solid var(--color-border); border-radius: var(--radius-md); margin-bottom: var(--spacing-base);
+  border: 1px solid var(--color-border); border-radius: var(--radius-md);
   &.earned { border-color: var(--color-warning); }
   h4 { margin: var(--spacing-sm) 0 var(--spacing-xs); font-size: var(--font-size-sm); }
   p { font-size: var(--font-size-sm); color: var(--color-text-secondary); margin-bottom: var(--spacing-md); }

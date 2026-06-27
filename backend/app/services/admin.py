@@ -348,7 +348,7 @@ class TeacherService:
             recent_activities.append({
                 "dimension": s.dimension,
                 "score": float(s.score),
-                "source_type": s.source_type,
+                "source_type": s.source,
                 "created_at": s.created_at.isoformat() if s.created_at else "",
             })
 
