@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field
 
 
 class ConversationStartRequest(BaseModel):
-    scene: str = Field(default="self_intro", description="场景标识: self_intro/directions/shopping/restaurant")
+    scene: str = Field(default="self_intro", description="场景标识: self_intro/directions/shopping/restaurant/hotel/airport/hospital/school")
     cefr_level: str = Field(default="B1", description="CEFR 等级: A1/A2/B1/B2")
 
 

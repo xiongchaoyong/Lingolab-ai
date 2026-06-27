@@ -90,7 +90,7 @@ async function readSSEStream(resp, callbacks) {
 
 /**
  * 开始新对话
- * @param {string} scene - 场景: self_intro/directions/shopping/restaurant
+ * @param {string} scene - 场景: self_intro/directions/shopping/restaurant/hotel/airport/hospital/school
  * @param {string} cefrLevel - CEFR 等级: A1/A2/B1/B2
  * @returns {Promise<{session_id: string, ai_text: string, ai_audio_base64: string}>}
  */

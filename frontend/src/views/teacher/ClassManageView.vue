@@ -87,7 +87,7 @@ function getLevelTag(level) {
 </script>
 
 <template>
-  <div class="content-card">
+  <div class="content-card class-manage-page">
     <div class="flex-between" style="margin-bottom: var(--spacing-xl);">
       <h2 class="page-title" style="margin-bottom:0;">班级管理</h2>
       <div style="display:flex;gap:var(--spacing-sm);">
@@ -96,7 +96,8 @@ function getLevelTag(level) {
       </div>
     </div>
 
-    <el-table :data="store.classes" stripe v-loading="loading">
+    <div class="class-table-wrap">
+      <el-table :data="store.classes" stripe v-loading="loading" height="100%">
       <el-table-column prop="name" label="班级名称" min-width="140" />
       <el-table-column prop="level_range" label="等级范围" width="100">
         <template #default="{ row }">
@@ -121,11 +122,12 @@ function getLevelTag(level) {
         </template>
       </el-table-column>
     </el-table>
+    </div>
 
     <el-empty v-if="store.classes.length === 0 && !loading" description="暂无班级，创建班级并分享邀请码给学生加入" />
 
     <!-- 创建班级对话框 -->
-    <el-dialog v-model="showCreateDialog" title="创建班级" width="440px">
+    <el-dialog v-model="showCreateDialog" title="创建班级" width="440px" :close-on-click-modal="false">
       <el-form label-position="top">
         <el-form-item label="班级名称">
           <el-input v-model="newClass.name" placeholder="如：初级英语A班" maxlength="100" />
@@ -148,7 +150,7 @@ function getLevelTag(level) {
     </el-dialog>
 
     <!-- 学生列表对话框 -->
-    <el-dialog v-model="showStudentsDialog" title="班级学生" width="560px">
+    <el-dialog v-model="showStudentsDialog" title="班级学生" width="560px" :close-on-click-modal="false">
       <el-table :data="store.students" stripe max-height="400">
         <el-table-column prop="username" label="用户名" width="140" />
         <el-table-column prop="level_final" label="CEFR" width="80">
@@ -170,7 +172,7 @@ function getLevelTag(level) {
     </el-dialog>
 
     <!-- 加入班级对话框 -->
-    <el-dialog v-model="showJoinDialog" title="加入班级" width="400px">
+    <el-dialog v-model="showJoinDialog" title="加入班级" width="400px" :close-on-click-modal="false">
       <el-form label-position="top">
         <el-form-item label="邀请码">
           <el-input v-model="inviteCode" placeholder="输入教师提供的邀请码" />
@@ -183,3 +185,17 @@ function getLevelTag(level) {
     </el-dialog>
   </div>
 </template>
+
+<style lang="scss" scoped>
+.class-manage-page {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 56px - var(--spacing-xl) * 2);
+}
+
+.class-table-wrap {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+</style>

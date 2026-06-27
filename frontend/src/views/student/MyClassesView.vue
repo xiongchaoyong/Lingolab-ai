@@ -42,30 +42,32 @@ async function handleJoin() {
 </script>
 
 <template>
-  <div class="content-card">
+  <div class="content-card classes-page">
     <div class="flex-between" style="margin-bottom: var(--spacing-xl);">
       <h2 class="page-title" style="margin-bottom:0;">我的班级</h2>
       <el-button type="primary" @click="showJoinDialog = true">加入班级</el-button>
     </div>
 
-    <el-table v-loading="loading" :data="classes" stripe>
-      <el-table-column prop="name" label="班级名称" min-width="160" />
-      <el-table-column prop="teacher_name" label="教师" width="120" />
-      <el-table-column prop="level_range" label="等级范围" width="100">
-        <template #default="{ row }">
-          <el-tag size="small" v-if="row.level_range">{{ row.level_range }}</el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column prop="student_count" label="学生数" width="80" />
-      <el-table-column prop="joined_at" label="加入时间" width="120">
-        <template #default="{ row }">{{ row.joined_at?.slice(0, 10) }}</template>
-      </el-table-column>
-    </el-table>
+    <div class="classes-table-wrap">
+      <el-table v-loading="loading" :data="classes" stripe height="100%">
+        <el-table-column prop="name" label="班级名称" min-width="160" />
+        <el-table-column prop="teacher_name" label="教师" width="120" />
+        <el-table-column prop="level_range" label="等级范围" width="100">
+          <template #default="{ row }">
+            <el-tag size="small" v-if="row.level_range">{{ row.level_range }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="student_count" label="学生数" width="80" />
+        <el-table-column prop="joined_at" label="加入时间" width="120">
+          <template #default="{ row }">{{ row.joined_at?.slice(0, 10) }}</template>
+        </el-table-column>
+      </el-table>
+    </div>
 
     <el-empty v-if="!loading && classes.length === 0" description="暂未加入任何班级，点击上方按钮通过邀请码加入" />
 
     <!-- 加入班级对话框 -->
-    <el-dialog v-model="showJoinDialog" title="加入班级" width="400px">
+    <el-dialog v-model="showJoinDialog" title="加入班级" width="400px" :close-on-click-modal="false">
       <el-form label-position="top">
         <el-form-item label="邀请码">
           <el-input v-model="inviteCode" placeholder="输入教师提供的邀请码" />
@@ -78,3 +80,17 @@ async function handleJoin() {
     </el-dialog>
   </div>
 </template>
+
+<style lang="scss" scoped>
+.classes-page {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 56px - var(--spacing-xl) * 2);
+}
+
+.classes-table-wrap {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+</style>

@@ -64,60 +64,62 @@ function getStatusLabel(submission) {
 </script>
 
 <template>
-  <div class="content-card">
+  <div class="content-card homework-page">
     <h2 class="page-title">我的作业</h2>
 
-    <el-table v-loading="loading" :data="assignments" stripe>
-      <el-table-column prop="title" label="作业标题" min-width="160" />
-      <el-table-column prop="class_name" label="班级" width="140" />
-      <el-table-column prop="content_type" label="类型" width="100">
-        <template #default="{ row }">
-          <el-tag size="small">{{ getContentTypeLabel(row.content_type) }}</el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column prop="due_date" label="截止日期" width="120">
-        <template #default="{ row }">{{ row.due_date?.slice(0, 10) || '-' }}</template>
-      </el-table-column>
-      <el-table-column label="提交状态" width="120">
-        <template #default="{ row }">
-          <el-tag size="small" :type="getStatusTag(row.my_submission)">
-            {{ getStatusLabel(row.my_submission) }}
-          </el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column label="AI评分" width="80">
-        <template #default="{ row }">
-          {{ row.my_submission?.score != null ? Math.round(row.my_submission.score) : '-' }}
-        </template>
-      </el-table-column>
-      <el-table-column label="教师点评" min-width="160">
-        <template #default="{ row }">
-          <template v-if="row.my_submission?.teacher_feedback">
-            <span style="color: var(--color-primary);">{{ row.my_submission.teacher_feedback }}</span>
-            <span v-if="row.my_submission.teacher_score != null" style="margin-left: 8px; color: var(--color-text-secondary);">
-              {{ Math.round(row.my_submission.teacher_score) }}分
-            </span>
+    <div class="homework-table-wrap">
+      <el-table v-loading="loading" :data="assignments" stripe height="100%">
+        <el-table-column prop="title" label="作业标题" min-width="160" />
+        <el-table-column prop="class_name" label="班级" width="140" />
+        <el-table-column prop="content_type" label="类型" width="100">
+          <template #default="{ row }">
+            <el-tag size="small">{{ getContentTypeLabel(row.content_type) }}</el-tag>
           </template>
-          <span v-else style="color: var(--color-text-disabled);">-</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="操作" width="100">
-        <template #default="{ row }">
-          <el-button
-            size="small"
-            :type="row.my_submission ? 'default' : 'primary'"
-            @click="openSubmit(row)"
-          >
-            {{ row.my_submission ? '重新提交' : '提交' }}
-          </el-button>
-        </template>
-      </el-table-column>
-    </el-table>
+        </el-table-column>
+        <el-table-column prop="due_date" label="截止日期" width="120">
+          <template #default="{ row }">{{ row.due_date?.slice(0, 10) || '-' }}</template>
+        </el-table-column>
+        <el-table-column label="提交状态" width="120">
+          <template #default="{ row }">
+            <el-tag size="small" :type="getStatusTag(row.my_submission)">
+              {{ getStatusLabel(row.my_submission) }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="AI评分" width="80">
+          <template #default="{ row }">
+            {{ row.my_submission?.score != null ? Math.round(row.my_submission.score) : '-' }}
+          </template>
+        </el-table-column>
+        <el-table-column label="教师点评" min-width="160">
+          <template #default="{ row }">
+            <template v-if="row.my_submission?.teacher_feedback">
+              <span style="color: var(--color-primary);">{{ row.my_submission.teacher_feedback }}</span>
+              <span v-if="row.my_submission.teacher_score != null" style="margin-left: 8px; color: var(--color-text-secondary);">
+                {{ Math.round(row.my_submission.teacher_score) }}分
+              </span>
+            </template>
+            <span v-else style="color: var(--color-text-disabled);">-</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="100" fixed="right">
+          <template #default="{ row }">
+            <el-button
+              size="small"
+              :type="row.my_submission ? 'default' : 'primary'"
+              @click="openSubmit(row)"
+            >
+              {{ row.my_submission ? '重新提交' : '提交' }}
+            </el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+    </div>
 
     <el-empty v-if="!loading && assignments.length === 0" description="暂无作业" />
 
     <!-- 提交作业对话框 -->
-    <el-dialog v-model="showSubmitDialog" title="提交作业" width="460px">
+    <el-dialog v-model="showSubmitDialog" title="提交作业" width="460px" :close-on-click-modal="false">
       <el-form label-position="top">
         <el-form-item label="作业标题">
           <el-input :model-value="currentAssignment?.title" disabled />
@@ -133,3 +135,17 @@ function getStatusLabel(submission) {
     </el-dialog>
   </div>
 </template>
+
+<style lang="scss" scoped>
+.homework-page {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 56px - var(--spacing-xl) * 2);
+}
+
+.homework-table-wrap {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+</style>

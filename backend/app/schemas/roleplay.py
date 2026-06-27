@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field
 
 
 class RoleplayStartRequest(BaseModel):
-    role: str = Field(default="interviewee", description="角色: interviewee/waiter/guide")
+    role: str = Field(default="interviewee", description="角色: interviewee/waiter/guide/doctor/teacher/customer_service/receptionist/colleague")
     cefr_level: str = Field(default="B1", description="CEFR 等级: A1/A2/B1/B2")
 
 

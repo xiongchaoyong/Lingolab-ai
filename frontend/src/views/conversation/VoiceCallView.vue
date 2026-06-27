@@ -15,6 +15,10 @@ const SCENARIOS = [
   { id: 'directions', title: '问路指路', subtitle: '帮助迷路的朋友', emoji: '🗺️', color: '#5B8FF9' },
   { id: 'shopping', title: '购物', subtitle: '一起逛街购物', emoji: '🛍️', color: '#F6BD16' },
   { id: 'restaurant', title: '餐厅', subtitle: '享受美食时光', emoji: '🍽️', color: '#5AD8A6' },
+  { id: 'hotel', title: '酒店入住', subtitle: '办理入住与咨询', emoji: '🏨', color: '#F5A623' },
+  { id: 'airport', title: '机场出行', subtitle: '值机登机与问询', emoji: '✈️', color: '#4A90D9' },
+  { id: 'hospital', title: '医院就诊', subtitle: '看病就医场景', emoji: '🏥', color: '#E74C3C' },
+  { id: 'school', title: '校园生活', subtitle: '学校日常交流', emoji: '🏫', color: '#2ECC71' },
 ]
 
 // ========== 状态 ==========
@@ -827,10 +831,10 @@ onUnmounted(() => {
 
 .call-scenario-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 14px;
   padding: 28px 20px;
-  max-width: 440px;
+  max-width: 900px;
   margin: 0 auto;
 }
 

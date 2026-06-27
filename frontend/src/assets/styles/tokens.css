@@ -4,15 +4,15 @@
 
 :root {
   /* 品牌色 (淡紫薰衣草色系) */
-  --color-primary: #A78BFA;
-  --color-primary-rgb: 167, 139, 250;
-  --color-primary-light: #C4B5FD;
-  --color-primary-lighter: #DDD6FE;
-  --color-primary-dark: #8B6FD8;
+  --color-primary: #7C3AED;
+  --color-primary-rgb: 124, 58, 237;
+  --color-primary-light: #A78BFA;
+  --color-primary-lighter: #C4B5FD;
+  --color-primary-dark: #6D28D9;
 
-  --color-secondary: #C4B5FD;
-  --color-secondary-rgb: 196, 181, 253;
-  --color-secondary-light: #DDD6FE;
+  --color-secondary: #A78BFA;
+  --color-secondary-rgb: 167, 139, 250;
+  --color-secondary-light: #C4B5FD;
 
   --color-accent-blue: #93C5FD;
   --color-accent-yellow: #FDE68A;
@@ -29,11 +29,11 @@
   --color-info-rgb: 147, 197, 253;
 
   /* 中性色 */
-  --color-bg-primary: #F8F7FF;
+  --color-bg-primary: #F5F3FF;
   --color-bg-secondary: #FFFFFF;
-  --color-bg-warm: #F5F3FF;
-  --color-border: #EDE7F8;
-  --color-border-light: rgba(167, 139, 250, 0.08);
+  --color-bg-warm: #EDE9FE;
+  --color-border: #DDD6FE;
+  --color-border-light: rgba(124, 58, 237, 0.08);
   --color-text-primary: #3D2F5C;
   --color-text-secondary: #7B6B9E;
   --color-text-disabled: #C4B5D4;
@@ -65,10 +65,10 @@
   --radius-lg: 16px;
 
   /* 阴影 (淡紫彩色阴影) */
-  --shadow-sm: 0 1px 3px rgba(167, 139, 250, 0.08);
-  --shadow-card: 0 3px 12px rgba(167, 139, 250, 0.10), 0 1px 3px rgba(167, 139, 250, 0.06);
-  --shadow-hover: 0 8px 24px rgba(167, 139, 250, 0.15), 0 2px 6px rgba(167, 139, 250, 0.08);
-  --shadow-modal: 0 16px 40px rgba(167, 139, 250, 0.18), 0 4px 12px rgba(167, 139, 250, 0.10);
+  --shadow-sm: 0 1px 3px rgba(124, 58, 237, 0.08);
+  --shadow-card: 0 3px 12px rgba(124, 58, 237, 0.10), 0 1px 3px rgba(124, 58, 237, 0.06);
+  --shadow-hover: 0 8px 24px rgba(124, 58, 237, 0.15), 0 2px 6px rgba(124, 58, 237, 0.08);
+  --shadow-modal: 0 16px 40px rgba(124, 58, 237, 0.18), 0 4px 12px rgba(124, 58, 237, 0.10);
 
   /* 动画 */
   --transition-fast: 150ms ease;
@@ -85,8 +85,8 @@
 
 /* 辅助色 */
 :root {
-  --color-macaron-purple: #A78BFA;
-  --color-macaron-lavender: #C4B5FD;
+  --color-macaron-purple: #7C3AED;
+  --color-macaron-lavender: #A78BFA;
   --color-macaron-blue: #93C5FD;
   --color-macaron-yellow: #FDE68A;
   --color-macaron-mint: #86EFAC;

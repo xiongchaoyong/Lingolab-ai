@@ -96,6 +96,10 @@ async def conversation_start(
         "directions": "You are lost. Ask the user for directions to a nearby place.",
         "shopping": "Welcome the customer and ask what they are looking for.",
         "restaurant": "Greet the customer and ask if they have a reservation.",
+        "hotel": "Greet the guest arriving at the hotel and ask if they have a reservation.",
+        "airport": "Greet the passenger at the check-in counter and ask for their destination.",
+        "hospital": "Greet the patient and ask what symptoms they are experiencing.",
+        "school": "Greet the new classmate and ask about their major and interests.",
     }
     opener = scene_openers.get(scene, scene_openers["self_intro"])
 

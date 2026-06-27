@@ -591,9 +591,6 @@ function handleCommand(command) {
   max-width: var(--content-max-width);
   margin: 0 auto;
   width: 100%;
-  background-image:
-    radial-gradient(ellipse at 20% 0%, rgba(var(--color-primary-rgb), 0.04) 0%, transparent 50%),
-    radial-gradient(ellipse at 80% 100%, rgba(var(--color-secondary-rgb), 0.04) 0%, transparent 50%);
 }
 
 /* 全屏内容区 — 用于 AI 智能对话等需要铺满的页面 */

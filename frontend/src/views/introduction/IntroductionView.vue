@@ -1,78 +1,85 @@
 <script setup>
-const pipeline = [
-  { label: '语音输入', tech: 'Whisper ASR', icon: 'Microphone', color: 'var(--color-success)' },
-  { label: '文本理解', tech: 'LLM 意图识别', icon: 'ChatDotRound', color: 'var(--color-primary)' },
-  { label: '多维评分', tech: 'GOP + GEC', icon: 'DataLine', color: 'var(--color-warning)' },
-  { label: '智能回复', tech: 'DeepSeek', icon: 'Service', color: '#8B5CF6' },
-  { label: '语音合成', tech: 'TTS 输出', icon: 'Headset', color: 'var(--color-danger)' },
+const competencies = [
+  {
+    title: '实时语音对话',
+    subtitle: '像真人一样自然交流',
+    icon: 'Headset',
+    color: '#6366F1',
+    gradient: 'linear-gradient(135deg, #6366F1, #8B5CF6)',
+    highlights: [
+      'ASR → LLM → TTS 端到端管线',
+      '60+ 真实场景（餐厅/面试/旅行…）',
+      '自适应语速与难度，流式秒回',
+    ],
+  },
+  {
+    title: '专业发音评测',
+    subtitle: '比老师更懂你的发音',
+    icon: 'Microphone',
+    color: '#10B981',
+    gradient: 'linear-gradient(135deg, #10B981, #34D399)',
+    highlights: [
+      '音素/重音/连读/语调/节奏 五维评分',
+      'wav2vec2 + GOP + CTC 强制对齐',
+      '音素级波形对比，定位每个发音问题',
+      '针对性纠音建议与练习自动生成',
+    ],
+  },
+  {
+    title: '个性化学习路径',
+    subtitle: 'AI 为你量身定制',
+    icon: 'Guide',
+    color: '#F59E0B',
+    gradient: 'linear-gradient(135deg, #F59E0B, #FBBF24)',
+    highlights: [
+      '智能测评 → 路径规划 → 内容推荐 → 效果预测',
+      '知识图谱（NetworkX BFS/拓扑排序）',
+      '四因子推荐算法，精准匹配学习内容',
+      '学习趋势预测与流失预警',
+    ],
+  },
+  {
+    title: '全场景多年龄段',
+    subtitle: '从儿童到职场，人人适用',
+    icon: 'UserFilled',
+    color: '#3B82F6',
+    gradient: 'linear-gradient(135deg, #3B82F6, #60A5FA)',
+    highlights: [
+      '覆盖儿童 / 青少年 / 大学生 / 职场 / 中老年',
+      '日常交流 / 考试备战 / 商务谈判 / 出国留学',
+      '游戏化闯关 + 积分勋章，激发学习动力',
+    ],
+  },
+  {
+    title: '教学管理一体化',
+    subtitle: '不止是学习工具',
+    icon: 'School',
+    color: '#EC4899',
+    gradient: 'linear-gradient(135deg, #EC4899, #F472B6)',
+    highlights: [
+      '教师端：班级管理 / 作业布置 / 学生报告',
+      '运营端：数据看板 / 用户管理 / 内容审核',
+      'C 端 + B 端完整闭环',
+    ],
+  },
+  {
+    title: '低成本高性能',
+    subtitle: '先进技术，可控成本',
+    icon: 'CPU',
+    color: '#06B6D4',
+    gradient: 'linear-gradient(135deg, #06B6D4, #22D3EE)',
+    highlights: [
+      '国产千问大模型，成本远低于 GPT',
+      'ASR / 发音评测本地推理，零 API 费用',
+      'TTS 微软免费方案，4 种自然音色',
+    ],
+  },
 ]
 
-const steps = [
-  {
-    title: '个性化任务推荐', tag: '推荐',
-    scene: '首页显示：「今日推荐：国际项目电话会议（匹配你的 B1 水平）」',
-    techs: ['BERT 文本特征', '协同过滤', '强化学习路径规划'],
-  },
-  {
-    title: '语音实时转写', tag: 'ASR',
-    scene: '小王按下麦克风："the backend... we already finish the API..."——系统流式转写，边说边出字',
-    techs: ['Whisper 语音识别', 'VAD 端点检测', '流式推理'],
-  },
-  {
-    title: '多维度口语评分', tag: '评分',
-    scene: '弹窗评分—发音78分(database重音错)、语法65分(have→has)、流利度70分(uh填充词过多)',
-    techs: ['GOP 发音评分', 'GECToR 语法纠错', 'Sentence-BERT 语义相似度'],
-  },
-  {
-    title: '波形可视化对比', tag: '可视化',
-    scene: '用户发音波形 vs 标准发音波形并排对比，重音偏移位置一目了然',
-    techs: ['音素级强制对齐', 'librosa 频谱提取', 'Canvas 波形绘制'],
-  },
-  {
-    title: '针对性纠音练习', tag: '练习',
-    scene: '系统自动生成纠音卡片—播放标准音→跟读→实时反馈「重音对了！试试放进句子」',
-    techs: ['自适应练习生成', '轻量级 GOP 模型', '手机端实时评测'],
-  },
-  {
-    title: 'AI 给出地道表达', tag: 'LLM',
-    scene: 'AI 伙伴："You could say we\'ve finished the API, but we\'re still working on the database issue."',
-    techs: ['大语言模型生成', '语法润色', '难度自适应'],
-  },
-  {
-    title: '改进后再测一次', tag: '反馈',
-    scene: '小王重新说→AI实时显示：语法正确✓ 发音85分✓ "should be resolved 比 will be resolved 更自信"',
-    techs: ['实时 ASR', '增量 GEC 检查', '正向激励反馈'],
-  },
-  {
-    title: '生成学习报告', tag: '报告',
-    scene: '词汇丰富度：中等 | 语法错误3处→1处(进步中) | 薄弱音素/θ//ð/ | 推荐明日练习',
-    techs: ['话语分析', '错误聚合热力图', '自适应推荐算法'],
-  },
-]
-
-const techCards = [
-  {
-    title: '语音技术栈', desc: '从音频采集到音素评分，毫秒级实时处理',
-    icon: 'Microphone', color: 'var(--color-success)',
-    items: ['Whisper 语音识别', 'VAD 静音检测', 'GOP 发音评分', '音素强制对齐', '实时流式推理'],
-  },
-  {
-    title: 'NLP 理解引擎', desc: '语义理解、语法纠错、内容质量评估',
-    icon: 'Cpu', color: 'var(--color-primary)',
-    items: ['GECToR 语法纠错', 'BERT 语义相似度', 'LLM 意图识别', '文本特征提取', '难易度评估'],
-  },
-  {
-    title: '推荐与调度', desc: '千人千面的自适应学习路径',
-    icon: 'Guide', color: 'var(--color-warning)',
-    items: ['协同过滤', '强化学习规划', '错误模式追踪', '能力热力图', '自适应题库'],
-  },
-]
-
-const architecture = [
-  { name: '前端展示层', bg: 'rgba(var(--color-primary-rgb), 0.03)', items: ['Vue 3 + Element Plus', 'ECharts 图表', 'Canvas 波形', 'VAD 录音'] },
-  { name: 'API 网关层', bg: 'rgba(var(--color-success-rgb), 0.03)', items: ['FastAPI', 'JWT 鉴权', 'WebSocket 流式', '请求限流'] },
-  { name: 'AI 推理层', bg: 'rgba(var(--color-warning-rgb), 0.03)', items: ['Whisper ASR', 'GOP/GEC 评分', 'DeepSeek LLM', 'TTS 合成'] },
-  { name: '数据服务层', bg: 'rgba(var(--color-danger-rgb), 0.03)', items: ['MySQL', 'Redis 缓存', '音频存储', '日志分析'] },
+const userTypes = [
+  { icon: 'User', label: '学习者', desc: '提升口语能力，备战考试，职场进阶' },
+  { icon: 'Avatar', label: '教师', desc: '管理班级，布置作业，追踪学生进步' },
+  { icon: 'OfficeBuilding', label: '学校机构', desc: '部署私有化方案，统一教学管理' },
 ]
 </script>
 
@@ -80,235 +87,316 @@ const architecture = [
   <div class="intro-page">
     <!-- Hero -->
     <section class="hero">
-      <div class="hero-badge">AI · NLP · EdTech</div>
-      <h1 class="hero-title">
-        用 <span class="gradient-text">AI</span> 重新定义<br />英语口语练习
-      </h1>
-      <p class="hero-desc">
-        从语音识别到智能纠音，从对话模拟到个性化推荐——<br />ASR → NLP 评分 → LLM 生成 → TTS 合成，全链路 AI 驱动
-      </p>
+      <h1 class="hero-title">为什么选择 <span class="gradient-text">Lingolab</span></h1>
     </section>
 
-    <!-- 核心技术链路 -->
-    <section class="pipeline-section">
-      <h2 class="section-title">核心技术链路</h2>
-      <div class="pipeline">
-        <div v-for="(step, i) in pipeline" :key="step.label" class="pipeline-node">
-          <div class="pipe-icon" :style="{ background: step.color }">
-            <el-icon :size="28"><component :is="step.icon" /></el-icon>
+    <!-- 六大核心竞争力 -->
+    <section class="competencies-section">
+      <h2 class="section-title">核心能力</h2>
+      <div class="competency-grid">
+        <div
+          v-for="c in competencies" :key="c.title"
+          class="competency-card"
+        >
+          <div class="comp-icon" :style="{ background: c.gradient }">
+            <el-icon :size="26"><component :is="c.icon" /></el-icon>
           </div>
-          <div class="pipe-label">{{ step.label }}</div>
-          <div class="pipe-tech">{{ step.tech }}</div>
-          <div v-if="i < pipeline.length - 1" class="pipe-arrow">→</div>
+          <h3 class="comp-title">{{ c.title }}</h3>
+          <p class="comp-subtitle">{{ c.subtitle }}</p>
+          <ul class="comp-highlights">
+            <li v-for="h in c.highlights" :key="h">{{ h }}</li>
+          </ul>
         </div>
       </div>
     </section>
 
-    <!-- 8步学习流程 -->
-    <section class="workflow-section">
-      <h2 class="section-title">一次完整的学习过程</h2>
-      <p class="section-desc">以「商务电话会议」场景为例，8 步走通 AI 口语训练全流程</p>
-      <div class="steps">
-        <div v-for="(s, i) in steps" :key="i" class="step-card">
-          <div class="step-number">{{ i + 1 }}</div>
-          <div class="step-body">
-            <div class="step-header">
-              <h3>{{ s.title }}</h3>
-              <el-tag size="small" effect="plain">{{ s.tag }}</el-tag>
-            </div>
-            <p class="step-scene">{{ s.scene }}</p>
-            <div class="step-tech">
-              <el-tag v-for="t in s.techs" :key="t" size="small">{{ t }}</el-tag>
-            </div>
+    <!-- 学习流程 -->
+    <section class="flow-section">
+      <h2 class="section-title">三步开始学习</h2>
+      <div class="flow-cards">
+        <div class="flow-card">
+          <div class="flow-icon-wrap" style="background: rgba(99, 102, 241, 0.1); color: #6366F1;">
+            <el-icon :size="32"><Microphone /></el-icon>
           </div>
+          <h3>开口说</h3>
+          <p>选择场景，按下录音，<br>AI 实时转写 + 实时对话</p>
+        </div>
+        <div class="flow-card">
+          <div class="flow-icon-wrap" style="background: rgba(16, 185, 129, 0.1); color: #10B981;">
+            <el-icon :size="32"><DataAnalysis /></el-icon>
+          </div>
+          <h3>AI 分析</h3>
+          <p>音素级评测 + 语法纠错 +<br>流利度评估，多维诊断</p>
+        </div>
+        <div class="flow-card">
+          <div class="flow-icon-wrap" style="background: rgba(245, 158, 11, 0.1); color: #F59E0B;">
+            <el-icon :size="32"><TrendCharts /></el-icon>
+          </div>
+          <h3>获得反馈</h3>
+          <p>纠音建议 + 地道表达 +<br>学习报告，反馈反哺学习</p>
         </div>
       </div>
     </section>
 
-    <!-- AI 能力矩阵 -->
-    <section class="tech-section">
-      <h2 class="section-title">AI 能力矩阵</h2>
-      <el-row :gutter="16">
-        <el-col v-for="card in techCards" :key="card.title" :span="8" :md="8" :sm="12" :xs="24">
-          <div class="tech-card" :style="{ borderTopColor: card.color }">
-            <div class="tech-card-icon" :style="{ color: card.color }">
-              <el-icon :size="28"><component :is="card.icon" /></el-icon>
-            </div>
-            <h4>{{ card.title }}</h4>
-            <p>{{ card.desc }}</p>
-            <ul>
-              <li v-for="item in card.items" :key="item">{{ item }}</li>
-            </ul>
-          </div>
-        </el-col>
-      </el-row>
-    </section>
-
-    <!-- 技术架构 -->
-    <section class="arch-section">
-      <h2 class="section-title">技术架构</h2>
-      <div class="arch-layers">
-        <div v-for="layer in architecture" :key="layer.name" class="arch-layer" :style="{ background: layer.bg }">
-          <div class="layer-label">{{ layer.name }}</div>
-          <div class="layer-items">
-            <el-tag v-for="item in layer.items" :key="item" size="small" effect="plain">{{ item }}</el-tag>
-          </div>
+    <!-- 适用人群 -->
+    <section class="users-section">
+      <h2 class="section-title">为谁而生</h2>
+      <div class="user-cards">
+        <div v-for="u in userTypes" :key="u.label" class="user-card">
+          <el-icon :size="36"><component :is="u.icon" /></el-icon>
+          <h3>{{ u.label }}</h3>
+          <p>{{ u.desc }}</p>
         </div>
       </div>
     </section>
+
+    <!-- 底部slogan -->
+    <div class="footer-slogan">
+      <p class="slogan-main">端到端语音交互 · 五维发音评测 · 个性化学习路径</p>
+      <p class="slogan-sub">从测评到进步，全链路 AI 陪伴你的英语口语之旅</p>
+    </div>
   </div>
 </template>
 
 <style lang="scss" scoped>
 .intro-page {
-  max-width: 960px;
+  max-width: 1200px;
   margin: 0 auto;
   padding: 0 var(--spacing-xl) var(--spacing-huge);
 }
 
-/* Hero */
+/* ========== Hero ========== */
 .hero {
   text-align: center;
-  padding: var(--spacing-xxl) 0 var(--spacing-xxl);
-  .hero-badge {
-    display: inline-block;
-    padding: var(--spacing-xs) var(--spacing-base);
-    background: rgba(var(--color-primary-rgb), 0.08);
-    color: var(--color-primary);
-    border-radius: 20px;
-    font-size: var(--font-size-sm);
-    font-weight: 600;
-    font-family: var(--font-heading);
-    letter-spacing: 1px;
-    margin-bottom: var(--spacing-lg);
-  }
-  .hero-title {
-    font-family: var(--font-heading);
-    font-size: 42px;
-    font-weight: 800;
-    line-height: 1.25;
-    margin-bottom: var(--spacing-lg);
-    letter-spacing: -1px;
-  }
-  .gradient-text {
-    background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-success) 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-  }
-  .hero-desc {
-    color: var(--color-text-secondary);
-    font-family: var(--font-body);
-    font-size: var(--font-size-lg);
-    line-height: 1.8;
-  }
+  padding: var(--spacing-huge) 0 var(--spacing-xxl);
+}
+.hero-badge {
+  display: inline-block;
+  padding: 6px 20px;
+  background: rgba(var(--color-primary-rgb), 0.08);
+  color: var(--color-primary);
+  border-radius: 20px;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  font-family: var(--font-heading);
+  letter-spacing: 0.5px;
+  margin-bottom: var(--spacing-xl);
+}
+.hero-title {
+  font-family: var(--font-heading);
+  font-size: 56px;
+  font-weight: 900;
+  line-height: 1.15;
+  margin-bottom: var(--spacing-lg);
+  letter-spacing: -1.5px;
+}
+.gradient-text {
+  background: linear-gradient(135deg, var(--color-primary) 0%, #A78BFA 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
-/* 节标题 */
+/* ========== 节标题 ========== */
 .section-title {
   font-family: var(--font-heading);
-  font-size: var(--font-size-xxl);
-  font-weight: 700;
+  font-size: 32px;
+  font-weight: 800;
   text-align: center;
-  margin-bottom: var(--spacing-md);
+  margin-bottom: var(--spacing-sm);
 }
 .section-desc {
   text-align: center;
   color: var(--color-text-secondary);
-  font-family: var(--font-body);
-  margin-bottom: var(--spacing-xl);
+  font-size: var(--font-size-lg);
+  font-weight: 500;
+  margin-bottom: var(--spacing-xxl);
 }
 
-/* 核心链路 */
-.pipeline-section { margin-bottom: var(--spacing-huge); }
-.pipeline {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0;
-  padding: var(--spacing-xl);
+/* ========== 六大竞争力 ========== */
+.competencies-section {
+  margin-bottom: var(--spacing-huge);
+}
+.competency-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--spacing-lg);
+}
+.competency-card {
   background: var(--color-bg-secondary);
   border: 1px solid var(--color-border-light);
   border-radius: var(--radius-lg);
-  overflow-x: auto;
-}
-.pipeline-node {
-  display: flex; flex-direction: column; align-items: center; gap: var(--spacing-sm);
-  position: relative; padding: 0 var(--spacing-base); min-width: 140px;
-}
-.pipe-icon {
-  width: 60px; height: 60px; border-radius: 50%;
-  display: flex; align-items: center; justify-content: center;
-  color: #fff; box-shadow: 0 4px 16px rgba(0,0,0,0.15);
-}
-.pipe-label { font-family: var(--font-heading); font-weight: 600; font-size: var(--font-size-base); }
-.pipe-tech { font-family: var(--font-body); font-size: var(--font-size-sm); color: var(--color-text-secondary); }
-.pipe-arrow {
-  position: absolute; right: -18px; top: 18px;
-  font-size: 24px; color: var(--color-border); font-weight: 300;
-}
-
-/* 8步流程 */
-.workflow-section { margin-bottom: var(--spacing-huge); }
-.steps { display: flex; flex-direction: column; gap: var(--spacing-base); }
-.step-card {
-  display: flex; gap: var(--spacing-xl);
-  background: var(--color-bg-secondary);
-  border: 1px solid var(--color-border-light);
-  border-radius: var(--radius-md);
-  padding: var(--spacing-xl);
-  transition: all var(--transition-base);
+  padding: var(--spacing-xxl) var(--spacing-xl);
+  transition: all 0.3s ease;
   cursor: default;
-  &:hover { box-shadow: var(--shadow-hover); transform: translateX(4px); }
-}
-.step-number {
-  width: 44px; height: 44px; border-radius: 50%;
-  background: rgba(var(--color-primary-rgb), 0.08);
-  color: var(--color-primary);
-  font-family: var(--font-heading); font-size: 20px; font-weight: 700;
-  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-}
-.step-body {
-  flex: 1;
-  .step-header { display: flex; align-items: center; gap: var(--spacing-md); margin-bottom: var(--spacing-sm);
-    h3 { font-family: var(--font-heading); font-size: var(--font-size-lg); font-weight: 600; margin: 0; }
+  display: flex;
+  flex-direction: column;
+  &:hover {
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
+    transform: translateY(-4px);
   }
-  .step-scene { color: var(--color-text-secondary); font-family: var(--font-body); font-size: var(--font-size-base); line-height: 1.7; margin-bottom: var(--spacing-md); }
-  .step-tech { display: flex; gap: var(--spacing-sm); flex-wrap: wrap; }
 }
-
-/* AI能力矩阵 */
-.tech-section { margin-bottom: var(--spacing-huge); }
-.tech-card {
-  background: var(--color-bg-secondary);
-  border: 1px solid var(--color-border-light);
-  border-top: 3px solid;
+.comp-icon {
+  width: 52px;
+  height: 52px;
   border-radius: var(--radius-md);
-  padding: var(--spacing-xl);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
   margin-bottom: var(--spacing-lg);
-  transition: all var(--transition-base);
-  cursor: default;
-  &:hover { box-shadow: var(--shadow-hover); transform: translateY(-2px); }
-  .tech-card-icon { margin-bottom: var(--spacing-md); }
-  h4 { font-family: var(--font-heading); font-size: var(--font-size-lg); font-weight: 600; margin-bottom: var(--spacing-sm); }
-  p { color: var(--color-text-secondary); font-family: var(--font-body); font-size: var(--font-size-sm); margin-bottom: var(--spacing-md); line-height: 1.6; }
-  ul { padding-left: var(--spacing-lg);
-    li { font-family: var(--font-body); font-size: var(--font-size-sm); color: var(--color-text-secondary); line-height: 2;
-      &::marker { color: var(--color-primary); }
+}
+.comp-title {
+  font-family: var(--font-heading);
+  font-size: 20px;
+  font-weight: 800;
+  margin: 0 0 4px;
+}
+.comp-subtitle {
+  font-size: var(--font-size-base);
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  margin: 0 0 var(--spacing-md);
+}
+.comp-highlights {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  li {
+    font-size: var(--font-size-base);
+    font-weight: 500;
+    color: var(--color-text-secondary);
+    line-height: 2.2;
+    padding-left: var(--spacing-md);
+    position: relative;
+    &::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 10px;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--color-primary);
+      opacity: 0.5;
     }
   }
 }
 
-/* 架构概览 */
-.arch-section { margin-bottom: var(--spacing-huge); }
-.arch-layers { display: flex; flex-direction: column; gap: var(--spacing-base); }
-.arch-layer {
-  display: flex; align-items: center; gap: var(--spacing-xl);
-  padding: var(--spacing-xl); border-radius: var(--radius-md);
+/* ========== 学习流程 ========== */
+.flow-section {
+  margin-bottom: var(--spacing-huge);
+}
+.flow-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--spacing-lg);
+}
+.flow-card {
+  text-align: center;
+  padding: var(--spacing-xxl) var(--spacing-xl);
+  background: var(--color-bg-secondary);
   border: 1px solid var(--color-border-light);
-  transition: all var(--transition-base);
-  &:hover { transform: scale(1.01); }
-  .layer-label { font-family: var(--font-heading); font-weight: 600; font-size: var(--font-size-base); white-space: nowrap; min-width: 120px; }
-  .layer-items { display: flex; gap: var(--spacing-sm); flex-wrap: wrap; }
+  border-radius: var(--radius-lg);
+  transition: all 0.3s ease;
+  cursor: default;
+  display: flex;
+  flex-direction: column;
+  &:hover {
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
+    transform: translateY(-4px);
+  }
+}
+.flow-icon-wrap {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto var(--spacing-md);
+}
+.flow-card h3 {
+  font-family: var(--font-heading);
+  font-size: 20px;
+  font-weight: 800;
+  margin: 0 0 var(--spacing-sm);
+}
+.flow-card p {
+  font-size: var(--font-size-base);
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  line-height: 1.7;
+  margin: 0;
+}
+
+/* ========== 适用人群 ========== */
+.users-section {
+  margin-bottom: var(--spacing-huge);
+}
+.user-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--spacing-lg);
+}
+.user-card {
+  text-align: center;
+  padding: var(--spacing-xxl) var(--spacing-xl);
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-lg);
+  transition: all 0.3s ease;
+  cursor: default;
+  display: flex;
+  flex-direction: column;
+  &:hover {
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
+    transform: translateY(-4px);
+  }
+  .el-icon {
+    color: var(--color-primary);
+    margin-bottom: var(--spacing-md);
+  }
+  h3 {
+    font-family: var(--font-heading);
+    font-size: 20px;
+    font-weight: 800;
+    margin: 0 0 var(--spacing-sm);
+  }
+  p {
+    font-size: var(--font-size-base);
+    font-weight: 500;
+    color: var(--color-text-secondary);
+    line-height: 1.7;
+    margin: 0;
+  }
+}
+
+/* ========== 底部slogan ========== */
+.footer-slogan {
+  text-align: center;
+  padding: var(--spacing-huge) 0 var(--spacing-xxl);
+}
+.slogan-main {
+  font-family: var(--font-heading);
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--color-text-primary);
+  margin: 0 0 var(--spacing-md);
+}
+.slogan-sub {
+  font-family: var(--font-heading);
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+
+/* ========== 响应式 ========== */
+@media (max-width: 768px) {
+  .hero-title { font-size: 36px; }
+  .competency-grid { grid-template-columns: 1fr; }
+  .flow-cards { grid-template-columns: 1fr; }
+  .user-cards { grid-template-columns: 1fr; }
 }
 </style>
