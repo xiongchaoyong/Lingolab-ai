@@ -4,7 +4,14 @@
 
 ---
 
-## 2026-06-27: 场景扩展 + 布局优化 + 教师端修复 + 排行榜数据
+## 2026-06-29: 修复对话音频存储时序 + 文档清理
+
+### 变更内容
+1. **修复音频存储时序**：`conversation_stream_speak` 中将 `session["user_audios"].append()` 从 finally 块提前到语法纠错之前，避免流式延迟导致音频文件丢失
+2. **清理 introduction.md**：删除末尾残留的草稿内容和核心竞争力板块（内容已迁移至 README.md）
+3. **.gitignore 更新**：添加 `backend/uploads/` 和 `frontend/.vite/` 运行时目录
+
+---
 
 ### 变更内容
 1. **对话场景扩展**：MySQL `conversation_sessions` 表新增 4 个场景枚举值（hotel/airport/hospital/school），前后端同步更新场景映射

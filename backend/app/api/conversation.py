@@ -379,6 +379,9 @@ async def conversation_stream_speak(
             session["history"].append({"role": "user", "text": user_text})
             session["round"] += 1
 
+            # 🔧 立即存储音频文件用于发音评分（避免语法纠错延迟导致/user_audios丢失）
+            session["user_audios"].append((converted_path, user_text))
+
             # 持久化用户消息
             db_msg_id = None
             try:
@@ -506,9 +509,7 @@ async def conversation_stream_speak(
             logger.error(f"流式 speak 失败: {e}")
             yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
         finally:
-            # 保留 WAV 用于发音评分，删除原始文件
-            if converted_path and user_text:
-                session["user_audios"].append((converted_path, user_text))
+            # 清理原始上传文件（WAV 已在上方存入 session，评分时释放）
             try:
                 if tmp_path:
                     os.unlink(tmp_path)
