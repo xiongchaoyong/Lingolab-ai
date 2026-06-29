@@ -33,3 +33,7 @@ PROGRESS.md
 # 后端生成的音频 / 测试文件
 backend/edge_tts_output/
 backend/test_*.wav
+backend/uploads/
+
+# 前端构建缓存
+frontend/.vite/
