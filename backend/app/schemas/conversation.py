@@ -24,8 +24,8 @@ class ConversationSpeakResponse(BaseModel):
     user_text: str = Field(..., description="用户语音转写文本")
     ai_text: str = Field(..., description="AI 回复文本")
     ai_audio_base64: str = Field(default="", description="AI 语音 MP3 (base64)")
-    grammar_correction: Optional[Dict[str, str]] = Field(
-        default=None, description="语法纠错: {original, correction, tip}"
+    grammar_correction: Optional[Dict[str, Any]] = Field(
+        default=None, description="语法纠错结果"
     )
     conversation_complete: bool = Field(default=False, description="对话是否结束")
 

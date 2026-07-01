@@ -4,6 +4,14 @@
 
 ---
 
+## 2026-07-01: 语法检测功能修复（对话+角色扮演）
+
+### 变更内容
+1. **角色扮演流式语法检测不再阻塞 TTS**：`roleplay_stream_speak` 中将语法 await 移到 `done` 事件之后，与 conversation 行为一致，TTS 播放不再等待语法检测
+2. **角色扮演语法结果持久化**：语法纠错结果存入 `conversation_messages.grammar_check`，并追加 `role: "grammar"` 到 session history，评分报告可展示纠错记录
+3. **非流式 speak 端点添加语法检测**：`conversation_speak` 和 `roleplay_speak` 增加 `asyncio.create_task(correct_grammar)` 并行调用，响应中返回 `grammar_correction`
+4. **Schema 类型修复**：`RoleplaySpeakResponse` 新增 `grammar_correction` 字段，`ConversationSpeakResponse.grammar_correction` 类型改为 `Optional[Dict[str, Any]]`
+
 ## 2026-06-29: 修复对话音频存储时序 + 文档清理
 
 ### 变更内容

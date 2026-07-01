@@ -191,8 +191,10 @@ async def conversation_speak(
         except Exception as e:
             logger.warning(f"流利度算法计算失败: {e}")
 
-        # LLM 生成回复
+        # LLM 生成回复 + 语法纠错（并行）
         llm = get_llm_service()
+        grammar_task = asyncio.create_task(llm.correct_grammar(user_text, cefr_level))
+
         ai_text = await llm.chat(
             scene=scene,
             user_text=user_text,
@@ -203,6 +205,15 @@ async def conversation_speak(
         # 记录 AI 消息
         session["history"].append({"role": "ai", "text": ai_text})
 
+        # 等待语法纠错结果
+        grammar_correction = None
+        try:
+            grammar_result = await grammar_task
+            if grammar_result.get("errors"):
+                grammar_correction = grammar_result
+        except Exception as e:
+            logger.warning(f"语法纠错失败: {e}")
+
         # 检查是否对话结束
         conversation_complete = session["round"] >= MAX_CONVERSATION_ROUNDS
 
@@ -210,6 +221,7 @@ async def conversation_speak(
             user_text=user_text,
             ai_text=ai_text,
             ai_audio_base64="",  # 语音通过 /tts 异步获取
+            grammar_correction=grammar_correction,
             conversation_complete=conversation_complete,
         )
 
