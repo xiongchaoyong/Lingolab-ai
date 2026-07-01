@@ -1,12 +1,14 @@
 <script setup>
 import { ref, onMounted } from 'vue'
-import { ElMessage } from 'element-plus'
+import { useRouter } from 'vue-router'
 import {
   getRecommendationsApi,
   dislikeRecommendationApi,
   refreshRecommendationsApi,
   clickRecommendationApi,
 } from '@/api/recommendation'
+
+const router = useRouter()
 
 const recommendations = ref({ videos: [], articles: [], audios: [] })
 const dislikedIds = ref(new Set())
@@ -70,12 +72,12 @@ async function handleView(item) {
     // 静默失败
   }
 
-  // 打开资料链接
-  if (item.url) {
-    window.open(item.url, '_blank')
-  } else {
-    ElMessage.warning('该资料暂无链接')
-  }
+  // 跳转到资料详情页
+  router.push({
+    name: 'MaterialDetail',
+    params: { id: item.material_id },
+    query: { recId: item.id },
+  })
 }
 
 const typeMeta = {

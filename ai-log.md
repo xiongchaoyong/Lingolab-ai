@@ -24,9 +24,11 @@
 ## 2026-07-01: 修复资料推荐"查看"按钮无响应 + 补充真实资料链接
 
 ### 变更内容
-1. **前端 — RecommendationView 修复**：`handleView()` 点击"查看"按钮 → 调用 click API 记录行为 → `window.open(url)` 新标签页打开资料
-2. **数据库 — kg_nodes 30 条资料 URL 全部更新**：从 `example.com` 占位符替换为真实链接（YouTube/Wikipedia/ELLLO/BBC 等）
-3. **数据库 — learning_materials 扩充**：从 12 条扩展到 30 条（视频/文章/音频各 10 条），新增记录均含真实 URL
+1. **前端 — RecommendationView 修复**：`handleView()` 点击"查看"按钮 → 调用 click API 记录行为 → 跳转到资料详情页
+2. **前端 — 新建资料详情页**：`MaterialDetailView.vue` 展示资料标题/描述/类型/难度/标签/维度/时长，含"打开原文链接"按钮
+3. **前端 — 新增 `/material/:id` 路由**
+4. **数据库 — kg_nodes 30 条资料 URL 更新**：从 `example.com` 占位符替换为国内网站（哔哩哔哩/知乎/简书/喜马拉雅）
+5. **数据库 — learning_materials 扩充**：从 12 条扩展到 30 条（视频/文章/音频各 10 条），URL 同步更新
 
 ---
 

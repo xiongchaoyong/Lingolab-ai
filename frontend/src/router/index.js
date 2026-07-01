@@ -145,6 +145,12 @@ const routes = [
         component: () => import('@/views/learning/ListeningView.vue'),
         meta: { title: '听力练习', auth: true },
       },
+      {
+        path: 'material/:id',
+        name: 'MaterialDetail',
+        component: () => import('@/views/learning/MaterialDetailView.vue'),
+        meta: { title: '资料详情', auth: true },
+      },
     ],
   },
 
