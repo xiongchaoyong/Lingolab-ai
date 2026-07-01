@@ -37,6 +37,7 @@ function getTypeIcon(type) {
 function startTask(task) {
   if (task.type === 'conversation') router.push('/conversation')
   else if (task.type === 'shadowing') router.push('/pronunciation')
+  else if (task.type === 'listening') router.push(`/listening?taskId=${task.id}`)
 }
 
 async function skipTask(task) {

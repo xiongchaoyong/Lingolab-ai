@@ -7,6 +7,7 @@ import {
   adjustDifficultyApi,
   getHistoryApi,
   getProfileSummaryApi,
+  completeTaskApi,
 } from '@/api/learning_path'
 
 export const useLearningPathStore = defineStore('learning_path', () => {
@@ -77,8 +78,23 @@ export const useLearningPathStore = defineStore('learning_path', () => {
     }
   }
 
+  async function completeTask(taskId, data = {}) {
+    const res = await completeTaskApi(taskId, data)
+    if (res.status === 'ok') {
+      const idx = tasks.value.findIndex(t => t.id === taskId)
+      if (idx !== -1) {
+        tasks.value[idx].status = 'completed'
+        tasks.value[idx].score = res.task?.score
+      }
+      // 更新进度
+      const done = tasks.value.filter(t => t.status === 'completed').length
+      progress.value = { done, total: tasks.value.length }
+    }
+    return res
+  }
+
   return {
     tasks, progress, taskDate, historyRecords, loading, isAllDone, profileSummary,
-    fetchDailyTasks, skipTask, replaceTask, adjustDifficulty, fetchHistory, fetchProfileSummary,
+    fetchDailyTasks, skipTask, replaceTask, adjustDifficulty, fetchHistory, fetchProfileSummary, completeTask,
   }
 })

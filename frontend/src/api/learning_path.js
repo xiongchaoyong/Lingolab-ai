@@ -29,3 +29,8 @@ export function getHistoryApi(days = 7) {
 export function getProfileSummaryApi() {
   return request.get('/api/learning-path/profile-summary')
 }
+
+/** 完成任务并记录分数 */
+export function completeTaskApi(taskId, data) {
+  return request.post(`/api/learning-path/tasks/${taskId}/complete`, data)
+}

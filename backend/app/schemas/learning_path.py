@@ -19,6 +19,7 @@ class TaskItem(BaseModel):
     duration: str = Field(..., description="预估时长，如 '5-10分钟'")
     tag: Optional[str] = Field(default=None, description="展示标签")
     scene: Optional[str] = Field(default=None, description="对话场景标识")
+    material_id: Optional[str] = Field(default=None, description="关联资料节点 ID（kg_nodes）")
     status: str = Field(default="pending", description="pending / skipped / completed")
     score: Optional[float] = None
 
@@ -131,8 +132,10 @@ class RecentStats(BaseModel):
     pronunciation_count: int = 0
     conversation_count: int = 0
     roleplay_count: int = 0
+    listening_count: int = 0
     avg_pronunciation_score: Optional[float] = None
     avg_conversation_score: Optional[float] = None
+    avg_listening_score: Optional[float] = None
 
 
 class RecommendationFactor(BaseModel):

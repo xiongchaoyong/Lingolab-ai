@@ -54,6 +54,7 @@ def get_daily_tasks(
             duration=t.get("duration", "5-10分钟"),
             tag=t.get("tag"),
             scene=t.get("scene"),
+            material_id=t.get("material_id"),
             status=t.get("status", "pending"),
             score=t.get("score"),
         ))
@@ -114,6 +115,7 @@ def replace_task(
             duration=result.get("duration", "5-10分钟"),
             tag=result.get("tag"),
             scene=result.get("scene"),
+            material_id=result.get("material_id"),
             status=result.get("status", "pending"),
             score=result.get("score"),
         ),
@@ -183,6 +185,7 @@ def complete_task(
             description=task.description or "",
             difficulty=task.difficulty,
             duration="",
+            material_id=task.material_id,
             status="completed",
             score=float(task.score) if task.score else None,
         ),
@@ -255,6 +258,7 @@ def get_profile_summary(
     pronunciation_scores = [s for s in skill_scores if s.source == "pronunciation"]
     conversation_scores = [s for s in skill_scores if s.source == "conversation"]
     roleplay_scores = [s for s in skill_scores if s.source == "roleplay"]
+    listening_scores = [s for s in skill_scores if s.source == "listening"]
 
     tasks_count = (
         db.query(func.count(DailyTask.id))
@@ -277,8 +281,10 @@ def get_profile_summary(
         pronunciation_count=len(pronunciation_scores),
         conversation_count=len(conversation_scores),
         roleplay_count=len(roleplay_scores),
+        listening_count=len(listening_scores),
         avg_pronunciation_score=avg_score(pronunciation_scores),
         avg_conversation_score=avg_score(conversation_scores),
+        avg_listening_score=avg_score(listening_scores),
     )
 
     # 4. 推荐算法说明

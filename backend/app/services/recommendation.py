@@ -515,6 +515,7 @@ class RecommendationService:
                 "duration": "5-10分钟",
                 "tag": t.difficulty,
                 "scene": t.scene,
+                "material_id": t.material_id,
                 "status": t.status,
                 "score": float(t.score) if t.score else None,
             }
@@ -626,6 +627,7 @@ class RecommendationService:
             "duration": "5-10分钟",
             "tag": new_task.difficulty,
             "scene": new_task.scene,
+            "material_id": new_task.material_id,
             "status": "pending",
             "score": None,
         }

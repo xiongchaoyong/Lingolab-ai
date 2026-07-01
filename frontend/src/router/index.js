@@ -139,6 +139,12 @@ const routes = [
         component: () => import('@/views/conversation/VoiceCallView.vue'),
         meta: { title: 'AI 智能对话', auth: true },
       },
+      {
+        path: 'listening',
+        name: 'Listening',
+        component: () => import('@/views/learning/ListeningView.vue'),
+        meta: { title: '听力练习', auth: true },
+      },
     ],
   },
 

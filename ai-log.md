@@ -4,6 +4,23 @@
 
 ---
 
+## 2026-07-01: 修复听力任务"开始听力"功能缺失
+
+### 变更内容
+1. **后端 — 新增资料详情 API**：`GET /api/recommendations/material/{material_id}` 支持 kg_node ID 和 learning_materials 数字 ID 两种查询方式
+2. **后端 — TaskItem 新增 `material_id` 字段**：每日任务 API 返回中增加关联资料节点 ID，供听力页面获取资料详情
+3. **后端 — RecentStats 新增听力统计**：`listening_count` + `avg_listening_score` 字段
+4. **前端 — 新建听力练习页面**：`ListeningView.vue` 三阶段流程（准备→听力中→完成），含 HTML5 音频播放器 + 计时器
+5. **前端 — 添加 `/listening` 路由**
+6. **前端 — API 层补充**：`completeTaskApi` + `getMaterialDetailApi`
+7. **前端 — Store 新增 `completeTask` action**：完成任务后自动更新本地进度
+8. **前端 — LearningPathView 修复**：`startTask()` 添加 `listening` 分支，导航到 `/listening?taskId=X`
+
+### 数据库操作
+- 删除旧库 → 从 `database-export/full-dump-data+structure.sql` 重建 43 张表（含完整数据）
+
+---
+
 ## 2026-06-29: 修复对话音频存储时序 + 文档清理
 
 ### 变更内容

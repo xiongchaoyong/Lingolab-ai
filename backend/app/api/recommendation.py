@@ -1,14 +1,17 @@
 """资料推荐 API — 个性化资料推荐"""
 
 from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException
+from typing import Optional
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.security import get_current_user
 from app.models.user import UserProfile
+from app.models.learning import LearningMaterial
 from app.models.knowledge_graph import MaterialRecommendation
 from app.services.recommendation import recommendation_service
+from app.services.knowledge_graph import kg_service
 from app.schemas.learning_path import (
     MaterialItem,
     RecommendationsResponse,
@@ -162,3 +165,94 @@ def click_recommendation(
     db.commit()
 
     return {"status": "ok", "action": rec.action}
+
+
+@router.get("/material/{material_id}")
+def get_material_detail(
+    material_id: str,
+    material_type: Optional[str] = Query(default=None, description="资料类型过滤：video/article/audio"),
+    db: Session = Depends(get_db),
+):
+    """获取单个学习资料详情
+
+    支持两种查询方式：
+    1. 数字 ID → 从 learning_materials 表查询
+    2. kg_nodes 格式（如 material:audio_1）→ 从知识图谱节点查询
+    """
+    # 尝试按 kg_nodes ID 查询
+    node_attrs = kg_service.get_node(material_id)
+    if node_attrs and node_attrs.get("type") == "material":
+        node = {"id": material_id, **node_attrs}  # get_node 不返回 id，手动补充
+        extra = node.get("extra_data", {}) or {}
+        sub_type = node.get("sub_type", "article")
+
+        # 尝试从 learning_materials 表匹配（按标题标签匹配）
+        material = (
+            db.query(LearningMaterial)
+            .filter(
+                LearningMaterial.title == node["label"],
+                LearningMaterial.is_active == 1,
+            )
+            .first()
+        )
+
+        if material:
+            # 类型过滤
+            if material_type and material.material_type != material_type:
+                raise HTTPException(status_code=404, detail=f"资料类型不匹配，期望 {material_type}，实际 {material.material_type}")
+
+            return {
+                "id": material.id,
+                "title": material.title,
+                "description": material.description or "",
+                "material_type": material.material_type,
+                "url": material.url,
+                "cefr_level": material.cefr_level,
+                "category": material.category or "",
+                "tags": material.tags or [],
+                "duration_seconds": material.duration_seconds,
+                "focus_dimensions": material.focus_dimensions or [],
+            }
+
+        # 回退：从 kg_node 构造返回数据
+        return {
+            "id": node["id"],
+            "title": node["label"],
+            "description": extra.get("description", ""),
+            "material_type": sub_type,
+            "url": extra.get("url", ""),
+            "cefr_level": extra.get("difficulty", "A1"),
+            "category": extra.get("category", ""),
+            "tags": extra.get("tags", []),
+            "duration_seconds": extra.get("duration_seconds"),
+            "focus_dimensions": extra.get("focus_dimensions", []),
+        }
+
+    # 按数字 ID 查询 learning_materials
+    try:
+        numeric_id = int(material_id)
+        material = (
+            db.query(LearningMaterial)
+            .filter(LearningMaterial.id == numeric_id, LearningMaterial.is_active == 1)
+            .first()
+        )
+        if material:
+            if material_type and material.material_type != material_type:
+                raise HTTPException(status_code=404, detail=f"资料类型不匹配，期望 {material_type}，实际 {material.material_type}")
+
+            return {
+                "id": material.id,
+                "title": material.title,
+                "description": material.description or "",
+                "material_type": material.material_type,
+                "url": material.url,
+                "cefr_level": material.cefr_level,
+                "category": material.category or "",
+                "tags": material.tags or [],
+                "duration_seconds": material.duration_seconds,
+                "focus_dimensions": material.focus_dimensions or [],
+            }
+    except ValueError:
+        pass
+
+    raise HTTPException(status_code=404, detail="资料不存在")

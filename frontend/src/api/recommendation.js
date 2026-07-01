@@ -19,3 +19,9 @@ export function refreshRecommendationsApi() {
 export function clickRecommendationApi(id, action) {
   return request.post(`/api/recommendations/${id}/click`, { action })
 }
+
+/** 获取单个资料详情 */
+export function getMaterialDetailApi(materialId, materialType = null) {
+  const params = materialType ? { material_type: materialType } : {}
+  return request.get(`/api/recommendations/material/${materialId}`, { params })
+}
