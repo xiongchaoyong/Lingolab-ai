@@ -95,10 +95,10 @@ def refresh_recommendations(
     current_user: UserProfile = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """换一批推荐（重新计算），每日限 3 次"""
+    """换一批推荐（重新计算），每日限 10 次"""
     refresh_count = recommendation_service.get_today_refresh_count(current_user.id, db)
-    if refresh_count >= 3:
-        raise HTTPException(status_code=429, detail="今日刷新次数已用完（每日限3次）")
+    if refresh_count >= 10:
+        raise HTTPException(status_code=429, detail="今日刷新次数已用完（每日限10次）")
 
     materials = recommendation_service.recommend_materials(current_user, db)
     recommendation_service.save_recommendations(current_user.id, materials, db)

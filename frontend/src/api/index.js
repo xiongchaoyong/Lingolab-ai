@@ -88,11 +88,14 @@ request.interceptors.response.use(
         case 404:
           ElMessage.error('请求的资源不存在')
           break
+        case 429:
+          ElMessage.warning(data?.detail || '请求过于频繁，请稍后再试')
+          break
         case 500:
           ElMessage.error('服务器内部错误')
           break
         default:
-          ElMessage.error(data?.message || '请求失败')
+          ElMessage.error(data?.detail || data?.message || '请求失败')
       }
     } else {
       ElMessage.error('网络连接异常')
