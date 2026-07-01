@@ -54,6 +54,9 @@ export const useGamificationStore = defineStore('gamification', () => {
     try {
       const result = await submitLevelApi(audio, levelIndex + 1)
       levelScores.value = { ...levelScores.value, [levelIndex]: result.score }
+      if (result.passed) {
+        lastPointsEarned.value = 20 // 每关通过 +20
+      }
       if (levelIndex >= 4 && result.passed) {
         dailyCompleted.value = true
       }
@@ -67,6 +70,11 @@ export const useGamificationStore = defineStore('gamification', () => {
     const passed = Object.values(levelScores.value).filter(s => s >= 70).length
     const result = await completeDailyApi(passed)
     dailyCompleted.value = true
+    // 暴露动画数据
+    lastPointsEarned.value = result.points_earned || 0
+    if (result.new_badges?.length > 0) {
+      newBadges.value = result.new_badges
+    }
     return result
   }
 
@@ -91,6 +99,7 @@ export const useGamificationStore = defineStore('gamification', () => {
     try {
       const result = await submitDubbingApi(audio, contentId)
       dubbingResult.value = result
+      lastPointsEarned.value = result.points_earned || 0
       return result
     } finally {
       dubbingScoring.value = false
@@ -109,6 +118,20 @@ export const useGamificationStore = defineStore('gamification', () => {
   const badges = ref([])
   const points = ref({ total_points: 0, recent_records: [] })
   const badgesLoading = ref(false)
+
+  // ===== 动画反馈状态 =====
+  const newBadges = ref([])              // 新解锁的勋章列表
+  const lastPointsEarned = ref(0)        // 最近一次获得的积分
+  const showLevelPass = ref(-1)          // 刚通过的关卡索引（触发动画）
+  const showLevelFail = ref(-1)          // 刚失败的关卡索引（触发动画）
+
+  function clearNewBadges() {
+    newBadges.value = []
+  }
+
+  function clearPointsEarned() {
+    lastPointsEarned.value = 0
+  }
 
   async function fetchBadges() {
     badgesLoading.value = true
@@ -135,5 +158,8 @@ export const useGamificationStore = defineStore('gamification', () => {
     // 勋章 & 积分
     badges, points, badgesLoading,
     fetchBadges, fetchPoints,
+    // 动画反馈
+    newBadges, lastPointsEarned, showLevelPass, showLevelFail,
+    clearNewBadges, clearPointsEarned,
   }
 })
