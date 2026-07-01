@@ -30,6 +30,7 @@ const isScoring = ref(false)
 const messages = ref([])
 const chatBoxRef = ref(null)
 let activeStreamController = null  // 当前活跃的 SSE 流控制器，新请求取消旧请求
+const currentUserMsgIdx = ref(-1)  // 模板渲染用（哪个消息正在等待语法检测）
 
 const ERROR_TYPE_COLORS = {
   tense: '#E6A23C', subject_verb_agreement: '#F56C6C', article: '#909399',
@@ -95,6 +96,7 @@ async function selectRole(role) {
   isPaused.value = false
   messages.value = []
   if (activeStreamController) { activeStreamController.abort(); activeStreamController = null }
+  currentUserMsgIdx.value = -1
 
   isConnecting.value = true
   streamStartRoleplay(role.id, 'B1', {
@@ -199,6 +201,7 @@ async function processUserAudio() {
   streamSpeakRoleplay(sessionId.value, selectedRole.value.id, audioBlob, {
     onAsr(text) {
       msgIdx = messages.value.push({ role: 'user', text: '' }) - 1
+      currentUserMsgIdx.value = msgIdx  // 模板渲染用
       scrollToBottom()
       typewriteUserText(msgIdx, text)
     },

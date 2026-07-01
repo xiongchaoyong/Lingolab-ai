@@ -35,6 +35,7 @@ const isScoring = ref(false)
 const messages = ref([])  // [{role: 'user'|'ai', text, grammar?, streaming?}]
 const chatBoxRef = ref(null)
 let activeStreamController = null  // 当前活跃的 SSE 流控制器，新请求取消旧请求
+const currentUserMsgIdx = ref(-1)  // 模板渲染用（哪个消息正在等待语法检测）
 
 // 语法错误类型颜色映射
 const ERROR_TYPE_COLORS = {
@@ -126,6 +127,7 @@ async function selectScenario(scenario) {
   isPaused.value = false
   messages.value = []
   if (activeStreamController) { activeStreamController.abort(); activeStreamController = null }
+  currentUserMsgIdx.value = -1
 
   // 开始对话
   isConnecting.value = true
@@ -268,6 +270,7 @@ async function processUserAudio() {
   streamSpeakConversation(sessionId.value, selectedScenario.value.id, audioBlob, {
     onAsr(text) {
       msgIdx = messages.value.push({ role: 'user', text: '' }) - 1
+      currentUserMsgIdx.value = msgIdx  // 模板渲染用
       scrollToBottom()
       // 逐字流式显示用户文本
       typewriteUserText(msgIdx, text)
