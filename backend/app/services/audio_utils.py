@@ -3,6 +3,25 @@
 import subprocess
 import os
 
+# ffmpeg 候选路径（Windows 下常见安装位置）
+_FFMPEG_PATHS = [
+    "ffmpeg",                                    # 系统 PATH
+    "/d/dwrg/ffmpeg/ffmpeg.exe",                 # 本地工具
+    "/d/FeverApps/dwrg2/ffmpeg/ffmpeg.exe",
+]
+
+
+def _find_ffmpeg() -> str:
+    """查找可用的 ffmpeg 路径"""
+    for path in _FFMPEG_PATHS:
+        if os.path.isfile(path) or path == "ffmpeg":
+            try:
+                subprocess.run([path, "-version"], capture_output=True, timeout=5)
+                return path
+            except Exception:
+                continue
+    raise FileNotFoundError("ffmpeg 未找到")
+
 
 def convert_to_wav(input_path: str) -> str:
     """将任意音频格式转为 16kHz 单声道 WAV
@@ -21,8 +40,9 @@ def convert_to_wav(input_path: str) -> str:
 
     output_path = input_path + "_converted.wav"
     try:
+        ffmpeg = _find_ffmpeg()
         subprocess.run(
-            ["ffmpeg", "-y", "-i", input_path,
+            [ffmpeg, "-y", "-i", input_path,
              "-ac", "1", "-ar", "16000", "-sample_fmt", "s16",
              output_path],
             check=True, capture_output=True, timeout=30,
