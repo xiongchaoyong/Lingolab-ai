@@ -41,13 +41,25 @@ logger = logging.getLogger(__name__)
 
 def convert_to_wav(input_path: str) -> str:
     """将任意音频格式转为 16kHz 单声道 WAV"""
+    # 检查是否已是 WAV
+    try:
+        with open(input_path, 'rb') as f:
+            header = f.read(12)
+            if header[:4] == b'RIFF' and header[8:12] == b'WAVE':
+                return input_path
+    except Exception:
+        pass
+
     output_path = input_path + "_converted.wav"
-    subprocess.run(
-        ["ffmpeg", "-y", "-i", input_path,
-         "-ac", "1", "-ar", "16000", "-sample_fmt", "s16",
-         output_path],
-        check=True, capture_output=True,
-    )
+    try:
+        subprocess.run(
+            ["ffmpeg", "-y", "-i", input_path,
+             "-ac", "1", "-ar", "16000", "-sample_fmt", "s16",
+             output_path],
+            check=True, capture_output=True, timeout=30,
+        )
+    except FileNotFoundError:
+        raise RuntimeError("ffmpeg 未安装，请安装 ffmpeg 后重试")
     return output_path
 
 
@@ -81,9 +93,11 @@ async def submit_challenge_level(
     level_data = content["levels"][level - 1]
 
     # 保存音频
-    suffix = ".webm"
+    suffix = ".wav"
     if audio.filename and "." in audio.filename:
-        suffix = os.path.splitext(audio.filename)[1] or ".webm"
+        ext = os.path.splitext(audio.filename)[1]
+        if ext in (".wav", ".webm", ".mp3", ".m4a", ".ogg"):
+            suffix = ext
 
     tmp_path = None
     converted_path = None
@@ -206,9 +220,11 @@ async def submit_dubbing(
     if not clip:
         raise HTTPException(status_code=422, detail="配音内容不存在")
 
-    suffix = ".webm"
+    suffix = ".wav"
     if audio.filename and "." in audio.filename:
-        suffix = os.path.splitext(audio.filename)[1] or ".webm"
+        ext = os.path.splitext(audio.filename)[1]
+        if ext in (".wav", ".webm", ".mp3", ".m4a", ".ogg"):
+            suffix = ext
 
     tmp_path = None
     converted_path = None

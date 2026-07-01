@@ -25,12 +25,15 @@ logger = logging.getLogger(__name__)
 def convert_to_wav(input_path: str) -> str:
     """将任意音频格式转为 16kHz 单声道 WAV（使用 ffmpeg）"""
     output_path = input_path + "_converted.wav"
-    subprocess.run(
-        ["ffmpeg", "-y", "-i", input_path,
-         "-ac", "1", "-ar", "16000", "-sample_fmt", "s16",
-         output_path],
-        check=True, capture_output=True,
-    )
+    try:
+        subprocess.run(
+            ["ffmpeg", "-y", "-i", input_path,
+             "-ac", "1", "-ar", "16000", "-sample_fmt", "s16",
+             output_path],
+            check=True, capture_output=True, timeout=30,
+        )
+    except FileNotFoundError:
+        raise RuntimeError("ffmpeg 未安装，请安装 ffmpeg 后重试")
     return output_path
 
 

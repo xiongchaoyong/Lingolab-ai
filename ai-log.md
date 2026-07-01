@@ -4,6 +4,16 @@
 
 ---
 
+## 2026-07-01: 修复闯关录音失败 — 前端直接输出 WAV 格式
+
+### 变更内容
+1. **前端 — VoiceRecorder 改为 Web Audio API 录音**：不再使用 MediaRecorder (webm)，改用 AudioContext + ScriptProcessor 直接捕获 PCM 数据并编码为 WAV，彻底绕过 ffmpeg 依赖
+2. **后端 — audio_utils 添加 WAV 检测**：通过 RIFF/WAVE 文件头检测，已是 WAV 格式直接跳过转码
+3. **后端 — gamification.py convert_to_wav 同步修复**：添加 FileNotFoundError 捕获和 WAV 检测
+4. **后端 — 所有 convert_to_wav 添加 ffmpeg 缺失时的友好错误提示**
+
+---
+
 ## 2026-07-01: 闯关挑战动画与交互反馈增强
 
 ### 变更内容

@@ -13,10 +13,15 @@ const state = ref('idle') // idle → preparing → recording → uploading → 
 const countdown = ref(0)
 const elapsed = ref(0)
 let timer = null
-let mediaRecorder = null
-let audioChunks = []
 let audioBlob = null
 let stream = null
+
+// Web Audio API 相关
+let audioContext = null
+let scriptProcessor = null
+let mediaStreamSource = null
+let pcmChunks = []
+let sampleRate = 16000
 
 const stateLabel = computed(() => ({
   idle: '点击开始录音',
@@ -28,13 +33,60 @@ const stateLabel = computed(() => ({
 
 const buttonClass = computed(() => `recorder-btn state-${state.value}`)
 
+// ===== WAV 编码工具函数 =====
+
+function encodeWAV(samples, sampleRate) {
+  const buffer = new ArrayBuffer(44 + samples.length * 2)
+  const view = new DataView(buffer)
+
+  // RIFF header
+  writeString(view, 0, 'RIFF')
+  view.setUint32(4, 36 + samples.length * 2, true)
+  writeString(view, 8, 'WAVE')
+  // fmt chunk
+  writeString(view, 12, 'fmt ')
+  view.setUint32(16, 16, true)        // chunk size
+  view.setUint16(20, 1, true)         // PCM format
+  view.setUint16(22, 1, true)         // mono
+  view.setUint32(24, sampleRate, true) // sample rate
+  view.setUint32(28, sampleRate * 2, true) // byte rate
+  view.setUint16(32, 2, true)         // block align
+  view.setUint16(34, 16, true)        // bits per sample
+  // data chunk
+  writeString(view, 36, 'data')
+  view.setUint32(40, samples.length * 2, true)
+
+  // PCM samples
+  for (let i = 0; i < samples.length; i++) {
+    const s = Math.max(-1, Math.min(1, samples[i]))
+    view.setInt16(44 + i * 2, s < 0 ? s * 0x8000 : s * 0x7FFF, true)
+  }
+
+  return new Blob([buffer], { type: 'audio/wav' })
+}
+
+function writeString(view, offset, string) {
+  for (let i = 0; i < string.length; i++) {
+    view.setUint8(offset + i, string.charCodeAt(i))
+  }
+}
+
+function floatTo16BitPCM(float32Array) {
+  const buffer = new Int16Array(float32Array.length)
+  for (let i = 0; i < float32Array.length; i++) {
+    const s = Math.max(-1, Math.min(1, float32Array[i]))
+    buffer[i] = s < 0 ? s * 0x8000 : s * 0x7FFF
+  }
+  return buffer
+}
+
 async function startRecording() {
   if (props.disabled) return
 
   // 请求麦克风权限
   try {
     stream = await navigator.mediaDevices.getUserMedia({
-      audio: { sampleRate: 16000, channelCount: 1 }
+      audio: { sampleRate: { ideal: 16000 }, channelCount: 1 }
     })
   } catch (e) {
     console.error('麦克风访问失败:', e)
@@ -43,7 +95,7 @@ async function startRecording() {
 
   state.value = 'preparing'
   countdown.value = props.prepTime
-  audioChunks = []
+  pcmChunks = []
   audioBlob = null
   emit('start')
 
@@ -57,30 +109,24 @@ async function startRecording() {
 }
 
 function beginCapture() {
-  // 不指定 mimeType，让浏览器选择默认格式（通常 audio/webm;codecs=opus）
-  mediaRecorder = new MediaRecorder(stream)
-  audioChunks = []
+  // 使用 Web Audio API 捕获 PCM 数据
+  audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 })
+  sampleRate = audioContext.sampleRate
+  mediaStreamSource = audioContext.createMediaStreamSource(stream)
 
-  mediaRecorder.ondataavailable = (e) => {
-    if (e.data.size > 0) audioChunks.push(e.data)
+  // 使用 ScriptProcessorNode 捕获原始 PCM
+  scriptProcessor = audioContext.createScriptProcessor(4096, 1, 1)
+  pcmChunks = []
+
+  scriptProcessor.onaudioprocess = (e) => {
+    const inputData = e.inputBuffer.getChannelData(0)
+    // 复制 Float32Array 数据
+    pcmChunks.push(new Float32Array(inputData))
   }
 
-  mediaRecorder.onstop = () => {
-    // 释放麦克风
-    stream.getTracks().forEach(t => t.stop())
-    const actualMime = mediaRecorder.mimeType || 'audio/webm'
-    audioBlob = new Blob(audioChunks, { type: actualMime })
+  mediaStreamSource.connect(scriptProcessor)
+  scriptProcessor.connect(audioContext.destination)
 
-    // 通知父组件
-    state.value = 'uploading'
-    emit('complete', {
-      blob: audioBlob,
-      mimeType: actualMime,
-      elapsed: elapsed.value,
-    })
-  }
-
-  mediaRecorder.start()
   state.value = 'recording'
   elapsed.value = 0
   timer = setInterval(() => {
@@ -96,8 +142,31 @@ function stopRecording() {
   if (state.value === 'preparing') {
     stream?.getTracks().forEach(t => t.stop())
     state.value = 'idle'
-  } else if (state.value === 'recording' && mediaRecorder?.state === 'recording') {
-    mediaRecorder.stop()
+  } else if (state.value === 'recording') {
+    // 断开音频处理
+    scriptProcessor?.disconnect()
+    mediaStreamSource?.disconnect()
+    audioContext?.close()
+    stream?.getTracks().forEach(t => t.stop())
+
+    // 合并所有 PCM 数据
+    const totalLength = pcmChunks.reduce((sum, chunk) => sum + chunk.length, 0)
+    const merged = new Float32Array(totalLength)
+    let offset = 0
+    for (const chunk of pcmChunks) {
+      merged.set(chunk, offset)
+      offset += chunk.length
+    }
+
+    // 编码为 WAV
+    audioBlob = encodeWAV(merged, sampleRate)
+
+    state.value = 'uploading'
+    emit('complete', {
+      blob: audioBlob,
+      mimeType: 'audio/wav',
+      elapsed: elapsed.value,
+    })
   }
 }
 
@@ -108,10 +177,13 @@ function setScored() {
 function reset() {
   clearInterval(timer)
   stream?.getTracks().forEach(t => t.stop())
+  scriptProcessor?.disconnect()
+  mediaStreamSource?.disconnect()
+  audioContext?.close()
   state.value = 'idle'
   countdown.value = 0
   elapsed.value = 0
-  audioChunks = []
+  pcmChunks = []
   audioBlob = null
 }
 
