@@ -269,11 +269,13 @@ async function processUserAudio() {
 
   streamSpeakConversation(sessionId.value, selectedScenario.value.id, audioBlob, {
     onAsr(text) {
-      if (gen.cancelled) return
+      // 不检查 gen.cancelled：必须设置 msgIdx，否则 onGrammar 找不到目标消息
       msgIdx = messages.value.push({ role: 'user', text: '' }) - 1
-      currentUserMsgIdx.value = msgIdx  // 模板渲染用
-      scrollToBottom()
-      typewriteUserText(msgIdx, text)
+      if (!gen.cancelled) {
+        currentUserMsgIdx.value = msgIdx  // 模板渲染用
+        scrollToBottom()
+        typewriteUserText(msgIdx, text)
+      }
     },
     onGrammar(data) {
       // 不检查 gen.cancelled：上一段的语法结果也要显示
