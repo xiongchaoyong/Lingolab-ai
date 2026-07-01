@@ -1,9 +1,11 @@
 <script setup>
 import { ref, onMounted } from 'vue'
+import { ElMessage } from 'element-plus'
 import {
   getRecommendationsApi,
   dislikeRecommendationApi,
   refreshRecommendationsApi,
+  clickRecommendationApi,
 } from '@/api/recommendation'
 
 const recommendations = ref({ videos: [], articles: [], audios: [] })
@@ -58,6 +60,22 @@ async function handleDislike(material) {
 
 function isDisliked(id) {
   return dislikedIds.value.has(id)
+}
+
+async function handleView(item) {
+  // 记录查看行为
+  try {
+    await clickRecommendationApi(item.id, 'view')
+  } catch {
+    // 静默失败
+  }
+
+  // 打开资料链接
+  if (item.url) {
+    window.open(item.url, '_blank')
+  } else {
+    ElMessage.warning('该资料暂无链接')
+  }
 }
 
 const typeMeta = {
@@ -127,7 +145,7 @@ onMounted(() => {
                 推荐分：{{ item.score }}
               </div>
               <div class="material-actions" v-if="!isDisliked(item.id)">
-                <el-button size="small" text type="primary">查看</el-button>
+                <el-button size="small" text type="primary" @click="handleView(item)">查看</el-button>
                 <el-button size="small" text @click="handleDislike(item)">不感兴趣</el-button>
               </div>
               <div v-else class="disliked-hint">
