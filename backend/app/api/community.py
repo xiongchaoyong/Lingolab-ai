@@ -25,6 +25,9 @@ from app.schemas.community import (
     GroupListResponse,
     GroupItem,
     JoinResult,
+    CreateGroupRequest,
+    GroupDetailResponse,
+    GroupMemberItem,
 )
 from app.services.community import community_service
 
@@ -143,7 +146,7 @@ async def create_post(
     db: Session = Depends(get_db),
 ):
     """发帖"""
-    result = community_service.create_post(current_user.id, body.topic, body.content, db)
+    result = community_service.create_post(current_user.id, body.topic, body.content, db, group_id=body.group_id)
     db.commit()
     return PostItem(**result)
 
@@ -210,3 +213,50 @@ async def toggle_group(
     result = community_service.toggle_group(current_user.id, group_id, db)
     db.commit()
     return JoinResult(**result)
+
+
+@router.post("/groups", response_model=GroupItem)
+async def create_group(
+    body: CreateGroupRequest,
+    current_user: UserProfile = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """创建学习小组"""
+    result = community_service.create_group(current_user.id, body.model_dump(), db)
+    db.commit()
+    return GroupItem(**result)
+
+
+@router.get("/groups/{group_id}", response_model=GroupDetailResponse)
+async def get_group_detail(
+    group_id: int,
+    current_user: UserProfile = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """获取小组详情（含成员列表）"""
+    try:
+        result = community_service.get_group_detail(group_id, current_user.id, db)
+    except ValueError as e:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail=str(e))
+    return GroupDetailResponse(**result)
+
+
+@router.get("/groups/{group_id}/members", response_model=list[GroupMemberItem])
+async def get_group_members(
+    group_id: int,
+    db: Session = Depends(get_db),
+):
+    """获取小组成员列表"""
+    items = community_service.get_group_members(group_id, db)
+    return [GroupMemberItem(**i) for i in items]
+
+
+@router.get("/groups/{group_id}/posts", response_model=PostListResponse)
+async def get_group_posts(
+    group_id: int,
+    db: Session = Depends(get_db),
+):
+    """获取小组帖子列表"""
+    items = community_service.get_group_posts(group_id, db)
+    return PostListResponse(posts=[PostItem(**i) for i in items])

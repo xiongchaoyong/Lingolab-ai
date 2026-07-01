@@ -107,6 +107,12 @@ const routes = [
         component: () => import('@/views/community/CommunityView.vue'),
         meta: { title: '社区', auth: true },
       },
+      {
+        path: 'community/groups/:id',
+        name: 'GroupDetail',
+        component: () => import('@/views/community/GroupDetailView.vue'),
+        meta: { title: '小组详情', auth: true },
+      },
       // 学生端：我的班级 & 我的作业
       {
         path: 'my-classes',

@@ -1,9 +1,11 @@
 <script setup>
 import { ref, onMounted } from 'vue'
-import { Microphone, Star, ChatLineRound, Picture, UserFilled, Clock } from '@element-plus/icons-vue'
+import { useRouter } from 'vue-router'
+import { Microphone, Star, ChatLineRound, Picture, UserFilled, Clock, Plus } from '@element-plus/icons-vue'
 import VoiceRecorder from '@/components/common/VoiceRecorder.vue'
 import { useCommunityStore } from '@/stores/community'
 
+const router = useRouter()
 const store = useCommunityStore()
 
 const activeTab = ref('challenge')
@@ -16,6 +18,18 @@ const comments = ref([])
 const showRecorder = ref(false)
 const submitting = ref(false)
 const submitResult = ref(null)
+
+// ===== 创建小组 =====
+const showCreateGroupDialog = ref(false)
+const createGroupForm = ref({
+  name: '',
+  description: '',
+  level: 'A1',
+  schedule: '',
+  tags: '',
+  max_members: 20,
+})
+const creatingGroup = ref(false)
 
 onMounted(() => {
   store.fetchChallenges()
@@ -76,6 +90,26 @@ async function handleAddComment() {
 
 async function handleToggleGroup(group) {
   await store.toggleGroup(group.id)
+}
+
+function goToGroup(group) {
+  router.push(`/community/groups/${group.id}`)
+}
+
+async function handleCreateGroup() {
+  if (!createGroupForm.value.name.trim()) return
+  creatingGroup.value = true
+  try {
+    const tags = createGroupForm.value.tags
+      .split(/[,，]/)
+      .map(t => t.trim())
+      .filter(Boolean)
+    await store.createGroup({ ...createGroupForm.value, tags })
+    showCreateGroupDialog.value = false
+    createGroupForm.value = { name: '', description: '', level: 'A1', schedule: '', tags: '', max_members: 20 }
+  } finally {
+    creatingGroup.value = false
+  }
 }
 
 // ===== 排行榜颜色 =====
@@ -203,12 +237,15 @@ const rankColors = { 1: '#FFD700', 2: '#C0C0C0', 3: '#CD7F32' }
 
       <!-- ======================================== 学习小组 -->
       <el-tab-pane label="学习小组" name="groups">
+        <div class="groups-toolbar">
+          <el-button type="primary" :icon="Plus" @click="showCreateGroupDialog = true">创建小组</el-button>
+        </div>
         <div v-if="store.groups.length === 0 && !store.groupsLoading" class="empty-hint">
           暂无学习小组
         </div>
         <el-row v-else :gutter="16">
           <el-col :span="12" v-for="group in store.groups" :key="group.id">
-            <div class="group-card" :class="{ joined: group.is_joined }">
+            <div class="group-card" :class="{ joined: group.is_joined }" @click="goToGroup(group)">
               <div class="group-header">
                 <h4>{{ group.name }}</h4>
                 <el-tag size="small" :type="group.is_joined ? 'success' : 'info'">
@@ -226,7 +263,7 @@ const rankColors = { 1: '#FFD700', 2: '#C0C0C0', 3: '#CD7F32' }
               <el-button
                 :type="group.is_joined ? 'default' : 'primary'"
                 size="small"
-                @click="handleToggleGroup(group)"
+                @click.stop="handleToggleGroup(group)"
               >
                 {{ group.is_joined ? '退出小组' : '加入小组' }}
               </el-button>
@@ -264,6 +301,38 @@ const rankColors = { 1: '#FFD700', 2: '#C0C0C0', 3: '#CD7F32' }
             发表评论
           </el-button>
         </div>
+      </template>
+    </el-dialog>
+
+    <!-- 创建小组弹窗 -->
+    <el-dialog v-model="showCreateGroupDialog" title="创建学习小组" width="480px" :close-on-click-modal="true">
+      <el-form :model="createGroupForm" label-position="top">
+        <el-form-item label="小组名称" required>
+          <el-input v-model="createGroupForm.name" placeholder="输入小组名称" maxlength="100" />
+        </el-form-item>
+        <el-form-item label="小组简介">
+          <el-input v-model="createGroupForm.description" type="textarea" :rows="3" placeholder="简单介绍小组" maxlength="500" />
+        </el-form-item>
+        <el-form-item label="等级范围">
+          <el-select v-model="createGroupForm.level" style="width:100%">
+            <el-option v-for="lv in ['A1','A2','B1','B2','C1','C2']" :key="lv" :label="lv" :value="lv" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="活动时间">
+          <el-input v-model="createGroupForm.schedule" placeholder="如：每周三晚 8:00-9:00" maxlength="100" />
+        </el-form-item>
+        <el-form-item label="标签（逗号分隔）">
+          <el-input v-model="createGroupForm.tags" placeholder="如：口语, 日常对话, 初级" maxlength="200" />
+        </el-form-item>
+        <el-form-item label="最大人数">
+          <el-input-number v-model="createGroupForm.max_members" :min="2" :max="100" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="showCreateGroupDialog = false">取消</el-button>
+        <el-button type="primary" @click="handleCreateGroup" :loading="creatingGroup" :disabled="!createGroupForm.name.trim()">
+          创建小组
+        </el-button>
       </template>
     </el-dialog>
   </div>
@@ -353,13 +422,19 @@ const rankColors = { 1: '#FFD700', 2: '#C0C0C0', 3: '#CD7F32' }
 .group-card {
   background: var(--color-bg-secondary); border: 1px solid var(--color-border);
   border-radius: var(--radius-md); padding: var(--spacing-xl);
-  margin-bottom: var(--spacing-lg);
+  margin-bottom: var(--spacing-lg); cursor: pointer;
+  transition: all 0.2s;
+  &:hover { box-shadow: var(--shadow-hover); transform: translateY(-1px); }
   &.joined { border-color: rgba(var(--color-success-rgb), 0.3); }
   .group-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--spacing-md);
     h4 { margin: 0; }
   }
   .group-body { display: flex; flex-direction: column; gap: var(--spacing-sm); margin-bottom: var(--spacing-md); }
   .group-stat { font-size: var(--font-size-sm); color: var(--color-text-secondary); display: flex; align-items: center; gap: var(--spacing-xs); }
+}
+
+.groups-toolbar {
+  margin-bottom: var(--spacing-lg);
 }
 
 .comment-list { max-height: 300px; overflow-y: auto; margin-bottom: var(--spacing-lg); }

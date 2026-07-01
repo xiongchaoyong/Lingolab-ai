@@ -29,8 +29,8 @@ export function getPostsApi() {
 }
 
 /** 发帖 */
-export function createPostApi(topic, content) {
-  return request.post('/api/community/posts', { topic, content })
+export function createPostApi(topic, content, groupId = null) {
+  return request.post('/api/community/posts', { topic, content, group_id: groupId })
 }
 
 /** 切换点赞 */
@@ -58,4 +58,24 @@ export function getGroupsApi() {
 /** 加入/退出小组 */
 export function toggleGroupApi(groupId) {
   return request.post(`/api/community/groups/${groupId}/join`)
+}
+
+/** 创建小组 */
+export function createGroupApi(data) {
+  return request.post('/api/community/groups', data)
+}
+
+/** 获取小组详情 */
+export function getGroupDetailApi(groupId) {
+  return request.get(`/api/community/groups/${groupId}`)
+}
+
+/** 获取小组成员 */
+export function getGroupMembersApi(groupId) {
+  return request.get(`/api/community/groups/${groupId}/members`)
+}
+
+/** 获取小组帖子 */
+export function getGroupPostsApi(groupId) {
+  return request.get(`/api/community/groups/${groupId}/posts`)
 }

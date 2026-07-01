@@ -188,12 +188,13 @@ class CommunityService:
             })
         return result
 
-    def create_post(self, user_id: int, topic: str, content: str, db: Session) -> Dict:
+    def create_post(self, user_id: int, topic: str, content: str, db: Session, group_id: int = None) -> Dict:
         """发帖"""
         post = DiscussionPost(
             user_id=user_id,
             topic=topic,
             content=content,
+            group_id=group_id,
         )
         db.add(post)
         db.flush()
@@ -312,6 +313,120 @@ class CommunityService:
                 "created_at": g.created_at.isoformat() if g.created_at else "",
             })
         return result
+
+    def create_group(self, user_id: int, data: Dict, db: Session) -> Dict:
+        """创建学习小组"""
+        tags_str = ",".join(data.get("tags", [])) if data.get("tags") else ""
+        group = StudyGroup(
+            name=data["name"],
+            description=data.get("description", ""),
+            creator_id=user_id,
+            level_range=data.get("level", "A1"),
+            schedule=data.get("schedule", ""),
+            tags=tags_str,
+            max_members=data.get("max_members", 20),
+            member_count=1,
+        )
+        db.add(group)
+        db.flush()
+        # 创建者自动成为 owner
+        db.add(GroupMember(group_id=group.id, user_id=user_id, role="owner"))
+        db.flush()
+        return {
+            "id": group.id,
+            "name": group.name,
+            "description": group.description,
+            "level": group.level_range or "",
+            "schedule": group.schedule or "",
+            "tags": data.get("tags", []),
+            "member_count": 1,
+            "max_members": group.max_members,
+            "is_joined": True,
+            "created_at": group.created_at.isoformat() if group.created_at else "",
+        }
+
+    def get_group_detail(self, group_id: int, user_id: int, db: Session) -> Dict:
+        """获取小组详情（含成员列表）"""
+        group = db.query(StudyGroup).filter(StudyGroup.id == group_id).first()
+        if not group:
+            raise ValueError("小组不存在")
+
+        # 成员列表
+        memberships = (
+            db.query(GroupMember, UserProfile)
+            .join(UserProfile, GroupMember.user_id == UserProfile.id)
+            .filter(GroupMember.group_id == group_id)
+            .all()
+        )
+        members = [{
+            "user_id": m.user_id,
+            "username": up.username,
+            "avatar": up.avatar or "",
+            "role": m.role or "member",
+            "joined_at": m.joined_at.isoformat() if m.joined_at else "",
+        } for m, up in memberships]
+
+        # 是否已加入
+        is_joined = (
+            db.query(GroupMember)
+            .filter(GroupMember.group_id == group_id, GroupMember.user_id == user_id)
+            .first()
+        ) is not None
+
+        tags = [t.strip() for t in group.tags.split(",") if t.strip()] if group.tags else []
+
+        return {
+            "id": group.id,
+            "name": group.name,
+            "description": group.description,
+            "level": group.level_range or "",
+            "schedule": group.schedule or "",
+            "tags": tags,
+            "member_count": group.member_count,
+            "max_members": group.max_members,
+            "is_joined": is_joined,
+            "created_at": group.created_at.isoformat() if group.created_at else "",
+            "members": members,
+        }
+
+    def get_group_members(self, group_id: int, db: Session) -> List[Dict]:
+        """获取小组成员列表"""
+        memberships = (
+            db.query(GroupMember, UserProfile)
+            .join(UserProfile, GroupMember.user_id == UserProfile.id)
+            .filter(GroupMember.group_id == group_id)
+            .order_by(GroupMember.joined_at)
+            .all()
+        )
+        return [{
+            "user_id": m.user_id,
+            "username": up.username,
+            "avatar": up.avatar or "",
+            "role": m.role or "member",
+            "joined_at": m.joined_at.isoformat() if m.joined_at else "",
+        } for m, up in memberships]
+
+    def get_group_posts(self, group_id: int, db: Session) -> List[Dict]:
+        """获取小组帖子列表"""
+        posts = (
+            db.query(DiscussionPost)
+            .filter(DiscussionPost.group_id == group_id)
+            .order_by(DiscussionPost.created_at.desc())
+            .all()
+        )
+        return [{
+            "id": p.id,
+            "user_id": p.user_id,
+            "username": "",
+            "avatar": "",
+            "topic": p.topic,
+            "content": p.content,
+            "likes_count": p.likes_count,
+            "comments_count": p.comments_count,
+            "is_liked": False,
+            "created_at": p.created_at.isoformat() if p.created_at else "",
+            "updated_at": p.updated_at.isoformat() if p.updated_at else "",
+        } for p in posts]
 
     def toggle_group(self, user_id: int, group_id: int, db: Session) -> Dict:
         """加入/退出小组"""

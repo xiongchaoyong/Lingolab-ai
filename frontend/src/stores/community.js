@@ -11,6 +11,10 @@ import {
   addCommentApi,
   getGroupsApi,
   toggleGroupApi,
+  createGroupApi,
+  getGroupDetailApi,
+  getGroupMembersApi,
+  getGroupPostsApi,
 } from '@/api/community'
 
 export const useCommunityStore = defineStore('community', () => {
@@ -57,8 +61,8 @@ export const useCommunityStore = defineStore('community', () => {
     }
   }
 
-  async function createPost(topic, content) {
-    const post = await createPostApi(topic, content)
+  async function createPost(topic, content, groupId = null) {
+    const post = await createPostApi(topic, content, groupId)
     posts.value.unshift(post)
     return post
   }
@@ -112,11 +116,47 @@ export const useCommunityStore = defineStore('community', () => {
     return result
   }
 
+  async function createGroup(data) {
+    const group = await createGroupApi(data)
+    groups.value.unshift(group)
+    return group
+  }
+
+  // ===== 小组详情 =====
+  const groupDetail = ref(null)
+  const groupMembers = ref([])
+  const groupPosts = ref([])
+  const groupDetailLoading = ref(false)
+
+  async function fetchGroupDetail(groupId) {
+    groupDetailLoading.value = true
+    try {
+      const [detail, members, posts] = await Promise.all([
+        getGroupDetailApi(groupId),
+        getGroupMembersApi(groupId),
+        getGroupPostsApi(groupId),
+      ])
+      groupDetail.value = detail
+      groupMembers.value = members
+      groupPosts.value = posts.posts || []
+    } finally {
+      groupDetailLoading.value = false
+    }
+  }
+
+  async function createGroupPost(groupId, topic, content) {
+    const post = await createPostApi(topic, content, groupId)
+    groupPosts.value.unshift(post)
+    return post
+  }
+
   return {
     challenges, leaderboard, currentChallenge, challengesLoading,
     fetchChallenges, submitChallenge, fetchLeaderboard,
     posts, postsLoading, fetchPosts, createPost, toggleLike,
     fetchComments, addComment,
-    groups, groupsLoading, fetchGroups, toggleGroup,
+    groups, groupsLoading, fetchGroups, toggleGroup, createGroup,
+    groupDetail, groupMembers, groupPosts, groupDetailLoading,
+    fetchGroupDetail, createGroupPost,
   }
 })

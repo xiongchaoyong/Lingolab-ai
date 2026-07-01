@@ -44,6 +44,7 @@ class DiscussionPost(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(Integer, ForeignKey("user_profiles.id"), nullable=False)
+    group_id = Column(Integer, ForeignKey("groups.id"), default=None, comment="所属小组ID（可选）")
     topic = Column(String(200), nullable=False, comment="帖子标题")
     content = Column(Text, nullable=False, comment="帖子内容")
     likes_count = Column(Integer, default=0, comment="点赞数")

@@ -4,6 +4,20 @@
 
 ---
 
+## 2026-07-01: 学习小组功能完整实现
+
+### 变更内容
+1. **后端 — 创建小组 API**：`POST /api/community/groups`，创建者自动成为 owner 成员
+2. **后端 — 小组详情 API**：`GET /api/community/groups/{id}` 含成员列表 + 基本信息
+3. **后端 — 小组成员列表 API**：`GET /api/community/groups/{id}/members`
+4. **后端 — 小组帖子 API**：`GET/POST /api/community/groups/{id}/posts`，DiscussionPost 新增 group_id 字段
+5. **前端 — 创建小组对话框**：CommunityView 添加表单弹窗（名称/描述/等级/时间/标签/人数）
+6. **前端 — 小组详情页**：`GroupDetailView.vue`（`/community/groups/:id`）含成员列表 + 小组讨论区
+7. **前端 — 小组卡片可点击**：点击卡片跳转详情页，hover 抬起效果
+8. **数据库 — discussion_posts 新增 group_id 列**
+
+---
+
 ## 2026-07-01: 修复评分服务不可用 — NLTK 数据缺失
 
 ### 问题
