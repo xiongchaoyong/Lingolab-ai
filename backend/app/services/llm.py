@@ -786,7 +786,7 @@ class LLMService:
                     json={
                         "model": self.model,
                         "messages": [{"role": "user", "content": prompt}],
-                        "max_tokens": 350,
+                        "max_tokens": 600,
                         "temperature": 0.3,
                         "enable_thinking": False,
                     },

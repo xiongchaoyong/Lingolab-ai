@@ -34,7 +34,7 @@ const isScoring = ref(false)
 // 对话记录（滚动展示）
 const messages = ref([])  // [{role: 'user'|'ai', text, grammar?, streaming?}]
 const chatBoxRef = ref(null)
-let activeStreamController = null  // 当前活跃的 SSE 流控制器，新请求取消旧请求
+let activeGeneration = null  // { cancelled: bool } 旧流标记，不杀 fetch 但静默回调
 const currentUserMsgIdx = ref(-1)  // 模板渲染用（哪个消息正在等待语法检测）
 
 // 语法错误类型颜色映射
@@ -126,7 +126,7 @@ async function selectScenario(scenario) {
   callState.value = 'idle'
   isPaused.value = false
   messages.value = []
-  if (activeStreamController) { activeStreamController.abort(); activeStreamController = null }
+  if (activeGeneration) { activeGeneration.cancelled = true; activeGeneration = null }
   currentUserMsgIdx.value = -1
 
   // 开始对话
@@ -259,24 +259,24 @@ async function processUserAudio() {
   callState.value = 'thinking'
   const audioBlob = new Blob(audioChunks, { type: 'audio/webm' })
 
-  // 取消上一次 SSE 流（避免旧语法检测结果覆盖新消息）
-  if (activeStreamController) {
-    activeStreamController.abort()
+  // 标记上一代流为取消，但不 abort fetch（语法事件仍能到达）
+  if (activeGeneration) {
+    activeGeneration.cancelled = true
   }
-  activeStreamController = new AbortController()
-  const signal = activeStreamController.signal
+  const gen = { cancelled: false }
+  activeGeneration = gen
   let msgIdx = -1  // 局部变量：每次调用独立的索引，避免竞态覆盖
 
   streamSpeakConversation(sessionId.value, selectedScenario.value.id, audioBlob, {
     onAsr(text) {
+      if (gen.cancelled) return
       msgIdx = messages.value.push({ role: 'user', text: '' }) - 1
       currentUserMsgIdx.value = msgIdx  // 模板渲染用
       scrollToBottom()
-      // 逐字流式显示用户文本
       typewriteUserText(msgIdx, text)
     },
     onGrammar(data) {
-      // 使用闭包捕获的 msgIdx，不会被后续调用覆盖
+      // 不检查 gen.cancelled：上一段的语法结果也要显示
       if (msgIdx >= 0 && msgIdx < messages.value.length) {
         const msg = messages.value[msgIdx]
         if (msg && msg.role === 'user') {
@@ -285,6 +285,7 @@ async function processUserAudio() {
       }
     },
     onToken(text) {
+      if (gen.cancelled) return
       const last = messages.value[messages.value.length - 1]
       if (last && last.role === 'ai' && last.streaming) {
         last.text += text
@@ -294,6 +295,7 @@ async function processUserAudio() {
       scrollToBottom()
     },
     onDone(data) {
+      if (gen.cancelled) return
       const last = messages.value[messages.value.length - 1]
       if (last && last.role === 'ai') {
         last.text = data.full_text
@@ -301,12 +303,13 @@ async function processUserAudio() {
       }
       speakAndListen(data.full_text, data.tts_url ? ttsCachedUrl(data.tts_url) : null)
     },
-    onError() {
+    onError(msg) {
+      if (gen.cancelled) return
       messages.value.push({ role: 'ai', text: 'Sorry, I had trouble understanding that.' })
       scrollToBottom()
       startListening()
     },
-  }, signal)
+  })
 }
 
 // ========== 暂停 / 继续 ==========
@@ -335,8 +338,8 @@ async function hangUp() {
   isHangingUp = true
   isPaused.value = false
 
-  // 1. 取消进行中的 SSE 流
-  if (activeStreamController) { activeStreamController.abort(); activeStreamController = null }
+  // 1. 取消进行中的 SSE 流回调
+  if (activeGeneration) { activeGeneration.cancelled = true; activeGeneration = null }
 
   // 2. 停止录音和相关资源
   if (vadRaF) { cancelAnimationFrame(vadRaF); vadRaF = null }
