@@ -776,7 +776,7 @@ class LLMService:
         )
 
         try:
-            async with httpx.AsyncClient(timeout=15.0) as client:
+            async with httpx.AsyncClient(timeout=12.0) as client:
                 resp = await client.post(
                     BAILIAN_API_URL,
                     headers={
@@ -786,7 +786,7 @@ class LLMService:
                     json={
                         "model": self.model,
                         "messages": [{"role": "user", "content": prompt}],
-                        "max_tokens": 800,
+                        "max_tokens": 350,
                         "temperature": 0.3,
                         "enable_thinking": False,
                     },

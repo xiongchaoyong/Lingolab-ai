@@ -29,7 +29,7 @@ const isScoring = ref(false)
 
 const messages = ref([])
 const chatBoxRef = ref(null)
-let currentUserMsgIdx = -1
+let activeStreamController = null  // 当前活跃的 SSE 流控制器，新请求取消旧请求
 
 const ERROR_TYPE_COLORS = {
   tense: '#E6A23C', subject_verb_agreement: '#F56C6C', article: '#909399',
@@ -94,7 +94,7 @@ async function selectRole(role) {
   callState.value = 'idle'
   isPaused.value = false
   messages.value = []
-  currentUserMsgIdx = -1
+  if (activeStreamController) { activeStreamController.abort(); activeStreamController = null }
 
   isConnecting.value = true
   streamStartRoleplay(role.id, 'B1', {
@@ -188,16 +188,24 @@ async function processUserAudio() {
   callState.value = 'thinking'
   const audioBlob = new Blob(audioChunks, { type: 'audio/webm' })
 
+  // 取消上一次 SSE 流（避免旧语法检测结果覆盖新消息）
+  if (activeStreamController) {
+    activeStreamController.abort()
+  }
+  activeStreamController = new AbortController()
+  const signal = activeStreamController.signal
+  let msgIdx = -1  // 局部变量：每次调用独立的索引，避免竞态覆盖
+
   streamSpeakRoleplay(sessionId.value, selectedRole.value.id, audioBlob, {
     onAsr(text) {
-      const idx = messages.value.push({ role: 'user', text: '' }) - 1
-      currentUserMsgIdx = idx
+      msgIdx = messages.value.push({ role: 'user', text: '' }) - 1
       scrollToBottom()
-      typewriteUserText(idx, text)
+      typewriteUserText(msgIdx, text)
     },
     onGrammar(data) {
-      if (currentUserMsgIdx >= 0 && currentUserMsgIdx < messages.value.length) {
-        const msg = messages.value[currentUserMsgIdx]
+      // 使用闭包捕获的 msgIdx，不会被后续调用覆盖
+      if (msgIdx >= 0 && msgIdx < messages.value.length) {
+        const msg = messages.value[msgIdx]
         if (msg && msg.role === 'user') msg.grammar = { ...data, _collapsed: true }
       }
     },
@@ -217,7 +225,7 @@ async function processUserAudio() {
       messages.value.push({ role: 'ai', text: 'Sorry, I had trouble understanding that.' })
       scrollToBottom(); startListening()
     },
-  })
+  }, signal)
 }
 
 function togglePause() {
@@ -236,6 +244,8 @@ function togglePause() {
 
 async function hangUp() {
   isHangingUp = true; isPaused.value = false
+  // 取消进行中的 SSE 流
+  if (activeStreamController) { activeStreamController.abort(); activeStreamController = null }
   if (vadRaF) { cancelAnimationFrame(vadRaF); vadRaF = null }
   if (mediaRecorder) {
     mediaRecorder.onstop = null

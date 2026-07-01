@@ -34,7 +34,7 @@ const isScoring = ref(false)
 // 对话记录（滚动展示）
 const messages = ref([])  // [{role: 'user'|'ai', text, grammar?, streaming?}]
 const chatBoxRef = ref(null)
-let currentUserMsgIdx = -1  // 当前等待语法纠错的用户消息索引
+let activeStreamController = null  // 当前活跃的 SSE 流控制器，新请求取消旧请求
 
 // 语法错误类型颜色映射
 const ERROR_TYPE_COLORS = {
@@ -125,7 +125,7 @@ async function selectScenario(scenario) {
   callState.value = 'idle'
   isPaused.value = false
   messages.value = []
-  currentUserMsgIdx = -1
+  if (activeStreamController) { activeStreamController.abort(); activeStreamController = null }
 
   // 开始对话
   isConnecting.value = true
@@ -257,18 +257,25 @@ async function processUserAudio() {
   callState.value = 'thinking'
   const audioBlob = new Blob(audioChunks, { type: 'audio/webm' })
 
+  // 取消上一次 SSE 流（避免旧语法检测结果覆盖新消息）
+  if (activeStreamController) {
+    activeStreamController.abort()
+  }
+  activeStreamController = new AbortController()
+  const signal = activeStreamController.signal
+  let msgIdx = -1  // 局部变量：每次调用独立的索引，避免竞态覆盖
+
   streamSpeakConversation(sessionId.value, selectedScenario.value.id, audioBlob, {
     onAsr(text) {
-      const idx = messages.value.push({ role: 'user', text: '' }) - 1
-      currentUserMsgIdx = idx
+      msgIdx = messages.value.push({ role: 'user', text: '' }) - 1
       scrollToBottom()
       // 逐字流式显示用户文本
-      typewriteUserText(idx, text)
+      typewriteUserText(msgIdx, text)
     },
     onGrammar(data) {
-      // 语法纠错挂到对应索引的用户消息上
-      if (currentUserMsgIdx >= 0 && currentUserMsgIdx < messages.value.length) {
-        const msg = messages.value[currentUserMsgIdx]
+      // 使用闭包捕获的 msgIdx，不会被后续调用覆盖
+      if (msgIdx >= 0 && msgIdx < messages.value.length) {
+        const msg = messages.value[msgIdx]
         if (msg && msg.role === 'user') {
           msg.grammar = { ...data, _collapsed: true }
         }
@@ -296,7 +303,7 @@ async function processUserAudio() {
       scrollToBottom()
       startListening()
     },
-  })
+  }, signal)
 }
 
 // ========== 暂停 / 继续 ==========
@@ -325,7 +332,10 @@ async function hangUp() {
   isHangingUp = true
   isPaused.value = false
 
-  // 1. 停止录音和相关资源
+  // 1. 取消进行中的 SSE 流
+  if (activeStreamController) { activeStreamController.abort(); activeStreamController = null }
+
+  // 2. 停止录音和相关资源
   if (vadRaF) { cancelAnimationFrame(vadRaF); vadRaF = null }
   if (mediaRecorder) {
     // 移除 onstop 回调，防止触发 processUserAudio

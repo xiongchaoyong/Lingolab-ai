@@ -4,6 +4,13 @@
 
 ---
 
+## 2026-07-01: 语法检测竞态条件修复 + 速度优化
+
+### 变更内容
+1. **修复语法检测结果丢失（竞态条件）**：`currentUserMsgIdx` 从模块级共享变量改为 `processUserAudio` 局部闭包变量，每次调用独立捕获索引，新请求不再覆盖旧索引
+2. **添加 SSE 流取消机制**：API 层 `streamSpeakConversation`/`streamSpeakRoleplay` 增加 `AbortSignal` 参数，新录音自动取消上一次未完成的 SSE 流
+3. **语法检测 LLM 速度优化**：`max_tokens` 800→350，`timeout` 15s→12s，减少响应时间
+
 ## 2026-07-01: 语法检测功能修复（对话+角色扮演）
 
 ### 变更内容
