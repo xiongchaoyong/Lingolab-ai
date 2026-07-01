@@ -361,7 +361,7 @@ class CommunityService:
         members = [{
             "user_id": m.user_id,
             "username": up.username,
-            "avatar": up.avatar or "",
+            "avatar": up.avatar_url or "",
             "role": m.role or "member",
             "joined_at": m.joined_at.isoformat() if m.joined_at else "",
         } for m, up in memberships]
@@ -401,7 +401,7 @@ class CommunityService:
         return [{
             "user_id": m.user_id,
             "username": up.username,
-            "avatar": up.avatar or "",
+            "avatar": up.avatar_url or "",
             "role": m.role or "member",
             "joined_at": m.joined_at.isoformat() if m.joined_at else "",
         } for m, up in memberships]
