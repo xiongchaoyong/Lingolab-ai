@@ -4,6 +4,18 @@
 
 ---
 
+## 2026-07-01: 修复评分服务不可用 — NLTK 数据缺失
+
+### 问题
+`g2p_en` 库需要 NLTK 的 `averaged_perceptron_tagger_eng` 和 `cmudict` 资源，但 NLTK 服务器在国内无法访问，导致发音模型加载失败。
+
+### 修复
+1. 通过 ghproxy 镜像下载 `averaged_perceptron_tagger_eng`（JSON 格式，1.5MB）
+2. 通过 ghproxy 镜像下载 `cmudict`（896KB）
+3. 数据存放路径：`~/nltk_data/taggers/` 和 `~/nltk_data/corpora/`
+
+---
+
 ## 2026-07-01: 修复闯关录音失败 — 前端直接输出 WAV 格式
 
 ### 变更内容
