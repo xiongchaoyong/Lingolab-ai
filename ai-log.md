@@ -4,6 +4,15 @@
 
 ---
 
+## 2026-07-02: 用户画像维度重构 + iOS 风格导航栏
+
+### 变更内容
+1. **画像四维度重构**：`listening/speaking/reading/grammar` → `fluency/pronunciation/vocabulary/grammar`，解决听力和阅读无日常评测数据的僵尸数据问题
+2. **后端全链路更新**：`profile_updater.py` 新增 ASSESSMENT_DIM_MAP 映射（测评维度→画像维度），`profile.py` 模型列重命名，`progress.py` 雷达图维度更新，`prediction.py/recommendation.py/knowledge_graph.py` 引用更新，`learning_path.py` API 和 Schema 同步
+3. **前端同步**：`ProfileSummaryView.vue` DIM_CONFIG 维度标签更新为发音/流利度/词汇运用/语法
+4. **导航栏 iOS 玻璃效果**：`TopNavLayout.vue` 重构为浮动胶囊布局 — 导航栏居中 65% 宽度 + 大圆角 + backdrop-filter 毛玻璃，头像独立定位到页面右端，下拉菜单亮色玻璃，通知铃铛移入导航栏
+5. **文档更新**：业务流程文档追加用户画像/EMA/推荐逻辑/知识图谱示例/观测层/智能客服/技术栈章节；新增答辩PPT三风格提示词
+
 ## 2026-07-02: RAG 知识库 + 智能客服增强
 
 ### 变更内容

@@ -221,8 +221,8 @@ def get_profile_summary(
     """获取个人情况说明 — 解释推荐依据"""
     # 维度中文标签
     DIM_LABELS = {
-        "speaking": "口语", "listening": "听力",
-        "reading": "阅读", "grammar": "语法",
+        "pronunciation": "发音", "fluency": "流利度",
+        "vocabulary": "词汇运用", "grammar": "语法",
     }
 
     # 1. 用户基础信息

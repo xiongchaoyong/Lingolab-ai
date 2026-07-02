@@ -216,7 +216,7 @@ class KnowledgeGraphService:
     def get_skills_by_dimension(self, dimension: str) -> List[str]:
         """获取属于某维度的技能节点 ID 列表
 
-        dimension: listening / speaking / reading / grammar
+        dimension: pronunciation / grammar / vocabulary / fluency
         """
         results = []
         for nid, attrs in self.graph.nodes(data=True):
@@ -227,21 +227,21 @@ class KnowledgeGraphService:
                 results.append(nid)
         return results
 
-    # 维度 → 技能子类型映射
+    # 画像维度 → 技能子类型映射
     DIMENSION_SKILL_MAP = {
-        "listening": None,       # 听力理解关联所有音素
-        "speaking": "phoneme",   # 口语表达关联音素
-        "reading": "vocabulary", # 阅读理解关联词汇
-        "grammar": "grammar",    # 语法选择关联语法
+        "fluency": None,          # 流利度关联所有音素和场景
+        "pronunciation": "phoneme",  # 发音关联音素
+        "vocabulary": "vocabulary",  # 词汇运用关联词汇
+        "grammar": "grammar",        # 语法关联语法
     }
 
     def get_skills_for_dimension(self, dimension: str) -> List[str]:
-        """根据测评维度获取关联的技能节点 ID"""
+        """根据画像维度获取关联的技能节点 ID"""
         sub_type = self.DIMENSION_SKILL_MAP.get(dimension)
         if sub_type:
             skills = self.get_nodes_by_type("skill", sub_type)
         else:
-            # listening 维度关联所有音素
+            # fluency 维度关联所有音素
             skills = self.get_nodes_by_type("skill", "phoneme")
         return [s["id"] for s in skills]
 

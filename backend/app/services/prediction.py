@@ -348,7 +348,7 @@ class PredictionService:
             db.query(func.avg(UserSkillScore.score))
             .filter(
                 UserSkillScore.user_id == user_id,
-                UserSkillScore.dimension == "speaking",
+                UserSkillScore.dimension == "pronunciation",
                 UserSkillScore.created_at >= start,
                 UserSkillScore.created_at <= mid,
             )
@@ -359,7 +359,7 @@ class PredictionService:
             db.query(func.avg(UserSkillScore.score))
             .filter(
                 UserSkillScore.user_id == user_id,
-                UserSkillScore.dimension == "speaking",
+                UserSkillScore.dimension == "pronunciation",
                 UserSkillScore.created_at >= mid,
                 UserSkillScore.created_at <= end,
             )

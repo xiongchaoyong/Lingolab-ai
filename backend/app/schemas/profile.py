@@ -18,7 +18,7 @@ class ProfileScoresResponse(BaseModel):
     level_final: Optional[str] = None
     dimension_scores: Dict[str, Optional[float]] = Field(
         default_factory=dict,
-        description="各维度当前 EMA 分数，如 {listening: 72.5, speaking: 68.3}"
+        description="各维度当前 EMA 分数，如 {pronunciation: 72.5, fluency: 68.3}"
     )
     recent_scores: List[SkillScoreItem] = Field(
         default_factory=list,
