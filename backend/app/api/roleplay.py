@@ -203,8 +203,10 @@ async def roleplay_speak(
         except Exception as e:
             logger.warning(f"流利度算法计算失败: {e}")
 
-        # LLM 角色回复
+        # LLM 角色回复 + 语法纠错（并行）
         llm = get_llm_service()
+        grammar_task = asyncio.create_task(llm.correct_grammar(user_text, cefr_level))
+
         ai_text = await llm.chat_roleplay(
             role=role,
             user_text=user_text,
@@ -215,12 +217,22 @@ async def roleplay_speak(
         # 记录 AI 消息
         session["history"].append({"role": "ai", "text": ai_text})
 
+        # 等待语法纠错结果
+        grammar_correction = None
+        try:
+            grammar_result = await grammar_task
+            if grammar_result.get("errors"):
+                grammar_correction = grammar_result
+        except Exception as e:
+            logger.warning(f"语法纠错失败: {e}")
+
         conversation_complete = session["round"] >= MAX_CONVERSATION_ROUNDS
 
         return RoleplaySpeakResponse(
             user_text=user_text,
             ai_text=ai_text,
             ai_audio_base64="",
+            grammar_correction=grammar_correction,
             conversation_complete=conversation_complete,
         )
 
@@ -312,7 +324,41 @@ async def roleplay_stream_start(
             asyncio.create_task(prefetch_tts())
 
             tts_url = f"/api/roleplay/tts/cached/{session_id}/{round_key}"
+
+            # 翻译 + 提示（后台启动，不与 done 竞争）
+            translation_task = asyncio.create_task(llm.translate_to_chinese(full_text))
+            hint_task = asyncio.create_task(llm.generate_hint(full_text, cefr_level))
+
             yield f"data: {json.dumps({'type': 'done', 'session_id': session_id, 'full_text': full_text, 'tts_url': tts_url})}\n\n"
+
+            # 等待翻译 + 提示结果
+            async def _wait_tagged(task, tag):
+                try:
+                    return tag, await task, None
+                except Exception as e:
+                    return tag, None, e
+
+            pending = [
+                _wait_tagged(translation_task, 'translation'),
+                _wait_tagged(hint_task, 'hint'),
+            ]
+
+            for coro in asyncio.as_completed(pending):
+                tag, result, error = await coro
+                if tag == 'translation':
+                    if error:
+                        logger.warning(f"翻译失败: {error}")
+                    elif result:
+                        yield f"data: {json.dumps({'type': 'translation', 'data': result})}\n\n"
+                elif tag == 'hint':
+                    if error:
+                        logger.warning(f"提示生成失败: {error}")
+                    elif result:
+                        try:
+                            hint_zh = await llm.translate_to_chinese(result)
+                        except Exception:
+                            hint_zh = ''
+                        yield f"data: {json.dumps({'type': 'hint', 'data': {'en': result, 'zh': hint_zh}})}\n\n"
         except Exception as e:
             logger.error(f"角色扮演流式 start 失败: {e}")
             yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
@@ -381,14 +427,18 @@ async def roleplay_stream_speak(
             session["round"] += 1
 
             # 持久化用户消息
+            db_msg_id = None
             try:
                 db_sid = session.get("db_session_id")
                 if db_sid:
-                    db.add(ConversationMessage(
+                    db_msg = ConversationMessage(
                         session_id=db_sid, round_number=session["round"],
                         role="user", content_text=user_text,
-                    ))
+                    )
+                    db.add(db_msg)
                     db.commit()
+                    db.refresh(db_msg)
+                    db_msg_id = db_msg.id
             except Exception as e:
                 db.rollback()
                 logger.warning(f"保存角色扮演用户消息失败: {e}")
@@ -408,7 +458,7 @@ async def roleplay_stream_speak(
             except Exception as e:
                 logger.warning(f"流利度算法计算失败: {e}")
 
-            # 语法纠错（后台并行，与 LLM 回复同时进行，不增加延迟）
+            # 🔧 语法纠错在 LLM 流式前启动，与 LLM 并行
             llm = get_llm_service()
             grammar_task = asyncio.create_task(llm.correct_grammar(user_text, cefr_level))
 
@@ -421,6 +471,10 @@ async def roleplay_stream_speak(
 
             session["history"].append({"role": "ai", "text": full_text})
             conversation_complete = session["round"] >= MAX_CONVERSATION_ROUNDS
+
+            # 翻译 + 提示（后台启动，不与 done 竞争）
+            translation_task = asyncio.create_task(llm.translate_to_chinese(full_text))
+            hint_task = asyncio.create_task(llm.generate_hint(full_text, cefr_level))
 
             # 持久化 AI 回复
             try:
@@ -435,15 +489,7 @@ async def roleplay_stream_speak(
                 db.rollback()
                 logger.warning(f"保存角色扮演 AI 消息失败: {e}")
 
-            # 等待语法纠错结果（后台已并行执行）
-            try:
-                grammar_result = await grammar_task
-                if grammar_result.get("errors"):
-                    yield f"data: {json.dumps({'type': 'grammar', 'data': grammar_result})}\n\n"
-            except Exception as e:
-                logger.warning(f"语法纠错失败: {e}")
-
-            # TTS 预取：后台启动 Edge TTS 调用，缓存音频块
+            # TTS 预取：后台启动 Edge TTS 调用
             round_key = str(session["round"])
             chunks = []
             cache_entry = {"chunks": chunks, "done": False}
@@ -463,8 +509,56 @@ async def roleplay_stream_speak(
 
             asyncio.create_task(prefetch_tts())
 
+            # ✅ done 立即发送，前端先播 TTS
             tts_url = f"/api/roleplay/tts/cached/{session_id}/{round_key}"
             yield f"data: {json.dumps({'type': 'done', 'full_text': full_text, 'conversation_complete': conversation_complete, 'tts_url': tts_url})}\n\n"
+
+            # ✅ 语法 / 翻译 / 提示 三者并行等结果，谁先完成先发谁
+            async def _wait_tagged(task, tag):
+                try:
+                    return tag, await task, None
+                except Exception as e:
+                    return tag, None, e
+
+            pending = [
+                _wait_tagged(grammar_task, 'grammar'),
+                _wait_tagged(translation_task, 'translation'),
+                _wait_tagged(hint_task, 'hint'),
+            ]
+
+            for coro in asyncio.as_completed(pending):
+                tag, result, error = await coro
+                if tag == 'grammar':
+                    if error:
+                        logger.warning(f"语法纠错失败: {error}")
+                    else:
+                        # 始终发送 grammar 事件（即使 errors 为空），防止前端永远等待
+                        yield f"data: {json.dumps({'type': 'grammar', 'data': result or {'errors': []}})}\n\n"
+                        if result and result.get("errors"):
+                            session["history"].append({"role": "grammar", "text": result})
+                        if db_msg_id and result:
+                            try:
+                                db.query(ConversationMessage).filter(
+                                    ConversationMessage.id == db_msg_id
+                                ).update({"grammar_check": result})
+                                db.commit()
+                            except Exception as e:
+                                db.rollback()
+                                logger.warning(f"保存语法纠错失败: {e}")
+                elif tag == 'translation':
+                    if error:
+                        logger.warning(f"翻译失败: {error}")
+                    elif result:
+                        yield f"data: {json.dumps({'type': 'translation', 'data': result})}\n\n"
+                elif tag == 'hint':
+                    if error:
+                        logger.warning(f"提示生成失败: {error}")
+                    elif result:
+                        try:
+                            hint_zh = await llm.translate_to_chinese(result)
+                        except Exception:
+                            hint_zh = ''
+                        yield f"data: {json.dumps({'type': 'hint', 'data': {'en': result, 'zh': hint_zh}})}\n\n"
 
         except Exception as e:
             logger.error(f"角色扮演流式 speak 失败: {e}")

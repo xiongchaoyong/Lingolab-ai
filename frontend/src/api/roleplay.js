@@ -30,8 +30,9 @@ export async function streamStartRoleplay(role, cefrLevel, callbacks) {
  * @param {string} role
  * @param {Blob} audioBlob
  * @param {object} callbacks - { onToken(text), onAsr(text), onGrammar(data), onDone(data), onError(err) }
+ * @param {AbortSignal} signal - 用于取消上一次请求
  */
-export async function streamSpeakRoleplay(sessionId, role, audioBlob, callbacks) {
+export async function streamSpeakRoleplay(sessionId, role, audioBlob, callbacks, signal) {
   const form = new FormData()
   form.append('session_id', sessionId)
   form.append('role', role)
@@ -40,11 +41,12 @@ export async function streamSpeakRoleplay(sessionId, role, audioBlob, callbacks)
     method: 'POST',
     headers: authHeaders(),
     body: form,
+    signal,
   })
-  await readSSEStream(resp, callbacks)
+  await readSSEStream(resp, callbacks, signal)
 }
 
-async function readSSEStream(resp, callbacks) {
+async function readSSEStream(resp, callbacks, signal) {
   if (!resp.ok) {
     callbacks.onError?.(`HTTP ${resp.status}`)
     return
@@ -53,38 +55,57 @@ async function readSSEStream(resp, callbacks) {
   const decoder = new TextDecoder()
   let buffer = ''
 
-  while (true) {
-    const { done, value } = await reader.read()
-    if (done) break
-    buffer += decoder.decode(value, { stream: true })
-    const lines = buffer.split('\n')
-    buffer = lines.pop() || ''
-    for (const line of lines) {
-      if (line.startsWith('data: ')) {
-        try {
-          const data = JSON.parse(line.slice(6))
-          switch (data.type) {
-            case 'token':
-              callbacks.onToken?.(data.content)
-              break
-            case 'asr':
-              callbacks.onAsr?.(data.text)
-              break
-            case 'done':
-              callbacks.onDone?.(data)
-              break
-            case 'error':
-              callbacks.onError?.(data.message)
-              break
-            case 'grammar':
-              callbacks.onGrammar?.(data.data)
-              break
+  try {
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      // 检查是否已被取消
+      if (signal?.aborted) {
+        reader.cancel()
+        break
+      }
+      buffer += decoder.decode(value, { stream: true })
+      const lines = buffer.split('\n')
+      buffer = lines.pop() || ''
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          try {
+            const data = JSON.parse(line.slice(6))
+            switch (data.type) {
+              case 'token':
+                callbacks.onToken?.(data.content)
+                break
+              case 'asr':
+                callbacks.onAsr?.(data.text)
+                break
+              case 'done':
+                callbacks.onDone?.(data)
+                break
+              case 'error':
+                callbacks.onError?.(data.message)
+                break
+              case 'grammar':
+                callbacks.onGrammar?.(data.data)
+                break
+              case 'translation':
+                callbacks.onTranslation?.(data.data)
+                break
+              case 'hint':
+                callbacks.onHint?.(data.data)
+                break
+            }
+          } catch (e) {
+            // skip malformed JSON
           }
-        } catch (e) {
-          // skip malformed JSON
         }
       }
     }
+  } catch (e) {
+    if (e.name === 'AbortError') {
+      // 请求被取消，静默处理
+      return
+    }
+    callbacks.onError?.(e.message)
   }
 }
 

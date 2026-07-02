@@ -4,6 +4,63 @@
 
 ---
 
+## 2026-07-02: 通话界面 UI 重构 + 提示卡片优化
+
+### 变更内容
+1. **左右面板布局重构**：通话界面改为 3:7 左右分栏，左侧展示 AI 状态/场景/提示/时间，右侧纯聊天区域
+2. **提示卡片增强**：SSE 流新增 hint 事件（英文提示+中文翻译），前端打字机逐字渲染，固定宽度卡片
+3. **会话状态信息**：左侧面板显示 ⏱️ 已用时间（实时计时），挂断/暂停按钮移至左侧底部
+4. **聊天区域视觉优化**：左侧紫色渐变背景 vs 右侧淡紫灰背景，聊天框卡片式圆角+阴影
+5. **最新消息居中定位**：`scrollIntoView({ block: 'center' })` + `::after` 45vh 占位，最新对话出现在可视区域中间
+6. **RolePlayView UI 对齐**：聊天气泡字号/间距/用户头像/authStore 全部与 VoiceCallView 统一
+
+### 影响文件
+- `frontend/src/views/conversation/VoiceCallView.vue` — 布局重构+提示卡片+会话信息
+- `frontend/src/views/roleplay/RolePlayView.vue` — 同步重构+UI 对齐
+- `frontend/src/api/conversation.js` — SSE 解析支持 translation/hint 事件
+- `frontend/src/api/roleplay.js` — 同上
+- `backend/app/api/conversation.py` — stream/start 添加翻译+hint 并行任务
+- `backend/app/api/roleplay.py` — 同上
+
+---
+
+## 2026-07-02: 修复语法检测竞态条件 Bug
+
+### 问题
+用户快速连续说话时，语法检测结果消失或挂到错误消息上（用户报告 3 次）。
+
+### 根因
+`VoiceCallView.vue` 和 `RolePlayView.vue` 的 `processUserAudio()` 中，`onAsr` 回调每次触发都会 `push` 一条新用户消息。当旧流的 ASR 比新流的 ASR 晚到时，旧 `onAsr` 会错误地插入重复消息并覆盖 `msgIdx`，导致语法结果挂到错误位置。
+
+### 修复
+将用户消息占位符的插入移到 SSE 流启动之前，`msgIdx` 变为闭包中不可变的 `const`。`onAsr` 仅更新文本，不再插入新消息。
+
+### 影响文件
+- `frontend/src/views/conversation/VoiceCallView.vue`
+- `frontend/src/views/roleplay/RolePlayView.vue`
+
+## 2026-07-02: AI 对话回复中文翻译功能
+
+### 变更内容
+1. **新增 LLM 翻译方法**：`translate_to_chinese()` 将英文文本译为地道中文
+2. **SSE 流新增 `translation` 事件**：conversation + roleplay 流式 speak 端点返回 AI 回复的中文翻译
+3. **前端翻译展开 UI**：蓝色「译」胶囊按钮，点击展开/收起中文翻译卡片
+
+## 2026-07-01: 语法检测竞态条件修复 + 速度优化
+
+### 变更内容
+1. **修复语法检测结果丢失（竞态条件）**：`currentUserMsgIdx` 从模块级共享变量改为 `processUserAudio` 局部闭包变量，每次调用独立捕获索引，新请求不再覆盖旧索引
+2. **添加 SSE 流取消机制**：API 层 `streamSpeakConversation`/`streamSpeakRoleplay` 增加 `AbortSignal` 参数，新录音自动取消上一次未完成的 SSE 流
+3. **语法检测 LLM 速度优化**：`max_tokens` 800→350，`timeout` 15s→12s，减少响应时间
+
+## 2026-07-01: 语法检测功能修复（对话+角色扮演）
+
+### 变更内容
+1. **角色扮演流式语法检测不再阻塞 TTS**：`roleplay_stream_speak` 中将语法 await 移到 `done` 事件之后，与 conversation 行为一致，TTS 播放不再等待语法检测
+2. **角色扮演语法结果持久化**：语法纠错结果存入 `conversation_messages.grammar_check`，并追加 `role: "grammar"` 到 session history，评分报告可展示纠错记录
+3. **非流式 speak 端点添加语法检测**：`conversation_speak` 和 `roleplay_speak` 增加 `asyncio.create_task(correct_grammar)` 并行调用，响应中返回 `grammar_correction`
+4. **Schema 类型修复**：`RoleplaySpeakResponse` 新增 `grammar_correction` 字段，`ConversationSpeakResponse.grammar_correction` 类型改为 `Optional[Dict[str, Any]]`
+
 ## 2026-06-29: 修复对话音频存储时序 + 文档清理
 
 ### 变更内容
