@@ -19,6 +19,7 @@ const scoreResult = ref(null)
 const isScoring = ref(false)
 const scoreError = ref('')
 const showDetail = ref(false)
+const detailTab = ref('phoneme')
 const recordingBlob = ref(null)
 const recordingUrl = ref('')
 const referenceUrl = ref('')
@@ -165,6 +166,7 @@ function resetState() {
   scoreResult.value = null
   scoreError.value = ''
   showDetail.value = false
+  detailTab.value = 'phoneme'
   recorderRef.value?.reset()
 }
 
@@ -533,9 +535,10 @@ const rhythmSummary = computed(() => {
     <el-dialog
       v-model="showDetail"
       title="发音详细评分报告"
-      width="900px"
+      width="1100px"
       :close-on-click-modal="false"
       destroy-on-close
+      top="3vh"
       class="score-dialog"
     >
       <template #header>
@@ -632,7 +635,7 @@ const rhythmSummary = computed(() => {
       <el-divider />
 
       <!-- Tab: 逐音素评分 / 可视化分析 / 评分说明 -->
-      <el-tabs model-value="phoneme">
+      <el-tabs v-model="detailTab">
         <el-tab-pane label="逐音素评分" name="phoneme">
           <!-- 文本高亮条 -->
           <div class="phoneme-strip">
@@ -1440,7 +1443,7 @@ const rhythmSummary = computed(() => {
 // ========== 详细评分弹窗 ==========
 :deep(.score-dialog) {
   .el-dialog__body {
-    max-height: 60vh;
+    max-height: 82vh;
     overflow-y: auto;
     padding-top: var(--spacing-md);
   }

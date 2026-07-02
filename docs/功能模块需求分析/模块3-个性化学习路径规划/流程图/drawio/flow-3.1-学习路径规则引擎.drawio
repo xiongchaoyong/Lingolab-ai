@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="drawio" version="26.0.0">
+  <diagram name="flow-3.1-学习路径规则引擎">
+    <mxGraphModel>
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <mxCell id="start" value="每日首次登录 / 手动刷新" style="ellipse;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="350" y="20" width="200" height="50" as="geometry" />
+        </mxCell>
+
+        <mxCell id="p1" value="读取用户画像&#xa;(age_group/learning_goal/interests/cefr)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="350" y="100" width="200" height="55" as="geometry" />
+        </mxCell>
+
+        <mxCell id="p2" value="读取测评四维分数&#xa;(listening/speaking/reading/grammar)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="350" y="185" width="200" height="55" as="geometry" />
+        </mxCell>
+
+        <mxCell id="d1" value="是否有测评分数？" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="370" y="280" width="160" height="70" as="geometry" />
+        </mxCell>
+
+        <mxCell id="p3" value="短板优先配比&#xa;取最低分维度→权重 50%" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="580" y="290" width="200" height="55" as="geometry" />
+        </mxCell>
+
+        <mxCell id="p4" value="四维等权分配&#xa;(新用户无测评数据)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="100" y="290" width="180" height="55" as="geometry" />
+        </mxCell>
+
+        <mxCell id="p5" value="叠加学习目标加权&#xa;(日常/商务/考试/出国/兴趣)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="350" y="390" width="200" height="50" as="geometry" />
+        </mxCell>
+
+        <mxCell id="p6" value="叠加年龄风格适配&#xa;(儿童/青少年/大学生/职场/中老年)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="350" y="470" width="200" height="50" as="geometry" />
+        </mxCell>
+
+        <mxCell id="d2" value="是否有兴趣标签？" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="370" y="560" width="160" height="65" as="geometry" />
+        </mxCell>
+
+        <mxCell id="p7" value="兴趣标签命中加分&#xa;(每个命中 +8 权重)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="580" y="565" width="180" height="55" as="geometry" />
+        </mxCell>
+
+        <mxCell id="p8" value="叠加难度偏好偏移&#xa;(用户手动±调整)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="350" y="665" width="200" height="45" as="geometry" />
+        </mxCell>
+
+        <mxCell id="end1" value="输出权重矩阵给&#xa;任务生成引擎" style="ellipse;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="350" y="750" width="200" height="55" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e1" value="" style="exitX=0.5;exitY=1;entryX=0.5;entryY=0;endArrow=block;html=1;" edge="1" parent="1" source="start" target="p1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e2" value="" style="exitX=0.5;exitY=1;entryX=0.5;entryY=0;endArrow=block;html=1;" edge="1" parent="1" source="p1" target="p2"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e3" value="" style="exitX=0.5;exitY=1;entryX=0.5;entryY=0;endArrow=block;html=1;" edge="1" parent="1" source="p2" target="d1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e4" value="是" style="exitX=1;exitY=0.5;entryX=0;entryY=0.5;endArrow=block;fontSize=10;html=1;edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;" edge="1" parent="1" source="d1" target="p3"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e5" value="否" style="exitX=0;exitY=0.5;entryX=1;entryY=0.5;endArrow=block;fontSize=10;html=1;edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;" edge="1" parent="1" source="d1" target="p4"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e6" value="" style="exitX=1;exitY=0.5;entryX=1;entryY=0.5;endArrow=block;html=1;edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;" edge="1" parent="1" source="p4" target="p5"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="320" y="318"/><mxPoint x="320" y="415"/></Array></mxGeometry></mxCell>
+        <mxCell id="e7" value="" style="exitX=0;exitY=0.5;entryX=1;entryY=0.5;endArrow=block;html=1;edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;" edge="1" parent="1" source="p3" target="p5"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="570" y="318"/><mxPoint x="570" y="415"/></Array></mxGeometry></mxCell>
+        <mxCell id="e8" value="" style="exitX=0.5;exitY=1;entryX=0.5;entryY=0;endArrow=block;html=1;" edge="1" parent="1" source="p5" target="p6"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e9" value="" style="exitX=0.5;exitY=1;entryX=0.5;entryY=0;endArrow=block;html=1;" edge="1" parent="1" source="p6" target="d2"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e10" value="是" style="exitX=1;exitY=0.5;entryX=0;entryY=0.5;endArrow=block;fontSize=10;html=1;edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;" edge="1" parent="1" source="d2" target="p7"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e11" value="否→跳过" style="exitX=0.5;exitY=1;entryX=0.5;entryY=0;endArrow=block;fontSize=10;html=1;" edge="1" parent="1" source="d2" target="p8"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e12" value="" style="exitX=0;exitY=0.5;entryX=1;entryY=0.5;endArrow=block;html=1;edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;" edge="1" parent="1" source="p7" target="p8"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="570" y="593"/><mxPoint x="570" y="688"/></Array></mxGeometry></mxCell>
+        <mxCell id="e13" value="" style="exitX=0.5;exitY=1;entryX=0.5;entryY=0;endArrow=block;html=1;" edge="1" parent="1" source="p8" target="end1"><mxGeometry relative="1" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

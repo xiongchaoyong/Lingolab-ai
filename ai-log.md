@@ -4,6 +4,32 @@
 
 ---
 
+## 2026-07-03: 项目精改优化
+
+### 变更内容
+1. **测评模块优化**：assessment API/Schema/Model 多项改进，前端 AssessmentResult 页面增强
+2. **LLM 服务增强**：llm.py 扩展，优化对话生成与评分逻辑
+3. **发音评测页面微调**：PronunciationView UI 调整
+4. **社区/游戏化 API 完善**：community.py + gamification.py 细节优化
+5. **安全模块微调**：security.py 调整
+6. **音频工具优化**：audio_utils.py 改进音频处理逻辑
+
+### 影响文件
+- `backend/app/api/assessment.py`
+- `backend/app/schemas/assessment.py`
+- `backend/app/models/assessment.py`
+- `backend/app/services/llm.py`
+- `backend/app/services/audio_utils.py`
+- `backend/app/core/security.py`
+- `backend/app/api/community.py`
+- `backend/app/api/gamification.py`
+- `backend/app/api/pronunciation.py`
+- `frontend/src/views/assessment/AssessmentResult.vue`
+- `frontend/src/views/pronunciation/PronunciationView.vue`
+- `frontend/src/stores/assessment.js`
+
+---
+
 ## 2026-07-02: RAG 知识库 + 智能客服增强
 
 ### 变更内容

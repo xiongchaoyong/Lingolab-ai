@@ -77,13 +77,8 @@ async def submit_challenge(
             raise HTTPException(status_code=422, detail="录音太短，请重新录制")
 
         # 转码为 16kHz WAV
-        converted_path = tmp_path + "_converted.wav"
-        subprocess.run(
-            ["ffmpeg", "-y", "-i", tmp_path,
-             "-ac", "1", "-ar", "16000", "-sample_fmt", "s16",
-             converted_path],
-            check=True, capture_output=True,
-        )
+        from app.services.audio_utils import convert_to_wav
+        converted_path = convert_to_wav(tmp_path)
 
         result = community_service.submit_challenge(
             current_user.id, challenge_id, converted_path, db

@@ -1,0 +1,141 @@
+<mxfile host="Claude Code" modified="2026-05-29T00:00:00.000Z" agent="drawio-skill" version="21.0.0">
+  <diagram name="flow-1.7-测评进度追踪" id="flow-1-7">
+    <mxGraphModel dx="900" dy="800" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="600" pageHeight="750" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- 开始 -->
+        <mxCell id="start" value="用户进入测评页" style="ellipse;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="200" y="20" width="150" height="45" as="geometry" />
+        </mxCell>
+
+        <!-- 查询进度 -->
+        <mxCell id="query" value="GET /api/assessment/progress&#xa;查询是否存在进度" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="185" y="105" width="180" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-start-query" style="html=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;endArrow=block;endFill=1;" edge="1" parent="1" source="start" target="query">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- 判断: 有进度? -->
+        <mxCell id="hasProgress" value="存在未完成&#xa;进度?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="215" y="200" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-query-hasProgress" style="html=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;endArrow=block;endFill=1;" edge="1" parent="1" source="query" target="hasProgress">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- 无进度: 从头开始 -->
+        <mxCell id="startNew" value="从第1题开始&#xa;初始难度=自评CEFR" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="420" y="205" width="130" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-hasProgress-startNew" value="否" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;entryX=0;entryY=0.5;endArrow=block;endFill=1;fontSize=10;fontColor=#82b366;" edge="1" parent="1" source="hasProgress" target="startNew">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- 有进度: 恢复 -->
+        <mxCell id="restore" value="恢复答题状态&#xa;跳过已答题目&#xa;恢复当前难度" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="195" y="305" width="160" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-hasProgress-restore" value="是" style="html=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;endArrow=block;endFill=1;fontSize=10;fontColor=#d6b656;" edge="1" parent="1" source="hasProgress" target="restore">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- 检查题库变更 -->
+        <mxCell id="checkBank" value="已答题目在&#xa;题库中仍存在?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="210" y="405" width="130" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-restore-checkBank" style="html=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;endArrow=block;endFill=1;" edge="1" parent="1" source="restore" target="checkBank">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- 题目缺失处理 -->
+        <mxCell id="replaceQuestion" value="跳过已下线题目&#xa;用同难度同维度&#xa;备选题替代" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="415" y="400" width="130" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-checkBank-replaceQuestion" value="部分缺失" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;entryX=0;entryY=0.5;endArrow=block;endFill=1;fontSize=10;fontColor=#9673a6;" edge="1" parent="1" source="checkBank" target="replaceQuestion">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- 开始答题 -->
+        <mxCell id="startAnswer" value="用户从恢复位置&#xa;继续作答" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="205" y="510" width="140" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-checkBank-startAnswer" value="全部存在" style="html=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;endArrow=block;endFill=1;fontSize=10;fontColor=#82b366;" edge="1" parent="1" source="checkBank" target="startAnswer">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-replaceQuestion-startAnswer" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;endArrow=block;endFill=1;" edge="1" parent="1" source="replaceQuestion" target="startAnswer">
+          <mxGeometry relative="1">
+            <Array as="points">
+              <mxPoint x="480" y="490" />
+              <mxPoint x="345" y="490" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge-startNew-startAnswer" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;endArrow=block;endFill=1;" edge="1" parent="1" source="startNew" target="startAnswer">
+          <mxGeometry relative="1">
+            <Array as="points">
+              <mxPoint x="485" y="490" />
+              <mxPoint x="345" y="490" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- 答题循环 -->
+        <mxCell id="answerLoop" value="用户作答 1 题" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="215" y="600" width="120" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-startAnswer-answerLoop" style="html=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;endArrow=block;endFill=1;" edge="1" parent="1" source="startAnswer" target="answerLoop">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- 保存进度 -->
+        <mxCell id="saveProgress" value="POST /api/assessment/progress&#xa;保存当前进度" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="195" y="680" width="160" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-answerLoop-saveProgress" style="html=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;endArrow=block;endFill=1;" edge="1" parent="1" source="answerLoop" target="saveProgress">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- 判断是否完成 -->
+        <mxCell id="allDone" value="10题全部&#xa;完成?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="215" y="775" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-saveProgress-allDone" style="html=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;endArrow=block;endFill=1;" edge="1" parent="1" source="saveProgress" target="allDone">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- 未完成: 继续循环 -->
+        <mxCell id="loopBack" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0;exitY=0.5;entryX=0;entryY=0.5;endArrow=block;endFill=1;" edge="1" parent="1" source="allDone" target="answerLoop">
+          <mxGeometry relative="1">
+            <Array as="points">
+              <mxPoint x="160" y="805" />
+              <mxPoint x="160" y="620" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="loopLabel" value="否，继续下一题" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=10;fontColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="160" y="700" width="80" height="20" as="geometry" />
+        </mxCell>
+
+        <!-- 完成: 清除进度 -->
+        <mxCell id="clearProgress" value="清除进度缓存&#xa;更新 assessment_completed=true" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="420" y="775" width="150" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-allDone-clearProgress" value="是" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;entryX=0;entryY=0.5;endArrow=block;endFill=1;fontSize=10;fontColor=#82b366;" edge="1" parent="1" source="allDone" target="clearProgress">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- 结束 -->
+        <mxCell id="end" value="测评完成&#xa;进入报告页" style="ellipse;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="435" y="875" width="120" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-clearProgress-end" style="html=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;endArrow=block;endFill=1;" edge="1" parent="1" source="clearProgress" target="end">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

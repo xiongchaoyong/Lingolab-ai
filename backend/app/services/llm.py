@@ -957,6 +957,191 @@ class LLMService:
             }
 
 
+    async def generate_assessment_question(
+        self,
+        dimension: str,
+        cefr_level: str = "B1",
+        context: dict | None = None,
+        age_group: str = "大学生",
+    ) -> dict:
+        """
+        动态生成测评题目 — 根据维度、CEFR等级、答题历史实时出题
+
+        Args:
+            dimension: "listening" | "reading" | "grammar" | "speaking"
+            cefr_level: 当前估算 CEFR 等级 "A1"~"C2"
+            context: 答题上下文
+                - previous_questions: 已出题目摘要列表 [{"dimension":"...", "content":"...", "score": 85}, ...]
+                - consecutive_correct: 连续答对数
+                - consecutive_wrong: 连续答错数
+                - weak_dimension: 当前弱项维度（可选）
+            age_group: 年龄段
+
+        Returns:
+            {
+                "question_text": "题面",
+                "options": ["A. ...", "B. ...", "C. ...", "D. ..."],
+                "correct_option": 1,
+                "dimension": "grammar",
+                "difficulty": "B1",
+                "explanation": "中文解析"
+            }
+        """
+        from app.services.age_adaptive import get_age_context_for_prompt
+
+        age_ctx = get_age_context_for_prompt(age_group)
+        ctx = context or {}
+
+        # 构建历史摘要
+        history_text = ""
+        prev_qs = ctx.get("previous_questions", [])
+        if prev_qs:
+            history_text = "已出题目（请避免重复）:\n"
+            for q in prev_qs[-5:]:  # 最近5题
+                history_text += f"  - [{q.get('dimension','?')}] {q.get('content','?')[:60]}\n"
+
+        weak_hint = ""
+        weak_dim = ctx.get("weak_dimension")
+        if weak_dim:
+            weak_hint = f"用户当前弱项是 {weak_dim}，本次题目难度可适当保守。"
+
+        consecutive_text = ""
+        if ctx.get("consecutive_correct", 0) >= 3:
+            consecutive_text = f"用户已连续答对 {ctx['consecutive_correct']} 题，请适当提升难度。"
+        elif ctx.get("consecutive_wrong", 0) >= 2:
+            consecutive_text = f"用户已连续答错 {ctx['consecutive_wrong']} 题，请适当降低难度。"
+
+        cefr_guide = {
+            "A1": "词汇量约500，简单现在时，基础疑问句，日常问候",
+            "A2": "词汇量约1000，一般现在时/过去时/将来时，简单从句，日常话题",
+            "B1": "词汇量约2000，完成时态，被动语态，条件句，社会话题",
+            "B2": "词汇量约4000，虚拟语气，复杂从句，学术/职场话题",
+            "C1": "词汇量约8000，习语、隐喻，专业领域，文化话题",
+            "C2": "词汇量12000+，母语水平，抽象哲学话题",
+        }
+        level_guide = cefr_guide.get(cefr_level, cefr_guide["B1"])
+
+        dimension_prompts = {
+            "grammar": (
+                f"Generate an English grammar multiple-choice question at CEFR {cefr_level}.\n"
+                f"Language level: {level_guide}\n"
+                f"Choose ONE grammar point appropriate for this level (tense, article, preposition, "
+                f"conditional, relative clause, passive voice, modal verb, etc).\n"
+                f"The question should have a CLEAR single correct answer.\n"
+                f"Format: a sentence with a blank or an underlined error, plus 4 options.\n"
+                f"Do NOT reuse common textbook examples — be creative and original."
+            ),
+            "reading": (
+                f"Generate an English reading comprehension question at CEFR {cefr_level}.\n"
+                f"Language level: {level_guide}\n"
+                f"Write a short, engaging passage (3-6 sentences) on an original topic.\n"
+                f"Then ask ONE comprehension question with 4 options.\n"
+                f"The question should test comprehension, not just word matching.\n"
+                f"Avoid overused topics (global warming, technology, education)."
+            ),
+            "listening": (
+                f"Generate an English listening comprehension question at CEFR {cefr_level}.\n"
+                f"Language level: {level_guide}\n"
+                f"Write a short, natural-sounding dialogue or monologue (3-5 sentences) "
+                f"that could be spoken aloud. It should sound like a real conversation.\n"
+                f"Then ask ONE comprehension question about what was said, with 4 options.\n"
+                f"Topics: daily life, travel, work, hobbies, social situations, news snippets."
+            ),
+            "speaking": (
+                f"Generate an English speaking prompt at CEFR {cefr_level}.\n"
+                f"Language level: {level_guide}\n"
+                f"Write a clear, open-ended speaking prompt that invites a spoken response "
+                f"of 3-6 sentences.\n"
+                f"The prompt should be a natural question or scenario, not a test item.\n"
+                f"Examples: describe a memory, give an opinion, explain a process, tell a story.\n"
+                f"For this question, there is NO correct option — it's for spoken assessment.\n"
+                f"However, still provide a correct_option=1 and 4 simple placeholder options "
+                f"like: ['回答并录音', '跳过此题', '稍后回答', '重新出题']"
+            ),
+        }
+
+        base_prompt = dimension_prompts.get(dimension, dimension_prompts["grammar"])
+        full_prompt = (
+            f"{base_prompt}\n\n"
+            f"User age group: {age_group}\n"
+            f"{age_ctx}\n\n"
+            f"{history_text}\n"
+            f"{weak_hint}\n"
+            f"{consecutive_text}\n\n"
+            f"Return ONLY a JSON object (no markdown, no code fences):\n"
+            f'{{"question_text": "the full question (for listening: the full dialogue/monologue)",\n'
+            f'"options": ["A. option1", "B. option2", "C. option3", "D. option4"],\n'
+            f'"correct_option": <1-4>,\n'
+            f'"dimension": "{dimension}",\n'
+            f'"difficulty": "{cefr_level}",\n'
+            f'"explanation": "brief Chinese explanation of the correct answer"}}'
+        )
+
+        try:
+            content = await self._raw_chat(full_prompt, temperature=1.0, max_tokens=600)
+            content = content.replace("```json", "").replace("```", "").strip()
+            # 修复 LLM 可能把 correct_option 写成字母的问题
+            result = json.loads(content)
+            # 规范化 correct_option 为 int
+            co = result.get("correct_option", 1)
+            if isinstance(co, str):
+                co_map = {"A": 1, "B": 2, "C": 3, "D": 4, "a": 1, "b": 2, "c": 3, "d": 4}
+                result["correct_option"] = co_map.get(co, 1)
+            else:
+                result["correct_option"] = int(co)
+            result["dimension"] = dimension
+            result["difficulty"] = cefr_level
+            logger.info(
+                f"LLM 动态出题: dim={dimension}, level={cefr_level}, "
+                f"q={result.get('question_text','')[:50]}..."
+            )
+            return result
+
+        except Exception as e:
+            logger.error(f"LLM 动态出题失败: {e}")
+            # 返回兜底题目
+            return _fallback_question(dimension, cefr_level)
+
+
+def _fallback_question(dimension: str, cefr_level: str) -> dict:
+    """出题失败时的兜底题目"""
+    fallbacks = {
+        "grammar": {
+            "question_text": "Choose the correct word to complete the sentence:\nShe ___ to school every day.",
+            "options": ["A. go", "B. goes", "C. going", "D. gone"],
+            "correct_option": 2,
+            "dimension": "grammar",
+            "difficulty": cefr_level,
+            "explanation": "主语第三人称单数，动词需加 -s，故选 goes。",
+        },
+        "reading": {
+            "question_text": "Read the passage:\nTom is a student. He likes reading books and playing basketball. Every morning, he gets up at 7 o'clock and goes to school by bus.\n\nQuestion: What does Tom like to do?",
+            "options": ["A. Swimming and dancing", "B. Reading books and playing basketball", "C. Watching TV and sleeping", "D. Cooking and cleaning"],
+            "correct_option": 2,
+            "dimension": "reading",
+            "difficulty": cefr_level,
+            "explanation": "文中明确提到 Tom 喜欢 reading books and playing basketball。",
+        },
+        "listening": {
+            "question_text": "Listen to the dialogue:\nA: Excuse me, where is the nearest post office?\nB: Go straight ahead and turn left at the second crossing. It's on your right.\n\nQuestion: Where does the person want to go?",
+            "options": ["A. Bank", "B. Post office", "C. Supermarket", "D. Hospital"],
+            "correct_option": 2,
+            "dimension": "listening",
+            "difficulty": cefr_level,
+            "explanation": "对话中明确问的是 post office 的位置。",
+        },
+        "speaking": {
+            "question_text": "Please describe your favorite season and explain why you like it.",
+            "options": ["回答并录音", "跳过此题", "稍后回答", "重新出题"],
+            "correct_option": 1,
+            "dimension": "speaking",
+            "difficulty": cefr_level,
+            "explanation": "口语题无标准答案，用户录音后由 AI 评分。",
+        },
+    }
+    return fallbacks.get(dimension, fallbacks["grammar"])
+
+
 # 全局单例
 _llm_instance = None
 

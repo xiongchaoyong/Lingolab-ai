@@ -1,0 +1,144 @@
+<mxfile host="Claude Code" modified="2026-05-29T00:00:00.000Z" agent="drawio-skill" version="21.0.0">
+  <diagram name="flow-1.2-登录与鉴权" id="flow-1-2">
+    <mxGraphModel dx="900" dy="950" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="600" pageHeight="900" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- 开始 -->
+        <mxCell id="start" value="用户发起登录请求" style="ellipse;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="200" y="20" width="150" height="40" as="geometry" />
+        </mxCell>
+
+        <!-- 接收参数 -->
+        <mxCell id="step1" value="接收 username + password" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="200" y="100" width="150" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-start-step1" style="html=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;endArrow=block;endFill=1;" edge="1" parent="1" source="start" target="step1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- 查询用户 -->
+        <mxCell id="queryUser" value="查询 users 表&#xa;WHERE username = ?" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="200" y="185" width="150" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-step1-queryUser" style="html=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;endArrow=block;endFill=1;" edge="1" parent="1" source="step1" target="queryUser">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- 用户存在判断 -->
+        <mxCell id="userExists" value="用户存在?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="215" y="275" width="120" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-queryUser-userExists" style="html=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;endArrow=block;endFill=1;" edge="1" parent="1" source="queryUser" target="userExists">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- 用户不存在 → 401 -->
+        <mxCell id="errorUser" value="返回 401&#xa;用户名或密码错误" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="420" y="278" width="120" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-userExists-errorUser" value="否" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;entryX=0;entryY=0.5;endArrow=block;endFill=1;fontSize=10;fontColor=#b85450;" edge="1" parent="1" source="userExists" target="errorUser">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- 检查锁定状态 -->
+        <mxCell id="checkLocked" value="账户已锁定?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="215" y="375" width="120" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-userExists-checkLocked" value="是" style="html=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;endArrow=block;endFill=1;fontSize=10;fontColor=#82b366;" edge="1" parent="1" source="userExists" target="checkLocked">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- 锁定 → 423 -->
+        <mxCell id="errorLocked" value="返回 423&#xa;账户已临时锁定&#xa;提示剩余时间" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="415" y="375" width="130" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-checkLocked-errorLocked" value="是" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;entryX=0;entryY=0.5;endArrow=block;endFill=1;fontSize=10;fontColor=#b85450;" edge="1" parent="1" source="checkLocked" target="errorLocked">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- 检查禁用状态 -->
+        <mxCell id="checkDisabled" value="账户已禁用?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="215" y="470" width="120" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-checkLocked-checkDisabled" value="否" style="html=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;endArrow=block;endFill=1;fontSize=10;fontColor=#82b366;" edge="1" parent="1" source="checkLocked" target="checkDisabled">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- 禁用 → 403 -->
+        <mxCell id="errorDisabled" value="返回 403&#xa;账户已被禁用" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="420" y="473" width="130" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-checkDisabled-errorDisabled" value="是" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;entryX=0;entryY=0.5;endArrow=block;endFill=1;fontSize=10;fontColor=#b85450;" edge="1" parent="1" source="checkDisabled" target="errorDisabled">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- bcrypt验证 -->
+        <mxCell id="bcryptVerify" value="bcrypt 验证密码" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="210" y="565" width="130" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-checkDisabled-bcryptVerify" value="否" style="html=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;endArrow=block;endFill=1;fontSize=10;fontColor=#82b366;" edge="1" parent="1" source="checkDisabled" target="bcryptVerify">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- 密码匹配判断 -->
+        <mxCell id="pwdMatch" value="密码匹配?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="215" y="645" width="120" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-bcryptVerify-pwdMatch" style="html=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;endArrow=block;endFill=1;" edge="1" parent="1" source="bcryptVerify" target="pwdMatch">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- 密码错误分支 -->
+        <mxCell id="failCount" value="login_attempts +1&#xa;≥5 → 锁定15分钟" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="415" y="635" width="140" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-pwdMatch-failCount" value="否" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;entryX=0;entryY=0.5;endArrow=block;endFill=1;fontSize=10;fontColor=#b85450;" edge="1" parent="1" source="pwdMatch" target="failCount">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- 返回401 -->
+        <mxCell id="errorPwd" value="返回 401&#xa;用户名或密码错误" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="420" y="730" width="130" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-failCount-errorPwd" style="html=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;endArrow=block;endFill=1;" edge="1" parent="1" source="failCount" target="errorPwd">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- 生成JWT -->
+        <mxCell id="genJWT" value="重置 login_attempts=0&#xa;生成 JWT Token (24h)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="195" y="745" width="160" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-pwdMatch-genJWT" value="是" style="html=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;endArrow=block;endFill=1;fontSize=10;fontColor=#82b366;" edge="1" parent="1" source="pwdMatch" target="genJWT">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- 查询画像 -->
+        <mxCell id="queryProfile" value="查询 user_profiles&#xa;获取 need_assessment" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="200" y="840" width="150" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-genJWT-queryProfile" style="html=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;endArrow=block;endFill=1;" edge="1" parent="1" source="genJWT" target="queryProfile">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- 成功返回 -->
+        <mxCell id="success" value="返回 200&#xa;Token + 用户信息&#xa;+ need_assessment 标志" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="195" y="930" width="160" height="65" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-queryProfile-success" style="html=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;endArrow=block;endFill=1;" edge="1" parent="1" source="queryProfile" target="success">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- 结束 -->
+        <mxCell id="end" value="前端根据&#xa;need_assessment&#xa;决定跳转目标" style="ellipse;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="210" y="1035" width="130" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="edge-success-end" style="html=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;endArrow=block;endFill=1;" edge="1" parent="1" source="success" target="end">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

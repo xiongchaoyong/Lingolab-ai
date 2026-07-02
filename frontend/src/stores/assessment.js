@@ -111,6 +111,7 @@ export const useAssessmentStore = defineStore('assessment', () => {
       dimensionScores: res.dimension_scores,
       weakness: res.weakness,
       duration: res.duration,
+      questionsDetail: res.questions_detail || [],
     }
 
     // 同步更新 authStore，标记测评已完成

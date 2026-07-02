@@ -27,7 +27,7 @@ class AssessmentRecord(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(Integer, ForeignKey("user_profiles.id"), nullable=False)
     session_id = Column(String(36), nullable=False, comment="测评会话UUID")
-    question_id = Column(Integer, ForeignKey("assessment_questions.id"), nullable=False)
+    question_id = Column(Integer, ForeignKey("assessment_questions.id"), nullable=True, comment="题库题目ID（动态生成时为NULL）")
     question_type = Column(
         Enum("multiple_choice", "speaking", name="question_type_enum"),
         nullable=False,
@@ -38,4 +38,5 @@ class AssessmentRecord(Base):
     audio_url = Column(String(500), default=None, comment="口语题录音文件路径")
     transcript = Column(Text, default=None, comment="口语题转写文本")
     question_order = Column(Integer, nullable=False, comment="题号 1-10")
+    question_data = Column(JSON, nullable=True, comment="动态生成的题目数据(JSON)")
     created_at = Column(DateTime, server_default=func.now())

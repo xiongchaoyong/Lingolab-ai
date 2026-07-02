@@ -1,8 +1,10 @@
-"""英语水平测评 API 路由 — 自适应难度 + 逐题提交 + 会话持久化"""
+"""英语水平测评 API 路由 — 自适应难度 + LLM 动态出题 + 逐题提交 + 会话持久化"""
 
 import os
 import uuid
 import json
+import time
+import base64
 import tempfile
 import logging
 import subprocess
@@ -23,10 +25,12 @@ from app.schemas.assessment import (
     AssessmentAnswerResponse,
     AssessmentSubmitResponse,
     CEFRLevel,
+    QuestionResultItem,
 )
 from app.services.asr import get_asr_service
 from app.services.llm import get_llm_service
 from app.services.audio_utils import convert_to_wav
+from app.services.tts import synthesize_speech
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -36,12 +40,13 @@ logger = logging.getLogger(__name__)
 CEFR_NUMERIC = {"A1": 1.0, "A2": 2.0, "B1": 3.0, "B2": 4.0, "C1": 5.0, "C2": 6.0}
 NUMERIC_CEFR = {v: k for k, v in CEFR_NUMERIC.items()}
 
-# 维度序列：10 题 = 听力3 + 口语2 + 阅读3 + 语法2
-DIMENSION_SEQUENCE = [
-    "listening", "reading", "grammar", "speaking",
-    "listening", "reading", "grammar", "reading",
-    "listening", "speaking",
+# 基础维度序列（前7题固定覆盖四维，后3题自适应弱项）
+BASE_DIMENSION_SEQUENCE = [
+    "listening", "reading", "grammar",
+    "listening", "speaking", "reading",
+    "grammar",
 ]
+TOTAL_QUESTIONS = 10
 
 CEFR_THRESHOLDS = [
     (96, "C2", "精通"),
@@ -67,20 +72,29 @@ SUGGESTIONS = {
 }
 
 # ========== 会话存储 ==========
-# 注意：正式环境应使用数据库存储，当前使用内存字典 + DB 记录双写
 _sessions: dict[str, dict] = {}
 
 # 全对/全错追加题阈值
-BONUS_THRESHOLD_CORRECT = 10   # 全对（10 题全答对）追加 C2 确认题
-BONUS_THRESHOLD_WRONG = 0      # 全错（10 题全答错）追加 A1 兜底题
+BONUS_THRESHOLD_CORRECT = 9    # ≥9 题全对追加 C2 确认题
+BONUS_THRESHOLD_WRONG = 1      # ≤1 题答对追加 A1 兜底题
 
 # ========== 工具函数 ==========
+
+# 动态题目 ID 计数器（用负值避免与 DB 主键冲突）
+_dynamic_id_counter = 0
+
+
+def _next_dynamic_id() -> int:
+    global _dynamic_id_counter
+    _dynamic_id_counter -= 1
+    return _dynamic_id_counter
+
 
 def _get_cefr(score: float, age_group: str = "大学生") -> tuple:
     """根据分数返回 CEFR 等级，考虑年龄段偏移"""
     from app.services.age_adaptive import get_assessment_age_offset
     offset = get_assessment_age_offset(age_group)
-    adjusted = score - offset  # offset 为负时门槛降低（更宽容）
+    adjusted = score - offset
     for threshold, level, label in CEFR_THRESHOLDS:
         if adjusted >= threshold:
             return level, label
@@ -100,35 +114,93 @@ def _adjust_level(current: float, score: float) -> float:
     return max(1.0, min(6.0, current + delta))
 
 
-def _select_question(db: Session, dimension: str, target_cefr: str, exclude_ids: set) -> AssessmentQuestion | None:
-    """按维度和目标 CEFR 等级选一道题，排除已答题目"""
-    # 优先匹配目标 CEFR 等级
-    q = (
-        db.query(AssessmentQuestion)
-        .filter(
-            AssessmentQuestion.dimension == dimension,
-            AssessmentQuestion.difficulty == target_cefr,
-            AssessmentQuestion.is_active == 1,
-            ~AssessmentQuestion.id.in_(exclude_ids) if exclude_ids else True,
-        )
-        .order_by(func.rand())
-        .first()
-    )
-    if q:
-        return q
+def _get_weak_dimension(session: dict) -> str | None:
+    """分析当前会话中用户的弱项维度"""
+    totals = session.get("dimension_totals", {})
+    if not totals:
+        return None
+    avg_scores = {}
+    for dim, scores in totals.items():
+        if scores:
+            avg_scores[dim] = sum(scores) / len(scores)
+    if not avg_scores:
+        return None
+    # 返回平均分最低的维度
+    return min(avg_scores, key=avg_scores.get)
 
-    # 如果目标等级无题，放宽到相邻等级
-    q = (
-        db.query(AssessmentQuestion)
-        .filter(
-            AssessmentQuestion.dimension == dimension,
-            AssessmentQuestion.is_active == 1,
-            ~AssessmentQuestion.id.in_(exclude_ids) if exclude_ids else True,
-        )
-        .order_by(func.rand())
-        .first()
+
+def _pick_next_dimension(session: dict) -> str:
+    """
+    自适应选题维度：前7题固定覆盖，后3题聚焦弱项
+    """
+    answered_count = session.get("question_order", 0)
+    if answered_count < len(BASE_DIMENSION_SEQUENCE):
+        return BASE_DIMENSION_SEQUENCE[answered_count]
+    # 后3题：分析弱项动态决定
+    weak = _get_weak_dimension(session)
+    if weak:
+        # 弱项维度多出现一次
+        remaining_slots = TOTAL_QUESTIONS - answered_count
+        all_dims = ["listening", "reading", "grammar", "speaking"]
+        # 弱项占 60%，其他轮流
+        if answered_count % 5 in (0, 2) and remaining_slots > 1:
+            return weak
+        return all_dims[answered_count % 4]
+    return BASE_DIMENSION_SEQUENCE[0]  # fallback
+
+
+async def _generate_question(
+    db: Session,
+    dimension: str,
+    cefr_level: str,
+    session: dict,
+    age_group: str,
+) -> tuple[dict, str | None]:
+    """
+    LLM 动态生成题目 + 听力题生成 TTS 音频
+
+    Returns:
+        (question_dict, audio_base64 | None)
+    """
+    llm_service = get_llm_service()
+
+    # 构建上下文
+    prev_qs = []
+    for qid, qdata in session.get("generated_questions", {}).items():
+        prev_qs.append({
+            "dimension": qdata.get("dimension", ""),
+            "content": qdata.get("question_text", "")[:60],
+        })
+
+    context = {
+        "previous_questions": prev_qs,
+        "consecutive_correct": session.get("consecutive_correct", 0),
+        "consecutive_wrong": session.get("consecutive_wrong", 0),
+        "weak_dimension": _get_weak_dimension(session),
+    }
+
+    result = await llm_service.generate_assessment_question(
+        dimension=dimension,
+        cefr_level=cefr_level,
+        context=context,
+        age_group=age_group,
     )
-    return q
+
+    # 听力题：同步生成 TTS 音频
+    audio_base64 = None
+    if dimension == "listening":
+        try:
+            question_text = result.get("question_text", "")
+            # 提取对话/独白部分（去掉 Question: 行）
+            audio_text = question_text.split("Question:")[0].strip() if "Question:" in question_text else question_text
+            if audio_text:
+                audio_bytes = await synthesize_speech(audio_text, voice="en-US-JennyNeural")
+                audio_base64 = base64.b64encode(audio_bytes).decode("utf-8")
+                logger.info(f"听力题 TTS 生成成功: {len(audio_bytes)} bytes")
+        except Exception as e:
+            logger.warning(f"听力题 TTS 生成失败（题目仍可用）: {e}")
+
+    return result, audio_base64
 
 
 # ========== API 端点 ==========
@@ -139,7 +211,7 @@ async def start_assessment(
     db: Session = Depends(get_db),
 ):
     """
-    开始自适应测评 — 返回第一题。
+    开始自适应测评 — LLM 动态生成第一题。
     起始难度基于用户自评等级，默认 B1。
     限制：30 天内只能重新测评一次。
     """
@@ -165,13 +237,6 @@ async def start_assessment(
     start_cefr = current_user.level_self if current_user.level_self in CEFR_NUMERIC else "B1"
     current_level = CEFR_NUMERIC.get(start_cefr, 3.0)
 
-    # 第一题：维度序列第一个 + 起始难度
-    first_dim = DIMENSION_SEQUENCE[0]
-    first_question = _select_question(db, first_dim, start_cefr, set())
-
-    if not first_question:
-        raise HTTPException(status_code=500, detail="题库不足，请联系管理员")
-
     # 初始化会话
     _sessions[session_id] = {
         "user_id": current_user.id,
@@ -179,27 +244,39 @@ async def start_assessment(
         "dimension_totals": {"listening": [], "speaking": [], "reading": [], "grammar": []},
         "question_order": 0,
         "answered_ids": set(),
-        "start_time": None,
+        "generated_questions": {},
+        "consecutive_correct": 0,
+        "consecutive_wrong": 0,
+        "start_time": time.time(),
         "bonus_added": False,
     }
 
+    # LLM 动态生成第一题
+    first_dim = _pick_next_dimension(_sessions[session_id])
+    qdata, audio_b64 = await _generate_question(
+        db, first_dim, start_cefr, _sessions[session_id], current_user.age_group,
+    )
+    qid = _next_dynamic_id()
+    _sessions[session_id]["generated_questions"][qid] = qdata
+
     question = QuestionItem(
-        id=first_question.id,
-        type=first_question.dimension,
-        difficulty=first_question.difficulty,
-        content=first_question.question_text,
-        options=first_question.options if first_question.options else [],
+        id=qid,
+        type=first_dim,
+        difficulty=start_cefr,
+        content=qdata["question_text"],
+        options=qdata.get("options", []),
+        audio_base64=audio_b64,
     )
 
     logger.info(
-        f"用户 {current_user.username} 开始自适应测评 session={session_id} "
+        f"用户 {current_user.username} 开始动态自适应测评 session={session_id} "
         f"start_level={start_cefr}"
     )
 
     return AssessmentStartResponse(
         session_id=session_id,
         question=question,
-        total_questions=len(DIMENSION_SEQUENCE),
+        total_questions=TOTAL_QUESTIONS,
         current_difficulty=start_cefr,
     )
 
@@ -207,15 +284,16 @@ async def start_assessment(
 @router.post("/answer", response_model=AssessmentAnswerResponse)
 async def answer_assessment(
     session_id: str = Form(..., description="测评会话 UUID"),
-    question_id: int = Form(..., description="题目 ID"),
+    question_id: int = Form(..., description="题目 ID（动态题为负值）"),
     answer: str = Form(default="", description="客观题：选项字母 A/B/C/D；口语题：空字符串"),
     audio: UploadFile | None = File(default=None, description="口语音频文件"),
     current_user: UserProfile = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """
-    提交单题答案 — 判分 + 自适应难度调整 + 返回下一题。
+    提交单题答案 — 判分 + LLM 动态生成下一题 + 自适应难度调整。
     口语题携带音频文件，后端执行 ASR + LLM 评分。
+    客观题（动态生成）正确答案从会话中读取。
     """
     # 验证会话
     session = _sessions.get(session_id)
@@ -224,16 +302,21 @@ async def answer_assessment(
     if session["user_id"] != current_user.id:
         raise HTTPException(status_code=403, detail="无权访问此会话")
 
-    # 记录开始时间
-    if session["start_time"] is None:
-        session["start_time"] = None  # 保留字段
+    # 获取题目数据（动态生成或 DB）
+    qdata = session.get("generated_questions", {}).get(question_id)
+    if qdata:
+        # 动态生成的题目
+        dimension = qdata.get("dimension", "grammar")
+        correct_option = qdata.get("correct_option", 1)
+    else:
+        # DB 题库题目（兼容旧逻辑）
+        question = db.query(AssessmentQuestion).filter(AssessmentQuestion.id == question_id).first()
+        if not question:
+            raise HTTPException(status_code=404, detail="题目不存在")
+        dimension = question.dimension
+        correct_option = question.correct_option
 
-    # 验证题目
-    question = db.query(AssessmentQuestion).filter(AssessmentQuestion.id == question_id).first()
-    if not question:
-        raise HTTPException(status_code=404, detail="题目不存在")
-
-    is_speaking = question.dimension == "speaking"
+    is_speaking = dimension == "speaking"
     question_type = "speaking" if is_speaking else "multiple_choice"
 
     # 判分
@@ -244,22 +327,17 @@ async def answer_assessment(
         # 口语题：ASR + LLM 评分
         if audio and audio.size > 0:
             try:
-                # 保存音频到临时文件
                 suffix = ".webm"
                 with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
                     content = await audio.read()
                     tmp.write(content)
                     tmp_path = tmp.name
 
-                # 转码为 WAV
                 wav_path = convert_to_wav(tmp_path)
-
-                # WhisperX 转写
                 asr_service = get_asr_service()
                 asr_result = asr_service.transcribe(wav_path)
                 transcript = asr_result.get("text", "").strip()
 
-                # LLM 四维评分
                 if transcript:
                     target_cefr = _level_to_cefr(session["current_level"])
                     llm_service = get_llm_service()
@@ -271,7 +349,6 @@ async def answer_assessment(
                     score = 0.0
                     transcript = ""
 
-                # 保存音频到持久化目录
                 audio_dir = f"uploads/assessment/{session_id}"
                 os.makedirs(audio_dir, exist_ok=True)
                 audio_filename = f"q{question_id}.webm"
@@ -279,7 +356,6 @@ async def answer_assessment(
                 shutil.copy(tmp_path, audio_path)
                 audio_url = f"/{audio_path}"
 
-                # 清理临时文件
                 os.unlink(tmp_path)
                 if os.path.exists(wav_path):
                     os.unlink(wav_path)
@@ -291,7 +367,6 @@ async def answer_assessment(
                 score = 60.0
                 transcript = f"[ASR 失败: {str(e)[:100]}]"
         else:
-            # 无音频 → 跳过/未作答
             score = 0.0
             transcript = ""
             logger.info(f"口语题无音频: qid={question_id}")
@@ -299,12 +374,20 @@ async def answer_assessment(
         is_correct = None
     else:
         # 客观题：比对正确选项
-        correct_letter = chr(64 + question.correct_option)  # 1→A, 2→B, ...
+        correct_letter = chr(64 + int(correct_option))  # 1→A, 2→B, ...
         is_correct = 1 if answer.strip().upper() == correct_letter else 0
         score = 100.0 if is_correct else 0.0
 
+    # 更新连续答对/错计数
+    if is_correct == 1:
+        session["consecutive_correct"] = session.get("consecutive_correct", 0) + 1
+        session["consecutive_wrong"] = 0
+    elif is_correct == 0:
+        session["consecutive_wrong"] = session.get("consecutive_wrong", 0) + 1
+        session["consecutive_correct"] = 0
+
     # 累计维度分数
-    session["dimension_totals"][question.dimension].append(score)
+    session["dimension_totals"][dimension].append(score)
     session["question_order"] += 1
     session["answered_ids"].add(question_id)
 
@@ -316,7 +399,7 @@ async def answer_assessment(
     record = AssessmentRecord(
         user_id=current_user.id,
         session_id=session_id,
-        question_id=question_id,
+        question_id=question_id if qdata is None else None,  # DB 题目有 ID，动态题 NULL
         question_type=question_type,
         user_answer=answer if not is_speaking else (transcript or ""),
         is_correct=is_correct,
@@ -324,6 +407,7 @@ async def answer_assessment(
         audio_url=audio_url,
         transcript=transcript,
         question_order=session["question_order"],
+        question_data=qdata if qdata else None,
     )
     db.add(record)
     db.commit()
@@ -332,86 +416,85 @@ async def answer_assessment(
     next_index = session["question_order"]
 
     # 全对/全错追加题逻辑
-    base_questions = len(DIMENSION_SEQUENCE)
-    if next_index == base_questions:
-        # 基础 10 题答完，检查是否需要追加
+    if next_index >= TOTAL_QUESTIONS:
         all_scores = []
         for dim_scores in session["dimension_totals"].values():
             all_scores.extend(dim_scores)
 
-        if len(all_scores) >= base_questions:
+        if len(all_scores) >= TOTAL_QUESTIONS:
             correct_count = sum(1 for s in all_scores if s >= 60)
 
             if correct_count >= BONUS_THRESHOLD_CORRECT and not session.get("bonus_added"):
                 # 全对 → 追加 1 题 C2 确认题
-                bonus_q = _select_question(db, "speaking", "C2", session["answered_ids"])
-                if bonus_q:
-                    session["bonus_added"] = True
-                    bonus_item = QuestionItem(
-                        id=bonus_q.id,
-                        type=bonus_q.dimension,
-                        difficulty=bonus_q.difficulty,
-                        content=bonus_q.question_text,
-                        options=bonus_q.options if bonus_q.options else [],
-                    )
-                    logger.info(f"全对追加 C2 确认题: session={session_id}")
-                    return AssessmentAnswerResponse(
-                        complete=False,
-                        next_question=bonus_item,
-                        current_difficulty="C2",
-                    )
+                session["bonus_added"] = True
+                qdata, audio_b64 = await _generate_question(
+                    db, "speaking", "C2", session, current_user.age_group,
+                )
+                qid = _next_dynamic_id()
+                session["generated_questions"][qid] = qdata
+                bonus_item = QuestionItem(
+                    id=qid, type="speaking", difficulty="C2",
+                    content=qdata["question_text"],
+                    options=qdata.get("options", []),
+                    audio_base64=audio_b64,
+                )
+                logger.info(f"全对追加 C2 确认题: session={session_id}")
+                return AssessmentAnswerResponse(
+                    complete=False,
+                    next_question=bonus_item,
+                    current_difficulty="C2",
+                )
 
             elif correct_count <= BONUS_THRESHOLD_WRONG and not session.get("bonus_added"):
                 # 全错 → 追加 1 题 A1 兜底题
-                bonus_q = _select_question(db, "listening", "A1", session["answered_ids"])
-                if bonus_q:
-                    session["bonus_added"] = True
-                    bonus_item = QuestionItem(
-                        id=bonus_q.id,
-                        type=bonus_q.dimension,
-                        difficulty=bonus_q.difficulty,
-                        content=bonus_q.question_text,
-                        options=bonus_q.options if bonus_q.options else [],
-                    )
-                    logger.info(f"全错追加 A1 兜底题: session={session_id}")
-                    return AssessmentAnswerResponse(
-                        complete=False,
-                        next_question=bonus_item,
-                        current_difficulty="A1",
-                    )
+                session["bonus_added"] = True
+                qdata, audio_b64 = await _generate_question(
+                    db, "listening", "A1", session, current_user.age_group,
+                )
+                qid = _next_dynamic_id()
+                session["generated_questions"][qid] = qdata
+                bonus_item = QuestionItem(
+                    id=qid, type="listening", difficulty="A1",
+                    content=qdata["question_text"],
+                    options=qdata.get("options", []),
+                    audio_base64=audio_b64,
+                )
+                logger.info(f"全错追加 A1 兜底题: session={session_id}")
+                return AssessmentAnswerResponse(
+                    complete=False,
+                    next_question=bonus_item,
+                    current_difficulty="A1",
+                )
 
-    if next_index >= base_questions and (not session.get("bonus_added") or next_index > base_questions):
-        # 全部完成（含追加题）
+    if next_index >= TOTAL_QUESTIONS and (
+        not session.get("bonus_added") or next_index > TOTAL_QUESTIONS
+    ):
         return AssessmentAnswerResponse(
             complete=True,
             next_question=None,
             current_difficulty=_level_to_cefr(session["current_level"]),
         )
 
-    # 选下一题
-    next_dim = DIMENSION_SEQUENCE[next_index]
+    # LLM 动态生成下一题
+    next_dim = _pick_next_dimension(session)
     target_cefr = _level_to_cefr(session["current_level"])
-    next_q = _select_question(db, next_dim, target_cefr, session["answered_ids"])
-
-    if not next_q:
-        # 题库不足，直接结束
-        logger.warning(f"题库不足，session={session_id} 在第 {next_index + 1} 题提前结束")
-        return AssessmentAnswerResponse(
-            complete=True,
-            next_question=None,
-            current_difficulty=target_cefr,
-        )
+    qdata, audio_b64 = await _generate_question(
+        db, next_dim, target_cefr, session, current_user.age_group,
+    )
+    qid = _next_dynamic_id()
+    session["generated_questions"][qid] = qdata
 
     next_question = QuestionItem(
-        id=next_q.id,
-        type=next_q.dimension,
-        difficulty=next_q.difficulty,
-        content=next_q.question_text,
-        options=next_q.options if next_q.options else [],
+        id=qid,
+        type=next_dim,
+        difficulty=target_cefr,
+        content=qdata["question_text"],
+        options=qdata.get("options", []),
+        audio_base64=audio_b64,
     )
 
     logger.info(
-        f"测评答题: user={current_user.username}, qid={question_id}, "
+        f"动态测评答题: user={current_user.username}, qid={question_id}, "
         f"score={score}, level={old_level:.1f}→{session['current_level']:.1f}, "
         f"next_dim={next_dim}"
     )
@@ -433,7 +516,6 @@ async def restore_session(
     恢复测评会话 — 从数据库记录重建中断的会话。
     前端刷新页面后调用此接口恢复进度。
     """
-    # 查询该会话的所有记录
     records = (
         db.query(AssessmentRecord)
         .filter(
@@ -450,15 +532,31 @@ async def restore_session(
     # 重建会话状态
     dimension_totals = {"listening": [], "speaking": [], "reading": [], "grammar": []}
     answered_ids = set()
-    current_level = 3.0  # 默认 B1
+    generated_questions = {}
+    current_level = 3.0
+    consecutive_correct = 0
+    consecutive_wrong = 0
 
     for rec in records:
-        answered_ids.add(rec.question_id)
-        question = db.query(AssessmentQuestion).filter(AssessmentQuestion.id == rec.question_id).first()
-        if question and rec.score is not None:
-            dimension_totals[question.dimension].append(float(rec.score))
-            # 反推当前难度
+        answered_ids.add(rec.question_id if rec.question_id else rec.question_order)
+        if rec.question_data:
+            # 动态题目，从 question_data 恢复
+            qdata = rec.question_data if isinstance(rec.question_data, dict) else json.loads(str(rec.question_data))
+            generated_questions[rec.question_id or (-rec.question_order)] = qdata
+            dim = qdata.get("dimension", "grammar")
+        else:
+            question = db.query(AssessmentQuestion).filter(AssessmentQuestion.id == rec.question_id).first()
+            dim = question.dimension if question else "grammar"
+
+        if rec.score is not None:
+            dimension_totals[dim].append(float(rec.score))
             current_level = _adjust_level(current_level, float(rec.score))
+            if rec.is_correct == 1:
+                consecutive_correct += 1
+                consecutive_wrong = 0
+            elif rec.is_correct == 0:
+                consecutive_wrong += 1
+                consecutive_correct = 0
 
     _sessions[session_id] = {
         "user_id": current_user.id,
@@ -466,28 +564,31 @@ async def restore_session(
         "dimension_totals": dimension_totals,
         "question_order": len(records),
         "answered_ids": answered_ids,
-        "start_time": None,
-        "bonus_added": len(records) > len(DIMENSION_SEQUENCE),
+        "generated_questions": generated_questions,
+        "consecutive_correct": consecutive_correct,
+        "consecutive_wrong": consecutive_wrong,
+        "start_time": (_sessions.get(session_id) or {}).get("start_time") or time.time(),
+        "bonus_added": len(records) > TOTAL_QUESTIONS,
     }
 
-    # 选下一题
+    # 还有下一题就动态生成
     next_index = len(records)
-    if next_index >= len(DIMENSION_SEQUENCE):
+    if next_index >= TOTAL_QUESTIONS and not (len(records) > TOTAL_QUESTIONS):
         return {"complete": True, "answered_count": len(records)}
 
-    next_dim = DIMENSION_SEQUENCE[next_index]
+    next_dim = _pick_next_dimension(_sessions[session_id])
     target_cefr = _level_to_cefr(current_level)
-    next_q = _select_question(db, next_dim, target_cefr, answered_ids)
-
-    if not next_q:
-        return {"complete": True, "answered_count": len(records)}
+    qdata, audio_b64 = await _generate_question(
+        db, next_dim, target_cefr, _sessions[session_id], current_user.age_group,
+    )
+    qid = _next_dynamic_id()
+    _sessions[session_id]["generated_questions"][qid] = qdata
 
     next_question = QuestionItem(
-        id=next_q.id,
-        type=next_q.dimension,
-        difficulty=next_q.difficulty,
-        content=next_q.question_text,
-        options=next_q.options if next_q.options else [],
+        id=qid, type=next_dim, difficulty=target_cefr,
+        content=qdata["question_text"],
+        options=qdata.get("options", []),
+        audio_base64=audio_b64,
     )
 
     return {
@@ -536,6 +637,10 @@ async def complete_assessment(
         "suggestion": SUGGESTIONS.get(weakness_dim, ""),
     }
 
+    # 计算实际用时
+    start_time = session.get("start_time")
+    duration_seconds = int(time.time() - start_time) if start_time else 0
+
     # 更新用户画像
     current_user.level_test = level
     current_user.level_final = level
@@ -549,12 +654,67 @@ async def complete_assessment(
     )
     db.commit()
 
+    # 查询该会话所有答题记录，构建逐题详情
+    records = (
+        db.query(AssessmentRecord)
+        .filter(
+            AssessmentRecord.session_id == session_id,
+            AssessmentRecord.user_id == current_user.id,
+        )
+        .order_by(AssessmentRecord.question_order)
+        .all()
+    )
+
+    questions_detail = []
+    for rec in records:
+        # 获取题目数据
+        qdata = None
+        if rec.question_data:
+            qdata = rec.question_data if isinstance(rec.question_data, dict) else json.loads(str(rec.question_data))
+        elif rec.question_id:
+            db_q = db.query(AssessmentQuestion).filter(AssessmentQuestion.id == rec.question_id).first()
+            if db_q:
+                qdata = {
+                    "question_text": db_q.question_text,
+                    "correct_option": db_q.correct_option,
+                    "dimension": db_q.dimension,
+                    "difficulty": db_q.difficulty,
+                    "options": db_q.options,
+                }
+
+        dim = qdata.get("dimension", "grammar") if qdata else "grammar"
+        difficulty = qdata.get("difficulty", "B1") if qdata else "B1"
+        question_text = qdata.get("question_text", "") if qdata else ""
+
+        # 正确答案
+        correct_answer = None
+        if qdata:
+            co = qdata.get("correct_option", 1)
+            try:
+                co_int = int(co)
+                correct_answer = chr(64 + co_int)  # 1→A, 2→B
+            except (ValueError, TypeError):
+                correct_answer = str(co)
+
+        questions_detail.append({
+            "order": rec.question_order,
+            "type": dim,
+            "type_label": DIMENSION_LABELS.get(dim, dim),
+            "difficulty": difficulty,
+            "content": question_text[:80] + ("..." if len(question_text) > 80 else ""),
+            "user_answer": rec.user_answer[:60] if rec.user_answer else None,
+            "correct_answer": correct_answer if rec.question_type == "multiple_choice" else None,
+            "is_correct": bool(rec.is_correct) if rec.is_correct is not None else None,
+            "score": float(rec.score) if rec.score else 0.0,
+            "transcript": rec.transcript[:100] if rec.transcript else None,
+        })
+
     # 清理会话
     del _sessions[session_id]
 
     logger.info(
         f"用户 {current_user.username} 完成测评: overall={overall}, level={level}, "
-        f"age_group={current_user.age_group}"
+        f"duration={duration_seconds}s, questions={len(questions_detail)}"
     )
 
     return AssessmentSubmitResponse(
@@ -562,7 +722,8 @@ async def complete_assessment(
         cefr_level=CEFRLevel(level=level, label=label),
         dimension_scores=dimension_scores,
         weakness=weakness,
-        duration=0,
+        duration=duration_seconds,
+        questions_detail=questions_detail,
     )
 
 

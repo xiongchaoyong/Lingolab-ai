@@ -6,11 +6,12 @@ from pydantic import BaseModel, Field
 
 class QuestionItem(BaseModel):
     """单道题目"""
-    id: int = Field(..., description="题目 ID")
+    id: int = Field(..., description="题目 ID（动态生成时为负值）")
     type: str = Field(..., description="题型：listening/speaking/reading/grammar")
     difficulty: str = Field(..., description="CEFR 难度")
     content: str = Field(..., description="题目文本")
     options: List[str] = Field(default_factory=list, description="客观题选项数组（口语题为空）")
+    audio_base64: Optional[str] = Field(default=None, description="听力题 TTS 音频 base64 编码")
 
 
 class AssessmentStartResponse(BaseModel):
@@ -52,6 +53,20 @@ class CEFRLevel(BaseModel):
     label: str = Field(..., description="等级中文描述")
 
 
+class QuestionResultItem(BaseModel):
+    """单题答题结果"""
+    order: int = Field(..., description="题号 1-10")
+    type: str = Field(..., description="题型：listening/speaking/reading/grammar")
+    type_label: str = Field(..., description="题型中文名")
+    difficulty: str = Field(..., description="CEFR 难度")
+    content: str = Field(default="", description="题目文本（截取前60字）")
+    user_answer: Optional[str] = Field(default=None, description="用户答案")
+    correct_answer: Optional[str] = Field(default=None, description="正确答案（客观题）")
+    is_correct: Optional[bool] = Field(default=None, description="是否正确")
+    score: float = Field(default=0, description="该题得分 0-100")
+    transcript: Optional[str] = Field(default=None, description="口语题转写文本")
+
+
 class AssessmentSubmitResponse(BaseModel):
     """测评结果"""
     overall: float = Field(..., description="综合分 0-100")
@@ -59,3 +74,4 @@ class AssessmentSubmitResponse(BaseModel):
     dimension_scores: Dict[str, float] = Field(..., description="四维分数字典")
     weakness: Dict[str, Any] = Field(..., description="短板维度信息")
     duration: int = Field(..., description="测评用时（秒）")
+    questions_detail: List[QuestionResultItem] = Field(default_factory=list, description="逐题详情")

@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="drawio" version="26.0.0">
+  <diagram name="flow-5.2-流利度多维度评分计算">
+    <mxGraphModel>
+      <root>
+        <mxCell id="0" /><mxCell id="1" parent="0" />
+
+        <mxCell id="start" value="模块6每轮对话：&#xa;用户语音→Whisper转写完成" style="ellipse;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="340" y="20" width="220" height="55" as="geometry" />
+        </mxCell>
+
+        <mxCell id="p1" value="子功能(1)：采集语音特征&#xa;WPM / 停顿频率 / 重复率" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="340" y="110" width="220" height="50" as="geometry" />
+        </mxCell>
+
+        <mxCell id="p2" value="子功能(3)：语法+语义分析&#xa;Deepseek 语法检查 + 场景相关性" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="340" y="190" width="220" height="50" as="geometry" />
+        </mxCell>
+
+        <mxCell id="d1" value="语法/语义&#xa;API 调用成功？" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="370" y="280" width="160" height="65" as="geometry" />
+        </mxCell>
+
+        <mxCell id="p3" value="标记对应维度 N/A&#xa;其余维度权重归一化" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="580" y="290" width="180" height="50" as="geometry" />
+        </mxCell>
+
+        <mxCell id="p4" value="五维分数映射计算&#xa;语速/停顿/重复/语法/相关性" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="340" y="390" width="220" height="50" as="geometry" />
+        </mxCell>
+
+        <mxCell id="d2" value="回复 &lt; 3 词？" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="380" y="480" width="140" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="p5" value="标记 low_confidence&#xa;「评估仅供参考」" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="580" y="485" width="160" height="50" as="geometry" />
+        </mxCell>
+
+        <mxCell id="p6" value="加权求和 → 综合分 0-100" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="340" y="580" width="220" height="45" as="geometry" />
+        </mxCell>
+
+        <mxCell id="p7" value="分段评级映射&#xa;(优秀/良好/中等/初级/入门)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="340" y="660" width="220" height="50" as="geometry" />
+        </mxCell>
+
+        <mxCell id="p8" value="写入 conversation_messages&#xa;fluency_scores 字段" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="340" y="750" width="220" height="50" as="geometry" />
+        </mxCell>
+
+        <mxCell id="d3" value="连续3轮下降？" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="380" y="840" width="140" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="p9" value="提示用户&#xa;「要不要放慢节奏？」" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="580" y="845" width="150" height="55" as="geometry" />
+        </mxCell>
+
+        <mxCell id="end1" value="返回评分结果&#xa;（对用户透明）" style="ellipse;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="350" y="940" width="200" height="50" as="geometry" />
+        </mxCell>
+
+        <!-- All edges with consistent orthogonal routing + visible block arrows -->
+        <mxCell id="e1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;endArrow=block;endFill=1;strokeWidth=1;" edge="1" parent="1" source="start" target="p1"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <mxCell id="e2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;endArrow=block;endFill=1;strokeWidth=1;" edge="1" parent="1" source="p1" target="p2"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <mxCell id="e3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;endArrow=block;endFill=1;strokeWidth=1;" edge="1" parent="1" source="p2" target="d1"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <mxCell id="e4" value="失败" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;entryX=0;entryY=0.5;endArrow=block;endFill=1;strokeWidth=1;fontSize=10;" edge="1" parent="1" source="d1" target="p3"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <mxCell id="e5" value="成功" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;endArrow=block;endFill=1;strokeWidth=1;fontSize=10;" edge="1" parent="1" source="d1" target="p4"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <mxCell id="e6" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0;exitY=0.5;entryX=1;entryY=0.5;endArrow=block;endFill=1;strokeWidth=1;" edge="1" parent="1" source="p3" target="p4"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="560" y="315" /><mxPoint x="560" y="415" /></Array></mxGeometry></mxCell>
+
+        <mxCell id="e7" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;endArrow=block;endFill=1;strokeWidth=1;" edge="1" parent="1" source="p4" target="d2"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <mxCell id="e8" value="是" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;entryX=0;entryY=0.5;endArrow=block;endFill=1;strokeWidth=1;fontSize=10;" edge="1" parent="1" source="d2" target="p5"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <mxCell id="e9" value="否" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;endArrow=block;endFill=1;strokeWidth=1;fontSize=10;" edge="1" parent="1" source="d2" target="p6"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <mxCell id="e10" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0;exitY=0.5;entryX=1;entryY=0.5;endArrow=block;endFill=1;strokeWidth=1;" edge="1" parent="1" source="p5" target="p6"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="560" y="510" /><mxPoint x="560" y="603" /></Array></mxGeometry></mxCell>
+
+        <mxCell id="e11" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;endArrow=block;endFill=1;strokeWidth=1;" edge="1" parent="1" source="p6" target="p7"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <mxCell id="e12" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;endArrow=block;endFill=1;strokeWidth=1;" edge="1" parent="1" source="p7" target="p8"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <mxCell id="e13" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;endArrow=block;endFill=1;strokeWidth=1;" edge="1" parent="1" source="p8" target="d3"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <mxCell id="e14" value="是" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;entryX=0;entryY=0.5;endArrow=block;endFill=1;strokeWidth=1;fontSize=10;" edge="1" parent="1" source="d3" target="p9"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <mxCell id="e15" value="否" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;endArrow=block;endFill=1;strokeWidth=1;fontSize=10;" edge="1" parent="1" source="d3" target="end1"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <mxCell id="e16" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;entryX=1;entryY=0.5;endArrow=block;endFill=1;strokeWidth=1;" edge="1" parent="1" source="p9" target="end1"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="760" y="873" /><mxPoint x="760" y="965" /></Array></mxGeometry></mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
