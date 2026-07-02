@@ -65,7 +65,7 @@ class RecommendationService:
         )
 
         if not latest_record:
-            return "speaking"
+            return "pronunciation"
 
         session_id = latest_record.session_id
         records = (
@@ -88,10 +88,19 @@ class RecommendationService:
                     dimension_scores[dim].append(float(r.score))
 
         if not dimension_scores:
-            return "speaking"
+            return "pronunciation"
+
+        # 映射测评维度到画像维度
+        from app.services.profile_updater import ASSESSMENT_DIM_MAP
+        profile_scores = {}
+        for dim, scores in dimension_scores.items():
+            mapped = ASSESSMENT_DIM_MAP.get(dim, dim)
+            if mapped not in profile_scores:
+                profile_scores[mapped] = []
+            profile_scores[mapped].extend(scores)
 
         avg_scores = {}
-        for dim, scores in dimension_scores.items():
+        for dim, scores in profile_scores.items():
             avg_scores[dim] = sum(scores) / len(scores) if scores else 0
 
         return min(avg_scores, key=avg_scores.get)

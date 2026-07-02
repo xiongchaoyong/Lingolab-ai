@@ -35,25 +35,33 @@ MAX_DAYS = 30     # 只计算最近 30 天
 
 # 发音维度 → 用户画像维度映射
 PRONUNCIATION_DIM_MAP = {
-    "phoneme_accuracy": "speaking",
-    "stress": "speaking",
-    "intonation": "speaking",
-    "linking": "speaking",
-    "rhythm": "speaking",
+    "phoneme_accuracy": "pronunciation",
+    "stress": "pronunciation",
+    "intonation": "pronunciation",
+    "linking": "pronunciation",
+    "rhythm": "pronunciation",
 }
 
 # 对话文本维度 → 用户画像维度映射
 TEXT_DIM_MAP = {
     "语法正确率": "grammar",
-    "词汇丰富度": "reading",
-    "对话参与度": "speaking",
+    "词汇丰富度": "vocabulary",
+    "对话参与度": "fluency",
 }
 
 # 任务类型 → 用户画像维度映射
 TASK_DIM_MAP = {
-    "shadowing": "speaking",
-    "conversation": "speaking",
-    "listening": "listening",
+    "shadowing": "pronunciation",
+    "conversation": "pronunciation",
+    "listening": "fluency",
+}
+
+# 测评维度 → 用户画像维度映射
+ASSESSMENT_DIM_MAP = {
+    "listening": "fluency",
+    "speaking": "pronunciation",
+    "reading": "vocabulary",
+    "grammar": "grammar",
 }
 
 
@@ -90,7 +98,7 @@ class ProfileUpdater:
 
         for dim in dimensions:
             eng_name = label_map.get(dim["label"], dim["label"])
-            mapped_dim = PRONUNCIATION_DIM_MAP.get(eng_name, "speaking")
+            mapped_dim = PRONUNCIATION_DIM_MAP.get(eng_name, "pronunciation")
 
             db.add(UserSkillScore(
                 user_id=user_id,
@@ -117,7 +125,7 @@ class ProfileUpdater:
         for dim in pronunciation:
             db.add(UserSkillScore(
                 user_id=user_id,
-                dimension="speaking",
+                dimension="pronunciation",
                 skill_name=f"conversation:pronunciation:{dim['label']}",
                 score=dim["score"],
                 source="conversation",
@@ -126,7 +134,7 @@ class ProfileUpdater:
 
         # 文本维度
         for dim in text_dimensions:
-            mapped_dim = TEXT_DIM_MAP.get(dim["label"], "speaking")
+            mapped_dim = TEXT_DIM_MAP.get(dim["label"], "fluency")
             db.add(UserSkillScore(
                 user_id=user_id,
                 dimension=mapped_dim,
@@ -140,7 +148,7 @@ class ProfileUpdater:
 
     def ingest_task_score(self, user_id: int, task: DailyTask, db: Session):
         """摄入任务完成分数"""
-        dimension = TASK_DIM_MAP.get(task.task_type, "speaking")
+        dimension = TASK_DIM_MAP.get(task.task_type, "pronunciation")
         score = float(task.score) if task.score else 70.0
 
         db.add(UserSkillScore(
@@ -158,16 +166,17 @@ class ProfileUpdater:
         self, user_id: int, dimension_scores: Dict[str, float],
         session_id: str, db: Session,
     ):
-        """摄入测评结果 — 初次测评完成后调用
+        """摄入测评结果 — 初次测评完成后调用，自动映射测评维度→画像维度
 
         Args:
-            dimension_scores: {listening: 72.5, speaking: 68.3, reading: 80.0, grammar: 55.0}
+            dimension_scores: 测评维度分 {listening: 72.5, speaking: 68.3, reading: 80.0, grammar: 55.0}
             session_id: 测评会话 UUID
         """
         for dim, score in dimension_scores.items():
+            mapped_dim = ASSESSMENT_DIM_MAP.get(dim, dim)
             db.add(UserSkillScore(
                 user_id=user_id,
-                dimension=dim,
+                dimension=mapped_dim,
                 skill_name=f"assessment:{dim}",
                 score=score,
                 source="assessment",
@@ -198,9 +207,9 @@ class ProfileUpdater:
 
         # 按维度分组
         dimension_values = {
-            "listening": [],
-            "speaking": [],
-            "reading": [],
+            "fluency": [],
+            "pronunciation": [],
+            "vocabulary": [],
             "grammar": [],
         }
         for s in scores:
@@ -290,9 +299,9 @@ class ProfileUpdater:
             user_id=user_id,
             source=source,
             source_id=source_id,
-            listening_score=dim_avgs.get("listening"),
-            speaking_score=dim_avgs.get("speaking"),
-            reading_score=dim_avgs.get("reading"),
+            fluency_score=dim_avgs.get("fluency"),
+            pronunciation_score=dim_avgs.get("pronunciation"),
+            vocabulary_score=dim_avgs.get("vocabulary"),
             grammar_score=dim_avgs.get("grammar"),
             overall_score=round(overall, 1) if overall is not None else None,
             cefr_level=cefr,
@@ -323,9 +332,9 @@ class ProfileUpdater:
                 "id": log.id,
                 "source": log.source,
                 "source_label": SOURCE_LABELS.get(log.source, log.source),
-                "listening_score": float(log.listening_score) if log.listening_score is not None else None,
-                "speaking_score": float(log.speaking_score) if log.speaking_score is not None else None,
-                "reading_score": float(log.reading_score) if log.reading_score is not None else None,
+                "fluency_score": float(log.fluency_score) if log.fluency_score is not None else None,
+                "pronunciation_score": float(log.pronunciation_score) if log.pronunciation_score is not None else None,
+                "vocabulary_score": float(log.vocabulary_score) if log.vocabulary_score is not None else None,
                 "grammar_score": float(log.grammar_score) if log.grammar_score is not None else None,
                 "overall_score": float(log.overall_score) if log.overall_score is not None else None,
                 "cefr_level": log.cefr_level,

@@ -218,64 +218,71 @@ function handleCommand(command) {
 
 <template>
   <div class="top-nav-layout">
-    <!-- 顶部导航栏 -->
-    <header class="tn-header">
-      <div class="tn-left">
-        <h1 class="tn-logo" @click="router.push('/')">Lingolab</h1>
-      </div>
-
-      <!-- 桌面端导航链接 -->
-      <nav class="tn-nav-desktop">
-        <div
-          v-for="item in navItems"
-          :key="item.title"
-          class="tn-nav-item"
-          @mouseenter="hoveredNav = item.title"
-          @mouseleave="hoveredNav = null"
-        >
-          <button
-            :class="['tn-nav-link', { active: isActive(item) }]"
-            @click="onParentClick(item)"
-          >
-            {{ item.title }}
-            <span v-if="item.children" class="tn-arrow">▾</span>
-          </button>
-
-          <!-- 下拉子菜单 -->
-          <transition name="dropdown">
-            <div
-              v-if="item.children && hoveredNav === item.title"
-              class="tn-dropdown"
-            >
-              <button
-                v-for="child in item.children"
-                :key="child.path"
-                :class="['tn-dropdown-item', { active: isChildActive(child) }]"
-                @click="navigate(child.path)"
-              >
-                {{ child.title }}
-              </button>
-            </div>
-          </transition>
+    <!-- 顶部浮动层：全宽容器 -->
+    <div class="tn-top-bar">
+      <!-- 居中导航栏 — 玻璃效果 -->
+      <header class="tn-header">
+        <div class="tn-left">
+          <h1 class="tn-logo" @click="router.push('/')">Lingolab</h1>
         </div>
-      </nav>
 
-      <div class="tn-right">
-        <!-- 未登录显示登录入口 -->
+        <!-- 桌面端导航链接 -->
+        <nav class="tn-nav-desktop">
+          <div
+            v-for="item in navItems"
+            :key="item.title"
+            class="tn-nav-item"
+            @mouseenter="hoveredNav = item.title"
+            @mouseleave="hoveredNav = null"
+          >
+            <button
+              :class="['tn-nav-link', { active: isActive(item) }]"
+              @click="onParentClick(item)"
+            >
+              {{ item.title }}
+              <span v-if="item.children" class="tn-arrow">▾</span>
+            </button>
+
+            <!-- 下拉子菜单 -->
+            <transition name="dropdown">
+              <div
+                v-if="item.children && hoveredNav === item.title"
+                class="tn-dropdown"
+              >
+                <button
+                  v-for="child in item.children"
+                  :key="child.path"
+                  :class="['tn-dropdown-item', { active: isChildActive(child) }]"
+                  @click="navigate(child.path)"
+                >
+                  {{ child.title }}
+                </button>
+              </div>
+            </transition>
+          </div>
+        </nav>
+        <!-- 通知铃铛 -->
+        <el-badge
+          v-if="authStore.isLoggedIn"
+          :value="predStore.unreadCount" :max="99" :hidden="!predStore.unreadCount"
+          class="tn-notice"
+          @click="router.push('/notices')"
+        >
+          <el-icon :size="18"><Bell /></el-icon>
+        </el-badge>
+      </header>
+
+      <!-- 页面右端：头像 + 登录 -->
+      <div class="tn-header-right">
         <template v-if="!authStore.isLoggedIn">
           <el-button text @click="router.push('/login')">登录</el-button>
           <el-button type="primary" @click="router.push('/register')">免费注册</el-button>
         </template>
         <template v-else>
-          <!-- 通知 -->
-          <el-badge :value="predStore.unreadCount" :max="99" :hidden="!predStore.unreadCount" class="tn-notice" @click="router.push('/notices')">
-            <el-icon :size="20"><Bell /></el-icon>
-          </el-badge>
-
           <!-- 用户下拉 -->
           <el-dropdown trigger="click" @command="handleCommand">
             <span class="tn-user">
-              <el-avatar :size="32" :src="authStore.userInfo?.avatar" icon="UserFilled" />
+              <el-avatar :size="36" :src="authStore.userInfo?.avatar" icon="UserFilled" />
               <span class="tn-username">{{ authStore.userInfo?.username || '用户' }}</span>
               <el-icon><ArrowDown /></el-icon>
             </span>
@@ -295,7 +302,7 @@ function handleCommand(command) {
           </el-icon>
         </button>
       </div>
-    </header>
+    </div>
 
     <!-- 移动端下拉菜单 -->
     <transition name="slide">
@@ -338,21 +345,37 @@ function handleCommand(command) {
   background: var(--color-bg-primary);
 }
 
-/* 顶部导航栏 */
-.tn-header {
-  display: flex;
-  align-items: center;
-  height: 56px;
-  padding: 0 var(--spacing-xl);
-  background: rgba(255, 255, 255, 0.92);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border-bottom: 1.5px solid var(--color-border);
-  box-shadow: 0 2px 12px rgba(var(--color-primary-rgb), 0.06);
+/* 全宽浮动容器 */
+.tn-top-bar {
   position: sticky;
   top: 0;
   z-index: 100;
-  gap: var(--spacing-xl);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px var(--spacing-xl) 0;
+  /* 作为 .tn-header-right absolute 的定位参考 */
+}
+
+/* 居中导航栏 — iOS 玻璃效果 */
+.tn-header {
+  display: flex;
+  align-items: center;
+  height: 48px;
+  padding: 0 var(--spacing-lg);
+  width: 65%;
+  max-width: 880px;
+  min-width: 520px;
+  background: rgba(255, 255, 255, 0.38);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 24px;
+  box-shadow:
+    0 1px 8px rgba(0, 0, 0, 0.04),
+    0 4px 24px rgba(0, 0, 0, 0.03),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  gap: var(--spacing-md);
 }
 
 .tn-left {
@@ -361,7 +384,7 @@ function handleCommand(command) {
 
 .tn-logo {
   font-family: var(--font-heading);
-  font-size: 24px;
+  font-size: 22px;
   font-weight: 700;
   background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
   -webkit-background-clip: text;
@@ -405,13 +428,13 @@ function handleCommand(command) {
 
   &:hover {
     color: var(--color-primary);
-    background: rgba(var(--color-primary-rgb), 0.04);
+    background: rgba(var(--color-primary-rgb), 0.06);
   }
 
   &.active {
     color: var(--color-primary-dark);
     font-weight: 600;
-    background: rgba(var(--color-primary-rgb), 0.08);
+    background: rgba(var(--color-primary-rgb), 0.1);
   }
 }
 
@@ -420,20 +443,22 @@ function handleCommand(command) {
   transition: transform 0.2s;
 }
 
-/* 下拉子菜单 */
+/* 下拉子菜单 — 高亮不透黑 */
 .tn-dropdown {
   position: absolute;
-  top: 100%;
+  top: calc(100% + 8px);
   left: 50%;
   transform: translateX(-50%);
   min-width: 150px;
-  padding: var(--spacing-xs);
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  border: 1.5px solid var(--color-border);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-hover);
+  padding: var(--spacing-sm);
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 16px;
+  box-shadow:
+    0 4px 16px rgba(0, 0, 0, 0.08),
+    0 12px 36px rgba(0, 0, 0, 0.06);
   z-index: 200;
   display: flex;
   flex-direction: column;
@@ -483,17 +508,35 @@ function handleCommand(command) {
   transform: translateX(-50%) translateY(-4px);
 }
 
-.tn-right {
+/* 页面右端：头像 + 按钮 */
+.tn-header-right {
+  position: absolute;
+  right: var(--spacing-xl);
+  top: 50%;
+  transform: translateY(-50%);
   display: flex;
   align-items: center;
-  gap: var(--spacing-lg);
-  flex-shrink: 0;
+  gap: var(--spacing-md);
+  z-index: 101;
+
+  .el-button {
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
 }
 
 .tn-notice {
   cursor: pointer;
-  transition: transform var(--transition-fast);
-  &:hover { transform: translateY(-1px); }
+  color: var(--color-text-secondary);
+  padding: 6px;
+  border-radius: var(--radius-sm);
+  transition: all var(--transition-fast);
+  flex-shrink: 0;
+
+  &:hover {
+    color: var(--color-primary);
+    background: rgba(var(--color-primary-rgb), 0.06);
+  }
 }
 
 .tn-user {
@@ -501,16 +544,24 @@ function handleCommand(command) {
   align-items: center;
   gap: var(--spacing-sm);
   cursor: pointer;
-  padding: var(--spacing-xs) var(--spacing-sm);
-  border-radius: var(--radius-sm);
-  transition: background var(--transition-fast);
+  padding: 5px 16px 5px 5px;
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.5);
+  backdrop-filter: blur(12px) saturate(160%);
+  -webkit-backdrop-filter: blur(12px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  transition: all var(--transition-fast);
 
-  &:hover { background: rgba(var(--color-primary-rgb), 0.04); }
+  &:hover {
+    background: rgba(255, 255, 255, 0.72);
+    border-color: rgba(255, 255, 255, 0.65);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  }
 }
 
 .tn-username {
   font-family: var(--font-body);
-  font-size: var(--font-size-base);
+  font-size: var(--font-size-sm);
   font-weight: 500;
   color: var(--color-text-primary);
 }
@@ -614,6 +665,23 @@ function handleCommand(command) {
 
 /* 响应式 */
 @media (max-width: 768px) {
+  .tn-top-bar {
+    padding: 4px 8px 0;
+  }
+
+  .tn-header {
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+    border-radius: 20px;
+    height: 44px;
+    padding: 0 var(--spacing-md);
+  }
+
+  .tn-header-right {
+    right: 12px;
+  }
+
   .tn-nav-desktop,
   .tn-username,
   .tn-notice { display: none; }

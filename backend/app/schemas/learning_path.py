@@ -153,9 +153,9 @@ class ScoreLogItem(BaseModel):
     id: int
     source: str = Field(..., description="触发来源标识")
     source_label: str = Field(..., description="触发来源中文名")
-    listening_score: Optional[float] = None
-    speaking_score: Optional[float] = None
-    reading_score: Optional[float] = None
+    fluency_score: Optional[float] = None
+    pronunciation_score: Optional[float] = None
+    vocabulary_score: Optional[float] = None
     grammar_score: Optional[float] = None
     overall_score: Optional[float] = None
     cefr_level: Optional[str] = None
