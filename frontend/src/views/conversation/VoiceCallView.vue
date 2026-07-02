@@ -32,10 +32,63 @@ const scoreReport = ref(null)
 const isScoring = ref(false)
 
 // 对话记录（滚动展示）
+const MAX_ROUNDS = 10
 const messages = ref([])  // [{role: 'user'|'ai', text, grammar?, streaming?}]
 const chatBoxRef = ref(null)
+const elapsedSeconds = ref(0)
+let elapsedTimer = null
+const userRoundCount = computed(() => messages.value.filter(m => m.role === 'user').length)
+
+function startElapsedTimer() {
+  stopElapsedTimer()
+  elapsedSeconds.value = 0
+  elapsedTimer = setInterval(() => { elapsedSeconds.value++ }, 1000)
+}
+function stopElapsedTimer() {
+  if (elapsedTimer) { clearInterval(elapsedTimer); elapsedTimer = null }
+}
+function formatTime(sec) {
+  const m = Math.floor(sec / 60)
+  const s = sec % 60
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+}
 let activeGeneration = null  // { cancelled: bool } 旧流标记，不杀 fetch 但静默回调
-const currentUserMsgIdx = ref(-1)  // 模板渲染用（哪个消息正在等待语法检测）
+// 语法检测状态由每条消息自己的 _grammarPending 追踪，不再使用全局索引
+const hintText = ref('')  // AI 回答提示（目标文本）
+const hintKey = ref(0)   // 强制触发动画
+const displayHintEn = ref('')  // 流式逐字显示的英文
+const displayHintZh = ref('')  // 流式逐字显示的中文
+const isHintTyping = ref(false)
+let _hintTimer = null
+
+function typeHintText(targetEn, targetZh) {
+  if (_hintTimer) { clearInterval(_hintTimer); _hintTimer = null }
+  displayHintEn.value = ''
+  displayHintZh.value = ''
+  isHintTyping.value = true
+  hintKey.value++
+
+  const maxLen = Math.max(targetEn.length, (targetZh || '').length)
+  if (maxLen === 0) { isHintTyping.value = false; return }
+  let idx = 0
+  _hintTimer = setInterval(() => {
+    if (idx < targetEn.length) displayHintEn.value += targetEn[idx]
+    if (targetZh && idx < targetZh.length) displayHintZh.value += targetZh[idx]
+    idx++
+    if (idx >= maxLen) {
+      clearInterval(_hintTimer)
+      _hintTimer = null
+      isHintTyping.value = false
+    }
+  }, 40)
+}
+
+function stopHintTyping() {
+  if (_hintTimer) { clearInterval(_hintTimer); _hintTimer = null }
+  isHintTyping.value = false
+  displayHintEn.value = ''
+  displayHintZh.value = ''
+}
 
 // 语法错误类型颜色映射
 const ERROR_TYPE_COLORS = {
@@ -84,11 +137,15 @@ function toggleUtterance(index) {
   expandedUtterance.value = expandedUtterance.value === index ? null : index
 }
 
-// 滚动到底部
-async function scrollToBottom() {
+// 最新消息滚动到可视区域中间，上方可见历史消息
+async function scrollToCenter() {
   await nextTick()
   if (chatBoxRef.value) {
-    chatBoxRef.value.scrollTop = chatBoxRef.value.scrollHeight
+    const bubbles = chatBoxRef.value.querySelectorAll('.chat-bubble')
+    const last = bubbles[bubbles.length - 1]
+    if (last) {
+      last.scrollIntoView({ block: 'center', behavior: 'instant' })
+    }
   }
 }
 
@@ -100,7 +157,7 @@ function typewriteUserText(idx, fullText) {
     if (isHangingUp) return
     if (pos < fullText.length && idx < messages.value.length) {
       messages.value[idx].text = fullText.slice(0, ++pos)
-      scrollToBottom()
+      scrollToCenter()
       setTimeout(step, speed * (Math.random() * 0.5 + 0.75))  // 模拟 token 随机性
     }
   }
@@ -126,8 +183,10 @@ async function selectScenario(scenario) {
   callState.value = 'idle'
   isPaused.value = false
   messages.value = []
+  hintText.value = ''
+  stopHintTyping()
+  startElapsedTimer()
   if (activeGeneration) { activeGeneration.cancelled = true; activeGeneration = null }
-  currentUserMsgIdx.value = -1
 
   // 开始对话
   isConnecting.value = true
@@ -140,7 +199,7 @@ async function selectScenario(scenario) {
       } else {
         messages.value.push({ role: 'ai', text, streaming: true })
       }
-      scrollToBottom()
+      scrollToCenter()
     },
     onDone(data) {
       isConnecting.value = false
@@ -151,6 +210,16 @@ async function selectScenario(scenario) {
         last.streaming = false
       }
       speakAndListen(data.full_text, data.tts_url ? ttsCachedUrl(data.tts_url) : null)
+    },
+    onTranslation(text) {
+      const last = messages.value[messages.value.length - 1]
+      if (last && last.role === 'ai') last.translation = text
+    },
+    onHint(data) {
+      hintText.value = data || null
+      if (data) {
+        typeHintText(data.en, data.zh || '')
+      }
     },
     onError() {
       isConnecting.value = false
@@ -259,30 +328,29 @@ async function processUserAudio() {
   callState.value = 'thinking'
   const audioBlob = new Blob(audioChunks, { type: 'audio/webm' })
 
+  // 🔧 立即插入用户消息占位（含语法待检测标记），msgIdx 不可变
+  const msgIdx = messages.value.push({ role: 'user', text: '', _grammarPending: true }) - 1
+  scrollToCenter()
+
   // 标记上一代流为取消，但不 abort fetch（语法事件仍能到达）
   if (activeGeneration) {
     activeGeneration.cancelled = true
   }
   const gen = { cancelled: false }
   activeGeneration = gen
-  let msgIdx = -1  // 局部变量：每次调用独立的索引，避免竞态覆盖
 
   streamSpeakConversation(sessionId.value, selectedScenario.value.id, audioBlob, {
     onAsr(text) {
-      // 不检查 gen.cancelled：必须设置 msgIdx，否则 onGrammar 找不到目标消息
-      msgIdx = messages.value.push({ role: 'user', text: '' }) - 1
-      if (!gen.cancelled) {
-        currentUserMsgIdx.value = msgIdx  // 模板渲染用
-        scrollToBottom()
+      if (msgIdx < messages.value.length) {
         typewriteUserText(msgIdx, text)
       }
     },
     onGrammar(data) {
-      // 不检查 gen.cancelled：上一段的语法结果也要显示
       if (msgIdx >= 0 && msgIdx < messages.value.length) {
         const msg = messages.value[msgIdx]
         if (msg && msg.role === 'user') {
           msg.grammar = { ...data, _collapsed: true }
+          msg._grammarPending = false
         }
       }
     },
@@ -294,7 +362,7 @@ async function processUserAudio() {
       } else {
         messages.value.push({ role: 'ai', text, streaming: true })
       }
-      scrollToBottom()
+      scrollToCenter()
     },
     onDone(data) {
       if (gen.cancelled) return
@@ -304,6 +372,12 @@ async function processUserAudio() {
         last.streaming = false
       }
       speakAndListen(data.full_text, data.tts_url ? ttsCachedUrl(data.tts_url) : null)
+    },
+    onHint(data) {
+      hintText.value = data || null
+      if (data) {
+        typeHintText(data.en, data.zh || '')
+      }
     },
     onTranslation(text) {
       // 挂到最后一个 AI 消息上
@@ -318,7 +392,7 @@ async function processUserAudio() {
     onError(msg) {
       if (gen.cancelled) return
       messages.value.push({ role: 'ai', text: 'Sorry, I had trouble understanding that.' })
-      scrollToBottom()
+      scrollToCenter()
       startListening()
     },
   })
@@ -349,6 +423,7 @@ function togglePause() {
 async function hangUp() {
   isHangingUp = true
   isPaused.value = false
+  stopElapsedTimer()
 
   // 1. 取消进行中的 SSE 流回调
   if (activeGeneration) { activeGeneration.cancelled = true; activeGeneration = null }
@@ -412,6 +487,9 @@ function resetCall() {
   selectedScenario.value = null
   callState.value = 'idle'
   messages.value = []
+  hintText.value = ''
+  stopHintTyping()
+  stopElapsedTimer()
   scoreReport.value = null
   sessionId.value = ''
 }
@@ -475,16 +553,23 @@ onUnmounted(() => {
     <!-- 通话界面 -->
     <template v-else-if="phase === 'calling'">
       <div class="call-screen">
-        <!-- 顶部装饰 -->
-        <div class="call-top">
-          <div class="call-scene-pill">
-            <span class="pill-emoji">{{ selectedScenario?.emoji }}</span>
-            {{ selectedScenario?.title }}
+        <!-- 左侧：AI 状态 + 提示文本 -->
+        <div class="call-left">
+          <!-- 场景标签 -->
+          <div class="call-top">
+            <div class="call-scene-pill">
+              <span class="pill-emoji">{{ selectedScenario?.emoji }}</span>
+              {{ selectedScenario?.title }}
+            </div>
           </div>
-        </div>
 
-        <!-- 中间状态区 -->
-        <div class="call-center">
+          <!-- 回答提示卡片 -->
+          <div v-if="hintText" class="hint-card">
+            <span class="hint-label">💡 你可以说</span>
+            <span class="hint-text">{{ displayHintEn }}<span v-if="isHintTyping" class="typing-cursor">|</span></span>
+            <span v-if="hintText.zh" class="hint-zh">{{ displayHintZh }}<span v-if="isHintTyping" class="typing-cursor">|</span></span>
+          </div>
+
           <!-- 可爱头像 + 波纹 -->
           <div class="mascot-container" :class="callState">
             <div class="ripple-ring r1"></div>
@@ -511,10 +596,32 @@ onUnmounted(() => {
             </template>
             <template v-else>准备就绪</template>
           </div>
+
+          <!-- 会话状态信息 -->
+          <div class="session-info">
+            <div class="si-item">
+              <span class="si-icon">⏱️</span>
+              <span class="si-value">{{ formatTime(elapsedSeconds) }}</span>
+            </div>
+          </div>
+
+          <!-- 操作按钮 -->
+          <div class="call-actions">
+            <button class="pause-btn" @click="togglePause">
+              <span class="pause-icon">{{ isPaused ? '▶️' : '⏸️' }}</span>
+            </button>
+            <p class="pause-label">{{ isPaused ? '继续' : '暂停' }}</p>
+            <button class="hangup-btn" @click="hangUp">
+              <span class="hangup-icon">📞</span>
+            </button>
+            <p class="hangup-label">挂断</p>
+          </div>
         </div>
 
-        <!-- 底部字幕区 → 滚动聊天记录 -->
-        <div class="call-chat-box" ref="chatBoxRef">
+        <!-- 右侧：聊天对话框 -->
+        <div class="call-right">
+          <!-- 滚动聊天记录 -->
+          <div class="call-chat-box" ref="chatBoxRef">
           <div
             v-for="(msg, idx) in messages"
             :key="idx"
@@ -529,10 +636,17 @@ onUnmounted(() => {
               <p class="bubble-text">{{ msg.text }}</p>
               <!-- 语法检测中 -->
               <div
-                v-if="!msg.grammar && msg.role === 'user' && idx === currentUserMsgIdx && msg.text && msg.text !== '(未识别到语音)'"
+                v-if="msg.role === 'user' && msg._grammarPending && msg.text && msg.text !== '(未识别到语音)'"
                 class="grammar-checking"
               >
                 <span class="gck-dot"></span> 语法检测中...
+              </div>
+              <!-- 语法正确标记 -->
+              <div
+                v-if="msg.grammar && !msg._grammarPending && !msg.grammar.errors?.length"
+                class="grammar-perfect"
+              >
+                👍
               </div>
               <!-- 语法纠错入口（每条用户消息下方） -->
               <div
@@ -588,17 +702,7 @@ onUnmounted(() => {
           </div>
         </div>
 
-        <!-- 操作按钮 -->
-        <div class="call-actions">
-          <button class="pause-btn" @click="togglePause">
-            <span class="pause-icon">{{ isPaused ? '▶️' : '⏸️' }}</span>
-          </button>
-          <p class="pause-label">{{ isPaused ? '继续' : '暂停' }}</p>
-          <button class="hangup-btn" @click="hangUp">
-            <span class="hangup-icon">📞</span>
-          </button>
-          <p class="hangup-label">挂断</p>
-        </div>
+        </div><!-- .call-right -->
       </div>
     </template>
 
@@ -924,14 +1028,168 @@ onUnmounted(() => {
 // ========== 通话界面 ==========
 .call-screen {
   display: flex;
+  flex-direction: row;
+  height: calc(100vh - 56px);
+  overflow: hidden;
+  background: #F5F3FA;
+}
+
+// 左侧面板 — AI 状态 + 提示
+.call-left {
+  flex: 3;
+  display: flex;
   flex-direction: column;
-  min-height: calc(100vh - 56px);
-  background: linear-gradient(180deg, #FFF5F5 0%, #F8F0FF 25%, #FFF9F0 50%, #F0F8FF 100%);
+  align-items: center;
+  gap: 20px;
+  padding: 24px 24px 20px;
+  background: linear-gradient(180deg, #EDE9F6 0%, #F2F0FA 40%, #F8F6FD 100%);
+  border-right: 1px solid rgba(124, 111, 247, 0.1);
+  min-width: 280px;
+}
+
+// 右侧面板 — 聊天 + 操作
+.call-right {
+  flex: 7;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 0;
+  background: #F5F3FA;
+}
+
+// 会话状态信息
+.session-info {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 20px;
+  background: rgba(255, 255, 255, 0.6);
+  border-radius: 14px;
+  box-shadow: 0 2px 12px rgba(124, 111, 247, 0.06);
+  width: 100%;
+  max-width: 440px;
+
+  .si-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .si-icon {
+    font-size: 16px;
+    width: 24px;
+    text-align: center;
+    flex-shrink: 0;
+  }
+  .si-value {
+    font-size: 15px;
+    font-weight: 600;
+    color: #5D5D7A;
+  }
+}
+
+// 回答提示卡片
+.hint-card {
+  width: 100%;
+  max-width: 440px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 16px 22px;
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(12px);
+  border: 1px solid transparent;
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(124, 111, 247, 0.12);
+  animation: hintSlideIn 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+  overflow: hidden;
+  position: relative;
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    border-radius: 16px;
+    background: linear-gradient(135deg, rgba(124,111,247,0.08), rgba(255,107,138,0.06), rgba(124,111,247,0.08));
+    animation: hintShimmer 2.5s ease-out;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  &::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    border-radius: 16px;
+    border: 1.5px solid transparent;
+    background: linear-gradient(135deg, #C4B5FD, #E8E0F0, #C4B5FD) border-box;
+    -webkit-mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
+    mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    animation: hintBorderPulse 2.5s ease-out;
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  .hint-label {
+    font-size: 14px;
+    color: #7C6FF7;
+    font-weight: 700;
+    position: relative;
+    z-index: 2;
+  }
+
+  .hint-text {
+    font-size: 18px;
+    color: #3D3D5C;
+    line-height: 1.5;
+    font-weight: 600;
+    position: relative;
+    z-index: 2;
+  }
+
+  .hint-zh {
+    font-size: 14px;
+    color: #9B7ED8;
+    line-height: 1.4;
+    margin-top: 2px;
+    position: relative;
+    z-index: 2;
+  }
+}
+
+.typing-cursor {
+  color: #7C6FF7;
+  font-weight: 300;
+  animation: cursorBlink 0.7s ease-in-out infinite;
+}
+
+@keyframes hintSlideIn {
+  from { opacity: 0; transform: translateX(20px) translateY(-6px); }
+  to { opacity: 1; transform: translateX(0) translateY(0); }
+}
+
+@keyframes hintShimmer {
+  0% { opacity: 1; }
+  60% { opacity: 0.6; }
+  100% { opacity: 0; }
+}
+
+@keyframes hintBorderPulse {
+  0% { opacity: 1; }
+  50% { opacity: 0.5; }
+  100% { opacity: 0; }
+}
+
+@keyframes cursorBlink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
 }
 
 .call-top {
   text-align: center;
-  padding: 40px 20px 0;
+  padding: 16px 20px 8px;
+  flex-shrink: 0;
 }
 
 .call-scene-pill {
@@ -949,20 +1207,12 @@ onUnmounted(() => {
   }
 }
 
-.call-center {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 28px;
-}
-
 // 可爱头像 + 波纹
 .mascot-container {
   position: relative;
-  width: 140px;
-  height: 140px;
+  width: 120px;
+  height: 120px;
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -999,8 +1249,8 @@ onUnmounted(() => {
   &.thinking .r3 { animation-delay: 0.4s; }
 
   .mascot-avatar {
-    width: 74px;
-    height: 74px;
+    width: 64px;
+    height: 64px;
     border-radius: 50%;
     background: linear-gradient(135deg, #FFE0E8, #FFD6E0);
     display: flex;
@@ -1010,7 +1260,7 @@ onUnmounted(() => {
     box-shadow: 0 4px 16px rgba(255, 107, 138, 0.15);
 
     .mascot-face {
-      font-size: 38px;
+      font-size: 32px;
       animation: wiggle 3s ease-in-out infinite;
     }
   }
@@ -1028,12 +1278,13 @@ onUnmounted(() => {
 }
 
 .call-state-label {
-  font-size: 16px;
+  font-size: 15px;
   color: #999;
   font-weight: 500;
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-shrink: 0;
 
   .state-dot {
     width: 8px;
@@ -1068,15 +1319,32 @@ onUnmounted(() => {
 .call-chat-box {
   flex: 1;
   overflow-y: auto;
-  padding: 12px 20px;
+  padding: 16px 20px 0;
   display: flex;
   flex-direction: column;
   gap: 10px;
-  max-height: calc(100vh - 360px);
   min-height: 0;
+  margin: 8px 16px 8px 8px;
+  background: #F8F7FC;
+  border-radius: 20px;
+  border: 1px solid rgba(124, 111, 247, 0.08);
+  box-shadow: 0 2px 20px rgba(124, 111, 247, 0.06), 0 0 0 1px rgba(0, 0, 0, 0.02);
+
+  // 底部占位：让最新消息能滚动到可视区域中间
+  &::after { content: ''; flex-shrink: 0; height: 45vh; }
 
   &::-webkit-scrollbar { width: 4px; }
   &::-webkit-scrollbar-thumb { background: #E0D8F0; border-radius: 2px; }
+}
+
+.call-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  padding: 16px 20px 20px;
+  flex-shrink: 0;
+  margin-top: auto;
 }
 
 .chat-bubble {
@@ -1140,16 +1408,6 @@ onUnmounted(() => {
 @keyframes dotPulse {
   0%, 100% { opacity: 0.3; }
   50% { opacity: 1; }
-}
-
-// 操作按钮
-.call-actions {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 24px;
-  padding: 16px 20px 36px;
-  flex-shrink: 0;
 }
 
 .pause-btn {
@@ -1223,6 +1481,18 @@ onUnmounted(() => {
     background: #F59E0B;
     animation: pulse-dot 0.8s ease-in-out infinite;
   }
+}
+
+// 语法正确标记
+.grammar-perfect {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: #059669;
+  margin-top: 4px;
+  font-weight: 600;
+  .gp-icon { font-size: 14px; }
 }
 
 // 语法纠错入口指示器

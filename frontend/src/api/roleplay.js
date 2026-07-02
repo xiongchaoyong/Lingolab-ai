@@ -90,6 +90,9 @@ async function readSSEStream(resp, callbacks, signal) {
               case 'translation':
                 callbacks.onTranslation?.(data.data)
                 break
+              case 'hint':
+                callbacks.onHint?.(data.data)
+                break
             }
           } catch (e) {
             // skip malformed JSON
