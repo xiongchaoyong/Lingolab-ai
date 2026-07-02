@@ -26,7 +26,7 @@ async def chat_text(
 ):
     """文字客服：发送问题，获取 AI 回复"""
     try:
-        result = await help_service.chat(req.message, req.history)
+        result = await help_service.chat(req.message, req.history, current_user.id)
         return ChatResponse(**result)
     except Exception as e:
         logger.error(f"客服接口异常: {e}")
@@ -45,7 +45,7 @@ async def chat_stream(
     """文字客服（流式）：SSE 逐 token 返回 AI 回复"""
     async def generate():
         try:
-            async for token in help_service.chat_stream(req.message, req.history):
+            async for token in help_service.chat_stream(req.message, req.history, current_user.id):
                 yield f"data: {json.dumps({'content': token})}\n\n"
             yield "data: [DONE]\n\n"
         except Exception as e:
@@ -96,7 +96,7 @@ async def chat_voice(
                 escalate=False,
             )
 
-        result = await help_service.chat(transcript, history_list)
+        result = await help_service.chat(transcript, history_list, current_user.id)
         result["transcript"] = transcript
         return ChatResponse(**result)
     finally:

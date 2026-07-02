@@ -6,6 +6,9 @@ import { chatText, chatVoice, chatStream } from '@/api/help'
 
 const authStore = useAuthStore()
 
+// 功能介绍弹窗
+const featureDialogVisible = ref(false)
+
 const faqCategories = [
   {
     title: '账号相关',
@@ -292,7 +295,10 @@ onUnmounted(() => {
             <div class="agent-status">在线 | AI 驱动</div>
           </div>
         </div>
-        <el-tag size="small" type="success">AI 客服</el-tag>
+        <div class="chat-header-right">
+          <el-button circle :icon="QuestionFilled" @click="featureDialogVisible = true" />
+          <el-tag size="small" type="success">AI 客服</el-tag>
+        </div>
       </div>
 
       <div class="chat-messages" ref="chatRef">
@@ -357,6 +363,65 @@ onUnmounted(() => {
         />
       </div>
     </div>
+
+    <!-- 功能介绍弹窗 -->
+    <el-dialog v-model="featureDialogVisible" title="智能客服核心功能" width="600px" center>
+      <div class="feature-section">
+        <div class="feature-icon" style="background: rgba(64,158,255,0.1); color: #409EFF">
+          <el-icon :size="28"><Search /></el-icon>
+        </div>
+        <div class="feature-body">
+          <h4>RAG 检索增强生成</h4>
+          <p>用户提问时，系统自动从知识库（FAQ + 产品文档）中检索最相关的 3 条内容，作为参考上下文注入 LLM，确保回复准确、基于真实文档而非凭空编造。</p>
+          <div class="feature-flow">
+            <span class="flow-step">用户提问</span>
+            <span class="flow-arrow">→</span>
+            <span class="flow-step">文本向量化</span>
+            <span class="flow-arrow">→</span>
+            <span class="flow-step">ChromaDB 语义检索</span>
+            <span class="flow-arrow">→</span>
+            <span class="flow-step">Top-3 文档注入</span>
+            <span class="flow-arrow">→</span>
+            <span class="flow-step">LLM 生成回复</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="feature-section">
+        <div class="feature-icon" style="background: rgba(103,194,58,0.1); color: #67C23A">
+          <el-icon :size="28"><Connection /></el-icon>
+        </div>
+        <div class="feature-body">
+          <h4>知识图谱学习推荐</h4>
+          <p>LLM 自动从用户问题中提取薄弱知识点（如"过去时"），到知识图谱（129 节点、292 边）中查询关联资源：</p>
+          <div class="kg-features">
+            <el-tag type="warning" size="small">前置依赖技能</el-tag>
+            <el-tag type="success" size="small">推荐学习资料</el-tag>
+            <el-tag type="danger" size="small">易混淆技能</el-tag>
+            <el-tag size="small">CEFR 等级定位</el-tag>
+          </div>
+          <p style="margin-top: 8px">将结果交给 LLM 生成个性化的分步学习建议。</p>
+        </div>
+      </div>
+
+      <div class="feature-section">
+        <div class="feature-icon" style="background: rgba(230,162,60,0.1); color: #E6A23C">
+          <el-icon :size="28"><Microphone /></el-icon>
+        </div>
+        <div class="feature-body">
+          <h4>语音输入 & 流式回复</h4>
+          <p>支持语音提问（浏览器录音 → Whisper 转写 → 完整 RAG+KG 管线），SSE 流式逐 token 返回回复内容，模拟真实客服的打字效果。</p>
+        </div>
+      </div>
+
+      <div class="feature-footer">
+        <el-divider />
+        <p class="feature-note">
+          后台管理入口：<el-tag size="small" type="info">/admin/knowledge</el-tag>
+          — 管理知识库文档、查看检索日志、重建向量索引
+        </p>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
@@ -498,11 +563,47 @@ onUnmounted(() => {
   border-top: 1px solid var(--color-border); align-items: center;
   .el-input { flex: 1; }
 }
+.chat-header-right {
+  display: flex; align-items: center; gap: var(--spacing-sm);
+}
+
 .is-recording {
   animation: pulse-rec 1.2s infinite;
 }
 @keyframes pulse-rec {
   0%, 100% { box-shadow: 0 0 0 0 rgba(var(--color-danger-rgb), 0.4); }
   50% { box-shadow: 0 0 0 8px rgba(var(--color-danger-rgb), 0); }
+}
+
+/* 功能介绍弹窗 */
+.feature-section {
+  display: flex; gap: var(--spacing-lg); margin-bottom: var(--spacing-xl);
+}
+.feature-icon {
+  width: 52px; height: 52px; border-radius: 12px;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.feature-body {
+  flex: 1;
+  h4 { margin: 0 0 6px 0; font-size: 16px; font-weight: 600; }
+  p { margin: 0 0 8px 0; font-size: var(--font-size-sm); color: var(--color-text-secondary); line-height: 1.7; }
+}
+.feature-flow {
+  display: flex; align-items: center; gap: 4px; flex-wrap: wrap;
+  padding: 10px 12px; background: var(--color-bg-secondary); border-radius: var(--radius-sm);
+}
+.flow-step {
+  background: var(--color-primary); color: #fff;
+  padding: 2px 8px; border-radius: 4px; font-size: 12px; white-space: nowrap;
+}
+.flow-arrow {
+  color: var(--color-text-disabled); font-size: 12px;
+}
+.kg-features {
+  display: flex; gap: 8px; flex-wrap: wrap;
+}
+.feature-note {
+  font-size: var(--font-size-sm); color: var(--color-text-tertiary);
+  display: flex; align-items: center; gap: 8px;
 }
 </style>

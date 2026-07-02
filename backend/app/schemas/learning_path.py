@@ -148,6 +148,20 @@ class RecommendationLogic(BaseModel):
     factors: List[RecommendationFactor]
 
 
+class ScoreLogItem(BaseModel):
+    """维度分数变更日志条目"""
+    id: int
+    source: str = Field(..., description="触发来源标识")
+    source_label: str = Field(..., description="触发来源中文名")
+    listening_score: Optional[float] = None
+    speaking_score: Optional[float] = None
+    reading_score: Optional[float] = None
+    grammar_score: Optional[float] = None
+    overall_score: Optional[float] = None
+    cefr_level: Optional[str] = None
+    created_at: str = ""
+
+
 class ProfileSummaryResponse(BaseModel):
     """个人情况说明响应"""
     cefr_level: str = "A1"
@@ -158,3 +172,4 @@ class ProfileSummaryResponse(BaseModel):
     dimension_scores: List[DimensionScore] = Field(default_factory=list)
     recent_stats: RecentStats = Field(default_factory=RecentStats)
     recommendation_logic: RecommendationLogic = Field(default_factory=RecommendationLogic)
+    score_logs: List[ScoreLogItem] = Field(default_factory=list)

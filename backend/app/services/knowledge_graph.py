@@ -257,8 +257,96 @@ class KnowledgeGraphService:
         return results
 
     # ============================================================
-    # 写操作 (MySQL + 内存图同步)
+    # 智能客服集成 — 薄弱点搜索 + 资源推荐
     # ============================================================
+
+    def search_skills(self, keyword: str) -> List[dict]:
+        """模糊搜索技能节点 — 按 label 关键词匹配
+
+        返回: [{"id": "skill:past_tense", "label": "过去时", "type": "skill", "sub_type": "grammar"}, ...]
+        """
+        keyword_lower = keyword.lower()
+        results = []
+        for nid, attrs in self.graph.nodes(data=True):
+            if attrs["type"] != "skill":
+                continue
+            label = attrs.get("label", "").lower()
+            # 关键词匹配：label 包含 keyword，或 keyword 包含在 label 中
+            if keyword_lower in label or any(
+                kw in label for kw in keyword_lower.split()
+            ):
+                results.append({"id": nid, **attrs})
+        # 按匹配度排序（完全匹配优先）
+        results.sort(key=lambda r: len(r["label"]))
+        return results
+
+    def get_skill_context(self, skill_id: str) -> dict:
+        """获取技能节点的完整教学上下文
+
+        返回:
+            {
+                "skill": {"id": "...", "label": "...", ...},
+                "cefr_level": "A2",
+                "prerequisites": [{"id": "...", "label": "..."}, ...],
+                "materials": [{"id": "...", "label": "...", "type": "video"}, ...],
+                "similar_skills": [{"id": "...", "label": "..."}, ...],
+            }
+        """
+        if skill_id not in self.graph:
+            return {}
+
+        skill_attrs = dict(self.graph.nodes[skill_id])
+        result = {
+            "skill": {"id": skill_id, **skill_attrs},
+            "cefr_level": self._get_cefr_for_skill(skill_id),
+            "prerequisites": self._get_prerequisite_labels(skill_id),
+            "materials": self._get_material_labels(skill_id),
+            "similar_skills": self._get_similar_labels(skill_id),
+        }
+        return result
+
+    def _get_cefr_for_skill(self, skill_id: str) -> str:
+        """获取技能所属的 CEFR 等级"""
+        for _, target, attrs in self.graph.out_edges(skill_id, data=True):
+            if attrs["relation"] == "BELONGS_TO":
+                target_attrs = self.graph.nodes[target]
+                if target_attrs["type"] == "cefr_level":
+                    return target_attrs.get("label", target)
+        return "未知"
+
+    def _get_prerequisite_labels(self, skill_id: str) -> List[dict]:
+        """获取技能的前置依赖（简化列表）"""
+        prereqs = self.get_prerequisites(skill_id)
+        return [{"id": p["id"], "label": p.get("label", p["id"])} for p in prereqs]
+
+    def _get_material_labels(self, skill_id: str) -> List[dict]:
+        """获取教授该技能的资料（简化列表）"""
+        materials = self.get_materials_teaching(skill_id)
+        return [{"id": m["id"], "label": m.get("label", m["id"]),
+                 "type": m.get("sub_type", m.get("type", "material"))} for m in materials]
+
+    def _get_similar_labels(self, skill_id: str) -> List[dict]:
+        """获取易混淆技能（简化列表）"""
+        similar = self.get_similar_skills(skill_id)
+        return [{"id": s["id"], "label": s.get("label", s["id"])} for s in similar]
+
+    def find_recommendations(self, keyword: str) -> dict:
+        """根据关键词查找技能并返回完整推荐上下文
+
+        这是智能客服调用的主入口：
+        1. 搜索匹配的技能
+        2. 对每个匹配技能获取完整上下文（前置/资料/相似技能/等级）
+        """
+        skills = self.search_skills(keyword)
+        if not skills:
+            return {"found": False, "keyword": keyword, "results": []}
+
+        results = []
+        for skill in skills[:3]:  # 最多取前3个匹配
+            context = self.get_skill_context(skill["id"])
+            results.append(context)
+
+        return {"found": True, "keyword": keyword, "results": results}
 
     def add_node(self, db: Session, node_id: str, node_type: str, label: str,
                  sub_type: Optional[str] = None, extra_data: Optional[dict] = None):

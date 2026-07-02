@@ -4,6 +4,74 @@
 
 ---
 
+## 2026-07-02: RAG 知识库 + 智能客服增强
+
+### 变更内容
+1. **RAG 检索服务**：新建 `rag_service.py`（ChromaDB 向量存储 + 语义搜索），`embedding.py`（BGE-small-zh 本地嵌入 512 维），`knowledge_base.py` ORM 模型（KnowledgeDocument + SearchLog）
+2. **后台知识库管理**：AdminService 新增知识文档 CRUD（创建自动向量化 / 更新同步向量 / 软删除移除向量 / 单条重建索引 / 全量重建索引）+ 检索日志查询；前端 KnowledgeBaseView 管理页面
+3. **智能客服 RAG 增强**：HelpService 重构为 RAG + 知识图谱双增强 — 先检索知识库（top_k=3）→ 提取薄弱知识点查知识图谱 → LLM 优先参考检索结果生成回复 → 记录检索日志
+4. **客服流式回复**：新增 `chat_stream()` 方法支持 SSE 逐 token 推送，替代原同步 chat 方法
+5. **知识图谱薄弱点搜索**：KnowledgeGraphService 新增 `search_skills()` 关键词模糊搜索 + `get_skill_context()` 教学上下文（前置依赖/资料/相似技能/CEFR）
+6. **种子脚本**：`seed_rag.py` 从 FAQ + Markdown 文档初始化向量索引
+
+### 影响文件
+- `backend/app/services/rag_service.py` — **新建**，ChromaDB 向量存储+CRUD
+- `backend/app/services/embedding.py` — **新建**，BGE 本地嵌入
+- `backend/app/models/knowledge_base.py` — **新建**，知识库 ORM
+- `backend/seed_rag.py` — **新建**，RAG 初始化种子脚本
+- `frontend/src/views/admin/KnowledgeBaseView.vue` — **新建**，知识库管理页面
+- `backend/app/services/help.py` — RAG+KG 双增强 + 流式回复
+- `backend/app/services/admin.py` — 知识文档 CRUD + 检索日志
+- `backend/app/services/knowledge_graph.py` — search_skills + get_skill_context
+- `backend/app/api/admin.py` — 知识库管理接口
+- `backend/app/api/help.py` — 切换流式客服端点
+- `backend/app/schemas/admin.py` — 知识库请求/响应 Schema
+- `backend/requirements.txt` — 新增 chromadb + transformers 依赖
+- `frontend/src/api/admin.js` — 知识库 API 函数
+- `frontend/src/router/index.js` — 知识库路由注册
+- `frontend/src/components/layout/TopNavLayout.vue` — 导航入口
+- `docs/业务流程度介绍文档.md` — **新建**，业务流程图文档
+
+---
+
+## 2026-07-02: 全年龄段自适应评分
+
+### 变更内容
+1. **新建 `age_adaptive.py`**：集中管理五类自适应配置（发音权重/对话配比/角色权重/LLM prompt/测评偏移），5 个年龄段 × 4 个评分维度
+2. **发音评测自适应**：`score()` 接受 age_group→五维权重差异化，儿童提高语调节奏(25%+20%)降低准确度(30%)，职场相反
+3. **对话评分自适应**：语音:文本配比从 6:4(儿童)→3.5:6.5(职场)；文本三维权重随年龄调整(儿童参与度60%，职场语法+词汇75%)
+4. **角色扮演自适应**：角色四维权重差异化，儿童应对45%术语10%，职场术语25%应对10%
+5. **LLM prompt 注入**：score_conversation/roleplay/speaking 接受 age_group→注入年龄段评分上下文（鼓励/严格/耐心）
+6. **测评 CEFR 偏移**：儿童/青少年门槛-5分，中老年-3分
+
+### 影响文件
+- `backend/app/services/age_adaptive.py` — **新建**，全部自适应配置
+- `backend/app/services/pronunciation.py` — score()/score_audio() 新增 age_group 参数
+- `backend/app/services/llm.py` — 3 个评分方法接受 age_group，注入 prompt
+- `backend/app/api/conversation.py` — conversation_end 自适应配比+文本权重
+- `backend/app/api/roleplay.py` — roleplay_end 自适应角色权重
+- `backend/app/api/assessment.py` — _get_cefr 考虑年龄偏移，口语题传入 age_group
+
+---
+
+## 2026-07-02: 维度能力分数更新记录
+
+### 变更内容
+1. **新增 `DimensionScoreLog` 模型**：记录每次 recalculate() 后的四维 EMA 分数快照（听/说/读/语法 + 综合分 + CEFR）
+2. **ProfileUpdater 增强**：`_log_scores()` 在 recalculate() 末尾自动写日志；新增 `get_score_logs()` 查询方法；新增 `ingest_assessment_scores()` 测评分数摄入
+3. **测评完成自动摄入**：complete 端点调用 `ingest_assessment_scores()`，将测评结果写入 user_skill_scores + 触发画像重算
+4. **个人情况说明增加时间线**：前端 ProfileSummaryView 新增「分数更新记录」卡片，竖线时间线展示每次活动的维度分数变化
+
+### 影响文件
+- `backend/app/models/profile.py` — 新增 DimensionScoreLog 模型
+- `backend/app/services/profile_updater.py` — _log_scores / ingest_assessment_scores / get_score_logs 方法
+- `backend/app/schemas/learning_path.py` — 新增 ScoreLogItem schema，ProfileSummaryResponse 增加 score_logs 字段
+- `backend/app/api/learning_path.py` — profile-summary 端点返回 score_logs
+- `backend/app/api/assessment.py` — complete 端点调用 ingest_assessment_scores
+- `frontend/src/views/learning/ProfileSummaryView.vue` — 新增分数更新记录时间线卡片
+
+---
+
 ## 2026-07-02: 通话界面 UI 重构 + 提示卡片优化
 
 ### 变更内容

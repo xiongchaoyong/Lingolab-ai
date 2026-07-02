@@ -76,9 +76,13 @@ BONUS_THRESHOLD_WRONG = 0      # 全错（10 题全答错）追加 A1 兜底题
 
 # ========== 工具函数 ==========
 
-def _get_cefr(score: float) -> tuple:
+def _get_cefr(score: float, age_group: str = "大学生") -> tuple:
+    """根据分数返回 CEFR 等级，考虑年龄段偏移"""
+    from app.services.age_adaptive import get_assessment_age_offset
+    offset = get_assessment_age_offset(age_group)
+    adjusted = score - offset  # offset 为负时门槛降低（更宽容）
     for threshold, level, label in CEFR_THRESHOLDS:
-        if score >= threshold:
+        if adjusted >= threshold:
             return level, label
     return "A1", "入门"
 
@@ -259,7 +263,9 @@ async def answer_assessment(
                 if transcript:
                     target_cefr = _level_to_cefr(session["current_level"])
                     llm_service = get_llm_service()
-                    score_result = await llm_service.score_speaking(transcript, target_cefr)
+                    score_result = await llm_service.score_speaking(
+                        transcript, target_cefr, current_user.age_group,
+                    )
                     score = float(score_result.get("total", 60))
                 else:
                     score = 0.0
@@ -518,8 +524,8 @@ async def complete_assessment(
     # 综合分 = 四维均分
     overall = round(sum(dimension_scores.values()) / 4, 1)
 
-    # CEFR 定级
-    level, label = _get_cefr(overall)
+    # CEFR 定级（考虑年龄段偏移）
+    level, label = _get_cefr(overall, current_user.age_group)
 
     # 短板维度
     weakness_dim = min(dimension_scores, key=dimension_scores.get)
@@ -536,11 +542,19 @@ async def complete_assessment(
     current_user.assessment_completed = 1
     db.commit()
 
+    # 摄入测评分数到动态画像（写入 UserSkillScore + 触发 recalculate + 生成 DimensionScoreLog）
+    from app.services.profile_updater import profile_updater
+    profile_updater.ingest_assessment_scores(
+        current_user.id, dimension_scores, session_id, db,
+    )
+    db.commit()
+
     # 清理会话
     del _sessions[session_id]
 
     logger.info(
-        f"用户 {current_user.username} 完成测评: overall={overall}, level={level}"
+        f"用户 {current_user.username} 完成测评: overall={overall}, level={level}, "
+        f"age_group={current_user.age_group}"
     )
 
     return AssessmentSubmitResponse(
@@ -620,7 +634,7 @@ async def submit_assessment(
             dimension_scores[dim] = 0.0
 
     overall = round(sum(dimension_scores.values()) / 4, 1)
-    level, label = _get_cefr(overall)
+    level, label = _get_cefr(overall, current_user.age_group)
 
     weakness_dim = min(dimension_scores, key=dimension_scores.get)
     weakness = {

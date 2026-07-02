@@ -12,6 +12,8 @@ import numpy as np
 import librosa
 import whisperx
 
+from app.services.age_adaptive import get_pronunciation_weights
+
 logger = logging.getLogger(__name__)
 
 # 推理线程池（避免阻塞事件循环）
@@ -771,7 +773,7 @@ class PronunciationService:
 
         return rhythm_score, detail, viz_data
 
-    def score(self, audio_path: str, text: str, mode: str = "word") -> Dict:
+    def score(self, audio_path: str, text: str, mode: str = "word", age_group: str = "大学生") -> Dict:
         """
         对音频进行发音评测
 
@@ -779,6 +781,7 @@ class PronunciationService:
             audio_path: 音频文件路径（16kHz 单声道 WAV）
             text: 标准文本
             mode: 跟读模式 word/sentence，影响综合分权重
+            age_group: 年龄段（儿童/青少年/大学生/职场/中老年），影响权重配比
 
         Returns:
             包含 overall, dimensions, errors, char_scores 的评测结果
@@ -842,23 +845,14 @@ class PronunciationService:
             {"label": "节奏感", "score": rhythm_score},
         ]
 
-        # 综合分 = 按模式加权平均
-        if mode == "word":
-            # 单词模式：音素准确度 50% + 重音位置 25% + 节奏感 25%
-            overall = round(
-                accuracy_score * 0.50 +
-                stress_score * 0.25 +
-                rhythm_score * 0.25
-            )
-        else:
-            # 句子模式：音素准确度 40% + 重音位置 15% + 连读表现 15% + 语调曲线 15% + 节奏感 15%
-            overall = round(
-                accuracy_score * 0.40 +
-                stress_score * 0.15 +
-                linking_score * 0.15 +
-                intonation_score * 0.15 +
-                rhythm_score * 0.15
-            )
+        # 综合分 = 按模式 + 年龄段加权平均
+        weights = get_pronunciation_weights(age_group, mode)
+        overall = round(sum(
+            weights[dim["label"]] * dim["score"] for dim in dimensions
+        )) if all(dim["label"] in weights for dim in dimensions) else (
+            # 回退：简单均分
+            round(sum(d["score"] for d in dimensions) / len(dimensions))
+        )
 
         return {
             "overall": overall,
@@ -876,16 +870,16 @@ class PronunciationService:
             "rhythm_viz": rhythm_viz,
         }
 
-    def score_sync(self, audio_path: str, text: str, mode: str = "word") -> Dict:
+    def score_sync(self, audio_path: str, text: str, mode: str = "word", age_group: str = "大学生") -> Dict:
         """同步版本的 score（供 run_in_executor 使用）"""
-        return self.score(audio_path, text, mode)
+        return self.score(audio_path, text, mode, age_group)
 
 
-async def score_audio(audio_path: str, text: str, mode: str = "word") -> Dict:
+async def score_audio(audio_path: str, text: str, mode: str = "word", age_group: str = "大学生") -> Dict:
     """异步接口：在线程池中运行发音评测"""
     service = get_pronunciation_service()
     loop = asyncio.get_running_loop()
-    return await loop.run_in_executor(_executor, service.score_sync, audio_path, text, mode)
+    return await loop.run_in_executor(_executor, service.score_sync, audio_path, text, mode, age_group)
 
 
 def get_pronunciation_service() -> PronunciationService:

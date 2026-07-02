@@ -199,6 +199,12 @@ const routes = [
         component: () => import('@/views/admin/FeedbackView.vue'),
         meta: { title: '反馈管理' },
       },
+      {
+        path: 'knowledge',
+        name: 'AdminKnowledge',
+        component: () => import('@/views/admin/KnowledgeBaseView.vue'),
+        meta: { title: '知识库管理' },
+      },
     ],
   },
 

@@ -714,6 +714,7 @@ async def conversation_end(
     history = session["history"]
     cefr_level = session["cefr_level"]
     user_audios = session.get("user_audios", [])
+    age_group = current_user.age_group
 
     # 默认值
     pronunciation = []
@@ -773,7 +774,7 @@ async def conversation_end(
         # 2. 文本评测：LLM 评分
         if len(user_messages) >= 1:
             llm = get_llm_service()
-            text_result = await llm.score_conversation(history, cefr_level)
+            text_result = await llm.score_conversation(history, cefr_level, age_group)
             text_dimensions = [
                 {"label": "语法正确率", "score": text_result.get("grammar", 75)},
                 {"label": "词汇丰富度", "score": text_result.get("vocabulary", 75)},
@@ -812,12 +813,18 @@ async def conversation_end(
             ]
             suggestions = "你还没有开口说话，无法评估你的口语水平。再来一次试试吧！"
 
-        # 3. 综合分 = 语音均分 × 0.5 + 文本均分 × 0.5
+        # 3. 综合分 = 语音均分 + 文本均分（按年龄段自适应配比）
+        from app.services.age_adaptive import get_conversation_ratio, get_conversation_text_weights
+        pron_weight, text_weight = get_conversation_ratio(age_group)
+        text_weights = get_conversation_text_weights(age_group)
+
         pron_avg = sum(d["score"] for d in pronunciation) / len(pronunciation) if pronunciation else 0
-        text_avg = sum(d["score"] for d in text_dimensions) / len(text_dimensions) if text_dimensions else 0
+        text_avg = sum(
+            d["score"] * text_weights.get(d["label"], 0.33) for d in text_dimensions
+        ) if text_dimensions else 0
 
         if pronunciation and text_dimensions:
-            overall = round(pron_avg * 0.5 + text_avg * 0.5)
+            overall = round(pron_avg * pron_weight + text_avg * text_weight)
         elif pronunciation:
             overall = round(pron_avg)
         elif text_dimensions:
@@ -825,7 +832,7 @@ async def conversation_end(
 
         # 4. 评分方法论说明
         scoring_methodology = (
-            "综合分 = 语音平均分 × 50% + 文本平均分 × 50%\n"
+            f"综合分 = 语音平均分 × {pron_weight:.0%} + 文本平均分 × {text_weight:.0%}\n"
             "语音评测（wav2vec2 + GOP 算法）：音素准确度、重音位置、语调曲线、连读表现、节奏感\n"
             "文本评测（LLM 评估）：语法正确率、词汇丰富度、对话参与度"
         )

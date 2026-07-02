@@ -37,3 +37,9 @@ backend/uploads/
 
 # 前端构建缓存
 frontend/.vite/
+
+# 向量数据库数据
+backend/chroma_data/
+
+# 数据库导出
+*.zip

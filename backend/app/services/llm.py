@@ -302,22 +302,27 @@ class LLMService:
             logger.error(f"LLM 流式调用失败: {e}")
             yield "I didn't catch that. Could you say it again?"
 
-    async def score_conversation(self, history: list[dict], cefr_level: str = "B1") -> dict:
+    async def score_conversation(self, history: list[dict], cefr_level: str = "B1", age_group: str = "大学生") -> dict:
         """
         对话结束后评分 — 仅文本维度（语法/词汇/参与度），发音由 wav2vec2 评分
 
         Returns:
             {"grammar": 75, "vocabulary": 70, "engagement": 85, "suggestions": "..."}
         """
+        from app.services.age_adaptive import get_age_context_for_prompt
+
         dialogue = ""
         for h in history:
             if h["role"] in ("user", "ai", "assistant"):
                 role = "User" if h["role"] == "user" else "AI"
                 dialogue += f"{role}: {h['text']}\n"
 
+        age_context = get_age_context_for_prompt(age_group)
+
         prompt = (
             f"You are an English teacher evaluating a student's conversation practice.\n"
-            f"Student CEFR level: {cefr_level}\n\n"
+            f"Student CEFR level: {cefr_level}\n"
+            f"{age_context}\n\n"
             f"Conversation:\n{dialogue}\n\n"
             f"Score the student on 3 text-based dimensions (0-100 each).\n"
             f"For each dimension, provide a score, a brief feedback sentence, "
@@ -513,7 +518,7 @@ class LLMService:
             logger.error(f"LLM 角色扮演流式调用失败: {e}")
             yield "I didn't catch that. Could you say it again?"
 
-    async def score_roleplay(self, history: list[dict], cefr_level: str = "B1") -> dict:
+    async def score_roleplay(self, history: list[dict], cefr_level: str = "B1", age_group: str = "大学生") -> dict:
         """
         角色扮演结束后评分 — 四维评分（角色贴合度/场景礼仪/专业术语/应对能力）
 
@@ -521,15 +526,20 @@ class LLMService:
             {"role_fit": 80, "etiquette": 75, "terminology": 70, "response": 72,
              "suggestions": "..."}
         """
+        from app.services.age_adaptive import get_age_context_for_prompt
+
         dialogue = ""
         for h in history:
             if h["role"] in ("user", "ai", "assistant"):
                 role = "User" if h["role"] == "user" else "AI"
                 dialogue += f"{role}: {h['text']}\n"
 
+        age_context = get_age_context_for_prompt(age_group)
+
         prompt = (
             f"You are an English teacher evaluating a student's role-play performance.\n"
-            f"Student CEFR level: {cefr_level}\n\n"
+            f"Student CEFR level: {cefr_level}\n"
+            f"{age_context}\n\n"
             f"Role-play conversation:\n{dialogue}\n\n"
             f"Score the student on 4 dimensions (0-100 each) specific to role-play scenarios.\n"
             f"For each dimension, provide a score, a brief feedback sentence in Chinese, "
@@ -738,45 +748,19 @@ class LLMService:
 
     async def correct_grammar(self, text: str, cefr_level: str = "B1") -> dict:
         """
-        语法纠错与润色 — 独立纠错功能
-
-        Args:
-            text: 用户输入的英文文本
-            cefr_level: CEFR 等级
-
-        Returns:
-            {
-                "corrected_text": "修正后的文本",
-                "errors": [{"original", "correction", "error_type", "explanation"}, ...],
-                "polished_version": "更地道的表达",
-                "suggestions": ["建议1", "建议2", ...],
-            }
+        语法纠错 — 极简 LLM 调用，只返回错误列表，追求低延迟
         """
-        level_instruction = CEFR_DIFFICULTY.get(cefr_level, CEFR_DIFFICULTY["B1"])
-
+        # 极简 prompt：只要求找错 + 一句话中文解释，不要润色/建议
         prompt = (
-            f"You are an expert English grammar tutor helping a {cefr_level} level student.\n"
-            f"Student's level instruction: {level_instruction}\n\n"
-            f"Analyze the following text for grammar errors:\n\n"
-            f'"{text}"\n\n'
-            f"Identify ALL grammar errors. Error types: tense, subject_verb_agreement, article, "
-            f"preposition, word_order, plural, word_choice, other.\n\n"
-            f"Provide:\n"
-            f"1. corrected_text: The text with ALL grammar errors fixed (minimal changes only)\n"
-            f"2. errors: Array of each error found, with original phrase, correction, error_type, "
-            f"and a Chinese explanation of why it's wrong\n"
-            f"3. polished_version: A more natural/idiomatic way to express the same idea "
-            f"(may rephrase the sentence, not just fix errors)\n"
-            f"4. suggestions: 2-4 specific improvement tips in Chinese\n\n"
-            f"Return ONLY a JSON object (no markdown, no code fences):\n"
-            f'{{"corrected_text": "...", "errors": ['
-            f'{{"original": "goed", "correction": "went", "error_type": "tense", '
-            f'"explanation": "go 的过去式是不规则变化，应为 went"}}'
-            f'], "polished_version": "...", "suggestions": ["建议1", "建议2"]}}'
+            f'Find grammar errors in: "{text}"\n'
+            f'Return ONLY JSON: {{"errors":['
+            f'{{"original":"word","correction":"fixed","error_type":"tense|article|plural|preposition|word_choice|word_order|other",'
+            f'"explanation":"简短中文解释"}}]}}\n'
+            f'If no errors, return {{"errors":[]}}'
         )
 
         try:
-            async with httpx.AsyncClient(timeout=12.0) as client:
+            async with httpx.AsyncClient(timeout=8.0) as client:
                 resp = await client.post(
                     BAILIAN_API_URL,
                     headers={
@@ -786,8 +770,8 @@ class LLMService:
                     json={
                         "model": self.model,
                         "messages": [{"role": "user", "content": prompt}],
-                        "max_tokens": 600,
-                        "temperature": 0.3,
+                        "max_tokens": 150,
+                        "temperature": 0.1,
                         "enable_thinking": False,
                     },
                 )
@@ -801,12 +785,7 @@ class LLMService:
 
         except Exception as e:
             logger.error(f"语法纠错失败: {e}")
-            return {
-                "corrected_text": text,
-                "errors": [],
-                "polished_version": text,
-                "suggestions": ["语法纠错服务暂时不可用，请稍后重试"],
-            }
+            return {"errors": []}
 
 
     async def translate_to_chinese(self, text: str) -> str:
@@ -855,13 +834,67 @@ class LLMService:
             return "翻译服务暂时不可用"
 
 
-    async def score_speaking(self, transcript: str, cefr_level: str = "B1") -> dict:
+    async def generate_hint(self, ai_text: str, cefr_level: str = "B1") -> str:
+        """
+        根据 AI 回复生成用户回答提示（1-2句简短英文）
+
+        Args:
+            ai_text: AI 的回复文本
+            cefr_level: 用户 CEFR 等级
+
+        Returns:
+            建议用户回答的英文提示文本
+        """
+        if not ai_text or not ai_text.strip():
+            return ""
+
+        level_instruction = CEFR_DIFFICULTY.get(cefr_level, CEFR_DIFFICULTY["B1"])
+
+        prompt = (
+            f"You are helping an English learner practice conversation.\n"
+            f"The learner's CEFR level is {cefr_level}. {level_instruction}\n\n"
+            f"The AI conversation partner just said:\n"
+            f'"{ai_text}"\n\n'
+            f"Write ONE short, natural English response (1-2 sentences) that the learner could say back. "
+            f"Keep it simple and appropriate for their level. "
+            f"Return ONLY the suggested response text, nothing else — no explanations, no quotes."
+        )
+
+        try:
+            async with httpx.AsyncClient(timeout=8.0) as client:
+                resp = await client.post(
+                    BAILIAN_API_URL,
+                    headers={
+                        "Authorization": f"Bearer {self.api_key}",
+                        "Content-Type": "application/json",
+                    },
+                    json={
+                        "model": self.model,
+                        "messages": [{"role": "user", "content": prompt}],
+                        "max_tokens": 80,
+                        "temperature": 0.7,
+                        "enable_thinking": False,
+                    },
+                )
+                resp.raise_for_status()
+                data = resp.json()
+                hint = data["choices"][0]["message"]["content"].strip()
+                logger.info(f"提示生成: {hint[:50]}...")
+                return hint
+
+        except Exception as e:
+            logger.error(f"提示生成失败: {e}")
+            return ""
+
+
+    async def score_speaking(self, transcript: str, cefr_level: str = "B1", age_group: str = "大学生") -> dict:
         """
         口语题评分 — 四维度评估用户口语回答（0-25 分/维度，总分 0-100）
 
         Args:
             transcript: WhisperX 转写文本
             cefr_level: 当前难度 CEFR 等级
+            age_group: 年龄段（儿童/青少年/大学生/职场/中老年）
 
         Returns:
             {
@@ -869,9 +902,14 @@ class LLMService:
                 "total": 74, "feedback": "简要中文评语"
             }
         """
+        from app.services.age_adaptive import get_age_context_for_prompt
+
+        age_context = get_age_context_for_prompt(age_group)
+
         prompt = (
             f"You are an English speaking assessment expert. Evaluate the student's spoken answer "
-            f"on 4 dimensions, 0-25 points each (total 0-100). The student's CEFR level is {cefr_level}.\n\n"
+            f"on 4 dimensions, 0-25 points each (total 0-100). The student's CEFR level is {cefr_level}.\n"
+            f"{age_context}\n\n"
             f"Student's answer:\n\"{transcript}\"\n\n"
             f"Scoring guidelines:\n"
             f"1. content_relevance (0-25): Is the answer on-topic and sufficiently developed?\n"
