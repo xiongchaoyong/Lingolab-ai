@@ -424,7 +424,7 @@ async def roleplay_stream_speak(
             except Exception as e:
                 logger.warning(f"流利度算法计算失败: {e}")
 
-            # 语法纠错（后台并行，与 LLM 回复同时进行，不增加延迟）
+            # 语法纠错 + 翻译（后台并行，与 LLM 回复同时进行，不增加延迟）
             llm = get_llm_service()
             grammar_task = asyncio.create_task(llm.correct_grammar(user_text, cefr_level))
 
@@ -437,6 +437,9 @@ async def roleplay_stream_speak(
 
             session["history"].append({"role": "ai", "text": full_text})
             conversation_complete = session["round"] >= MAX_CONVERSATION_ROUNDS
+
+            # AI 回复翻译（后台并行）
+            translation_task = asyncio.create_task(llm.translate_to_chinese(full_text))
 
             # 持久化 AI 回复
             try:
@@ -495,6 +498,14 @@ async def roleplay_stream_speak(
                         logger.warning(f"保存语法纠错失败: {e}")
             except Exception as e:
                 logger.warning(f"语法纠错失败: {e}")
+
+            # 等待 AI 回复翻译结果
+            try:
+                translation = await translation_task
+                if translation:
+                    yield f"data: {json.dumps({'type': 'translation', 'data': translation})}\n\n"
+            except Exception as e:
+                logger.warning(f"翻译失败: {e}")
 
         except Exception as e:
             logger.error(f"角色扮演流式 speak 失败: {e}")

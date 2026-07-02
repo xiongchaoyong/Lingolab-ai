@@ -87,6 +87,9 @@ async function readSSEStream(resp, callbacks, signal) {
               case 'grammar':
                 callbacks.onGrammar?.(data.data)
                 break
+              case 'translation':
+                callbacks.onTranslation?.(data.data)
+                break
             }
           } catch (e) {
             // skip malformed JSON

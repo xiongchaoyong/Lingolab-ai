@@ -809,6 +809,52 @@ class LLMService:
             }
 
 
+    async def translate_to_chinese(self, text: str) -> str:
+        """
+        将英文文本翻译为中文
+
+        Args:
+            text: 英文文本
+
+        Returns:
+            中文翻译文本
+        """
+        if not text or not text.strip():
+            return ""
+
+        prompt = (
+            f"Translate the following English text to natural, colloquial Chinese. "
+            f"Return ONLY the Chinese translation, nothing else — no explanations, no quotes.\n\n"
+            f'"{text}"'
+        )
+
+        try:
+            async with httpx.AsyncClient(timeout=8.0) as client:
+                resp = await client.post(
+                    BAILIAN_API_URL,
+                    headers={
+                        "Authorization": f"Bearer {self.api_key}",
+                        "Content-Type": "application/json",
+                    },
+                    json={
+                        "model": self.model,
+                        "messages": [{"role": "user", "content": prompt}],
+                        "max_tokens": 200,
+                        "temperature": 0.3,
+                        "enable_thinking": False,
+                    },
+                )
+                resp.raise_for_status()
+                data = resp.json()
+                translation = data["choices"][0]["message"]["content"].strip()
+                logger.info(f"翻译完成: {translation[:50]}...")
+                return translation
+
+        except Exception as e:
+            logger.error(f"翻译失败: {e}")
+            return "翻译服务暂时不可用"
+
+
     async def score_speaking(self, transcript: str, cefr_level: str = "B1") -> dict:
         """
         口语题评分 — 四维度评估用户口语回答（0-25 分/维度，总分 0-100）

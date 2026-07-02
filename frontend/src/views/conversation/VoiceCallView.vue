@@ -305,6 +305,16 @@ async function processUserAudio() {
       }
       speakAndListen(data.full_text, data.tts_url ? ttsCachedUrl(data.tts_url) : null)
     },
+    onTranslation(text) {
+      // 挂到最后一个 AI 消息上
+      for (let i = messages.value.length - 1; i >= 0; i--) {
+        if (messages.value[i].role === 'ai') {
+          messages.value[i].translation = text
+          messages.value[i]._transCollapsed = true
+          break
+        }
+      }
+    },
     onError(msg) {
       if (gen.cancelled) return
       messages.value.push({ role: 'ai', text: 'Sorry, I had trouble understanding that.' })
@@ -552,6 +562,20 @@ onUnmounted(() => {
                   >{{ ERROR_TYPE_LABELS[err.error_type] || err.error_type }}</span>
                   <span class="gc-error-explain">{{ err.explanation }}</span>
                 </div>
+              </div>
+              <!-- AI 回复中文翻译 -->
+              <div
+                v-if="msg.role === 'ai' && msg.translation"
+                class="translation-toggle"
+                :class="{ expanded: !msg._transCollapsed }"
+                @click="msg._transCollapsed = !msg._transCollapsed"
+              >
+                <span class="tt-icon">译</span>
+                <span class="tt-text">{{ msg._transCollapsed ? '查看翻译' : '收起翻译' }}</span>
+                <span class="tt-arrow">▾</span>
+              </div>
+              <div v-if="msg.role === 'ai' && msg.translation && !msg._transCollapsed" class="translation-card">
+                <p class="tc-text">{{ msg.translation }}</p>
               </div>
             </div>
           </div>
@@ -1290,6 +1314,26 @@ onUnmounted(() => {
     font-size: 11px; color: #999; width: 100%; margin-top: 2px;
     padding-left: 2px;
   }
+}
+
+// ========== AI 翻译 ==========
+.translation-toggle {
+  display: inline-flex; align-items: center; gap: 4px;
+  margin-top: 6px; padding: 3px 10px;
+  background: rgba(64, 158, 255, 0.08); border-radius: 12px;
+  cursor: pointer; font-size: 12px; color: #409EFF;
+  user-select: none; transition: background .2s;
+  &:hover { background: rgba(64, 158, 255, 0.15); }
+  &.expanded { color: #909399; background: rgba(0,0,0,0.04); }
+  .tt-icon { font-weight: 700; font-size: 11px; color: #fff; background: #409EFF; border-radius: 3px; padding: 1px 4px; }
+  .tt-arrow { font-size: 10px; transition: transform .2s; }
+  &.expanded .tt-arrow { transform: rotate(180deg); }
+}
+.translation-card {
+  margin-top: 4px; padding: 8px 12px;
+  background: rgba(64, 158, 255, 0.04); border-left: 3px solid #409EFF;
+  border-radius: 4px;
+  .tc-text { font-size: 13px; color: #606266; line-height: 1.6; margin: 0; }
 }
 
 // ========== 评分报告 ==========

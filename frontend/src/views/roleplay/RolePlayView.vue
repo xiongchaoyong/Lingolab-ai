@@ -229,6 +229,16 @@ async function processUserAudio() {
       if (data.conversation_complete) { setTimeout(() => hangUp(), 500) }
       else speakAndListen(data.full_text, data.tts_url ? ttsCachedUrl(data.tts_url) : null)
     },
+    onTranslation(text) {
+      // 挂到最后一个 AI 消息上
+      for (let i = messages.value.length - 1; i >= 0; i--) {
+        if (messages.value[i].role === 'ai') {
+          messages.value[i].translation = text
+          messages.value[i]._transCollapsed = true
+          break
+        }
+      }
+    },
     onError(msg) {
       if (gen.cancelled) return
       messages.value.push({ role: 'ai', text: 'Sorry, I had trouble understanding that.' })
@@ -374,6 +384,20 @@ onUnmounted(() => { hangUp() })
                   <span class="gc-error-type" :style="{ background: ERROR_TYPE_COLORS[err.error_type] || '#909399' }">{{ ERROR_TYPE_LABELS[err.error_type] || err.error_type }}</span>
                   <span class="gc-error-explain">{{ err.explanation }}</span>
                 </div>
+              </div>
+              <!-- AI 回复中文翻译 -->
+              <div
+                v-if="msg.role === 'ai' && msg.translation"
+                class="translation-toggle"
+                :class="{ expanded: !msg._transCollapsed }"
+                @click="msg._transCollapsed = !msg._transCollapsed"
+              >
+                <span class="tt-icon">译</span>
+                <span class="tt-text">{{ msg._transCollapsed ? '查看翻译' : '收起翻译' }}</span>
+                <span class="tt-arrow">▾</span>
+              </div>
+              <div v-if="msg.role === 'ai' && msg.translation && !msg._transCollapsed" class="translation-card">
+                <p class="tc-text">{{ msg.translation }}</p>
               </div>
             </div>
           </div>
@@ -628,6 +652,26 @@ onUnmounted(() => { hangUp() })
   .hangup-icon { font-size: 22px; } &:hover { transform: scale(1.08); box-shadow: 0 6px 24px rgba(255,107,138,0.4); } &:active { transform: scale(0.95); }
 }
 .hangup-label { font-size: 11px; color: #bbb; margin: 0; text-align: center; }
+
+// ========== AI 翻译 ==========
+.translation-toggle {
+  display: inline-flex; align-items: center; gap: 4px;
+  margin-top: 6px; padding: 3px 10px;
+  background: rgba(64, 158, 255, 0.08); border-radius: 12px;
+  cursor: pointer; font-size: 12px; color: #409EFF;
+  user-select: none; transition: background .2s;
+  &:hover { background: rgba(64, 158, 255, 0.15); }
+  &.expanded { color: #909399; background: rgba(0,0,0,0.04); }
+  .tt-icon { font-weight: 700; font-size: 11px; color: #fff; background: #409EFF; border-radius: 3px; padding: 1px 4px; }
+  .tt-arrow { font-size: 10px; transition: transform .2s; }
+  &.expanded .tt-arrow { transform: rotate(180deg); }
+}
+.translation-card {
+  margin-top: 4px; padding: 8px 12px;
+  background: rgba(64, 158, 255, 0.04); border-left: 3px solid #409EFF;
+  border-radius: 4px;
+  .tc-text { font-size: 13px; color: #606266; line-height: 1.6; margin: 0; }
+}
 
 .report-screen { min-height: calc(100vh - 56px); background: linear-gradient(180deg, #FFF5F5 0%, #F8F0FF 30%, #FFF9F0 100%); padding: 24px 24px 32px; max-width: 1400px; margin: 0 auto; }
 .report-header { text-align: center; margin-bottom: 16px; .report-mascot { font-size: 40px; margin-bottom: 4px; } h2 { font-size: 22px; font-weight: 700; color: #3D3D5C; margin: 0; } .report-role { font-size: 13px; color: #999; margin-top: 4px; } }
