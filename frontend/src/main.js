@@ -6,10 +6,10 @@ import VueECharts from 'vue-echarts'
 import 'echarts'
 import App from './App.vue'
 import router from './router'
-import '@/assets/styles/tokens.css'
+import './assets/styles/tokens.css'
 import 'element-plus/theme-chalk/src/index.scss'
-import '@/assets/styles/element-override.scss'
-import '@/assets/styles/global.scss'
+import './assets/styles/element-override.scss'
+import './assets/styles/global.scss'
 
 const app = createApp(App)
 

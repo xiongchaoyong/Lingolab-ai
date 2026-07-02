@@ -4,7 +4,17 @@
 
 ---
 
-## 2026-07-01: 学习小组功能完整实现
+## 2026-07-02: 听力练习模块 — 环境修复与依赖降级
+
+### 变更内容
+1. **后端 — 数据库字符集修复**：`database.py` SQLAlchemy engine 添加 `connect_args={"charset": "utf8mb4"}`，确保存储 emoji 和中文不乱码
+2. **后端 — 发音模型懒加载优化**：`main.py` 注释掉启动时的发音评测模型预加载（wav2vec2 + G2P），改为首次使用时懒加载，大幅缩短启动时间
+3. **后端 — 新增种子数据脚本**：`seed_all_tables.py` / `test_insert.py` 用于测试数据填充
+4. **前端 — 依赖降级**：Vite 8→5、@vitejs/plugin-vue 6→5、unplugin-auto-import 21→0.18、unplugin-vue-components 32→0.28、vitest 4→2，解决兼容性问题
+5. **前端 — 导入路径修复**：`main.js` 将 `@/` 别名改为相对路径 `./`，修复 Vite 5 下别名解析问题
+6. **前端 — SCSS 配置**：`vite.config.js` scss api 从 `modern-compiler` 改为 `modern`，适配降级后的 sass 版本
+
+---
 
 ### 变更内容
 1. **后端 — 创建小组 API**：`POST /api/community/groups`，创建者自动成为 owner 成员

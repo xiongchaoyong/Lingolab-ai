@@ -31,13 +31,13 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"知识图谱加载失败: {e}")
 
-    # 预加载发音评测模型（wav2vec2 + G2P）
-    try:
-        from app.services.pronunciation import get_pronunciation_service
-        service = get_pronunciation_service()
-        logger.info("发音评测模型加载完成")
-    except Exception as e:
-        logger.warning(f"发音评测模型加载失败（可启动后重试）: {e}")
+    # 预加载发音评测模型（wav2vec2 + G2P）— 启动耗时过长，改为首次使用时懒加载
+    # try:
+    #     from app.services.pronunciation import get_pronunciation_service
+    #     service = get_pronunciation_service()
+    #     logger.info("发音评测模型加载完成")
+    # except Exception as e:
+    #     logger.warning(f"发音评测模型加载失败（可启动后重试）: {e}")
 
     yield
 
