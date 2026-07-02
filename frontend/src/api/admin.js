@@ -97,3 +97,33 @@ export function replyFeedbackApi(feedbackId, reply) {
 export function resolveFeedbackApi(feedbackId) {
   return request.put(`/api/admin/feedbacks/${feedbackId}/resolve`)
 }
+
+// ===== 知识库管理 =====
+
+export function getKnowledgeDocsApi(params = {}) {
+  return request.get('/api/admin/knowledge', { params })
+}
+
+export function createKnowledgeDocApi(data) {
+  return request.post('/api/admin/knowledge', data)
+}
+
+export function updateKnowledgeDocApi(docId, data) {
+  return request.put(`/api/admin/knowledge/${docId}`, data)
+}
+
+export function deleteKnowledgeDocApi(docId) {
+  return request.delete(`/api/admin/knowledge/${docId}`)
+}
+
+export function reindexKnowledgeDocApi(docId) {
+  return request.post(`/api/admin/knowledge/${docId}/reindex`)
+}
+
+export function rebuildKnowledgeIndexApi() {
+  return request.post('/api/admin/knowledge/rebuild-index')
+}
+
+export function getSearchLogsApi(params = {}) {
+  return request.get('/api/admin/knowledge/logs', { params })
+}

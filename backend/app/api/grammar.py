@@ -44,7 +44,7 @@ async def grammar_correct(
             original_text=text,
             corrected_text=result.get("corrected_text", text),
             errors=errors,
-            polished_version=result.get("polished_version", text),
+            polished_version=result.get("polished_version", ""),
             suggestions=result.get("suggestions", []),
         )
     except Exception as e:
@@ -103,7 +103,7 @@ async def grammar_correct_voice(
             original_text=user_text,
             corrected_text=result.get("corrected_text", user_text),
             errors=errors,
-            polished_version=result.get("polished_version", user_text),
+            polished_version=result.get("polished_version", ""),
             suggestions=result.get("suggestions", []),
         )
 

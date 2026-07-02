@@ -687,6 +687,7 @@ async def roleplay_end(
     cefr_level = session["cefr_level"]
     user_audios = session.get("user_audios", [])
     role = session.get("role", "interviewee")
+    age_group = current_user.age_group
 
     dimensions = []
     pronunciation = []
@@ -734,7 +735,7 @@ async def roleplay_end(
         # 2. 角色四维评分
         if len(user_messages) >= 1:
             llm = get_llm_service()
-            rp_result = await llm.score_roleplay(history, cefr_level)
+            rp_result = await llm.score_roleplay(history, cefr_level, age_group)
 
             dimensions = [
                 {"label": "角色贴合度", "score": rp_result.get("role_fit", 75)},
@@ -782,8 +783,9 @@ async def roleplay_end(
             ]
             suggestions = "还没有开口说话，无法评估。再来一次试试吧！"
 
-        # 3. 综合分（角色表现加权：贴合度40% + 礼仪25% + 术语20% + 应对15%）
-        role_weights = {"角色贴合度": 0.40, "场景礼仪": 0.25, "专业术语": 0.20, "应对能力": 0.15}
+        # 3. 综合分（角色表现加权：按年龄段自适应）
+        from app.services.age_adaptive import get_roleplay_role_weights
+        role_weights = get_roleplay_role_weights(age_group)
         role_avg = sum(
             d["score"] * role_weights.get(d["label"], 0.25) for d in dimensions
         ) if dimensions else 0
@@ -796,9 +798,12 @@ async def roleplay_end(
         elif pronunciation:
             overall = round(pron_avg)
 
+        w = role_weights
         scoring_methodology = (
-            "综合分 = 角色表现加权分 × 60% + 发音均分 × 40%\n"
-            "角色表现（LLM 评估）：角色贴合度(40%)、场景礼仪(25%)、专业术语(20%)、应对能力(15%)\n"
+            f"综合分 = 角色表现加权分 × 60% + 发音均分 × 40%（{age_group}自适应权重）\n"
+            f"角色表现（LLM 评估）：角色贴合度({w.get('角色贴合度',0.40):.0%})、"
+            f"场景礼仪({w.get('场景礼仪',0.25):.0%})、专业术语({w.get('专业术语',0.20):.0%})、"
+            f"应对能力({w.get('应对能力',0.15):.0%})\n"
             "发音评测（wav2vec2 + GOP 算法）：音素准确度、重音位置、语调曲线、连读表现、节奏感"
         )
 

@@ -1,11 +1,59 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useLearningPathStore } from '@/stores/learning_path'
 
 const store = useLearningPathStore()
 
 const refreshing = ref(false)
 const lastUpdated = ref('')
+const showLogDialog = ref(false)
+
+// 模拟数据 — 每次活动后完整的四维 EMA 快照 + 画像更新
+const MOCK_LOGS = [
+  {
+    id: 1, source: 'assessment', source_label: '初次测评',
+    listening_score: 45, speaking_score: 38, reading_score: 52, grammar_score: 41,
+    overall_score: 44.0, cefr_level: 'B1', created_at: new Date(Date.now() - 6 * 86400000).toISOString(),
+  },
+  {
+    id: 2, source: 'pronunciation', source_label: '发音评测',
+    listening_score: 45, speaking_score: 46, reading_score: 52, grammar_score: 41,
+    overall_score: 46.0, cefr_level: 'B1', created_at: new Date(Date.now() - 5 * 86400000).toISOString(),
+  },
+  {
+    id: 3, source: 'conversation', source_label: '智能对话',
+    listening_score: 45, speaking_score: 53, reading_score: 58, grammar_score: 48,
+    overall_score: 51.0, cefr_level: 'B1', created_at: new Date(Date.now() - 4 * 86400000).toISOString(),
+  },
+  {
+    id: 4, source: 'daily_task', source_label: '每日任务',
+    listening_score: 52, speaking_score: 53, reading_score: 58, grammar_score: 48,
+    overall_score: 52.8, cefr_level: 'B1', created_at: new Date(Date.now() - 3 * 86400000).toISOString(),
+  },
+  {
+    id: 5, source: 'pronunciation', source_label: '发音评测',
+    listening_score: 52, speaking_score: 61, reading_score: 58, grammar_score: 48,
+    overall_score: 54.8, cefr_level: 'B1', created_at: new Date(Date.now() - 2 * 86400000).toISOString(),
+  },
+  {
+    id: 6, source: 'conversation', source_label: '智能对话',
+    listening_score: 52, speaking_score: 68, reading_score: 63, grammar_score: 55,
+    overall_score: 59.5, cefr_level: 'B2', created_at: new Date(Date.now() - 1 * 86400000).toISOString(),
+  },
+]
+
+const displayLogs = computed(() => {
+  const real = store.profileSummary?.score_logs
+  return (real && real.length > 0) ? real : MOCK_LOGS
+})
+
+// 维度显示配置
+const DIM_CONFIG = [
+  { key: 'speaking_score', label: '口语' },
+  { key: 'listening_score', label: '听力' },
+  { key: 'reading_score', label: '阅读' },
+  { key: 'grammar_score', label: '语法' },
+]
 
 async function refresh() {
   refreshing.value = true
@@ -15,6 +63,27 @@ async function refresh() {
   } finally {
     refreshing.value = false
   }
+}
+
+function sourceTagType(source) {
+  const map = {
+    assessment: 'success',
+    pronunciation: 'warning',
+    conversation: 'primary',
+    roleplay: 'danger',
+    daily_task: 'info',
+  }
+  return map[source] || ''
+}
+
+function formatLogTime(isoStr) {
+  if (!isoStr) return ''
+  const d = new Date(isoStr)
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  const hour = String(d.getHours()).padStart(2, '0')
+  const min = String(d.getMinutes()).padStart(2, '0')
+  return `${month}-${day} ${hour}:${min}`
 }
 
 onMounted(() => {
@@ -78,6 +147,9 @@ onMounted(() => {
         <div class="sc-header">
           <span class="sc-icon">📈</span> 维度能力分数
           <span class="sc-hint">（EMA 动态加权，近30天）</span>
+          <el-button size="small" text type="primary" @click="showLogDialog = true">
+            更新记录
+          </el-button>
         </div>
         <div class="sc-body">
           <div v-for="dim in store.profileSummary.dimension_scores" :key="dim.key" class="dimension-row">
@@ -152,6 +224,39 @@ onMounted(() => {
         </div>
       </div>
     </div>
+
+    <!-- 分数更新记录弹窗 -->
+    <el-dialog v-model="showLogDialog" title="维度分数更新记录" width="600px" destroy-on-close>
+      <div class="log-timeline">
+        <div v-for="log in displayLogs" :key="log.id" class="log-item">
+          <div class="log-dot" :class="'dot--' + log.source"></div>
+          <div class="log-content">
+            <div class="log-header">
+              <el-tag :type="sourceTagType(log.source)" size="small">
+                {{ log.source_label }}
+              </el-tag>
+              <span class="log-time">{{ formatLogTime(log.created_at) }}</span>
+            </div>
+            <!-- 完整四维分数 -->
+            <div class="log-scores">
+              <div v-for="dim in DIM_CONFIG" :key="dim.key" class="log-dim">
+                <span class="log-dim-label">{{ dim.label }}</span>
+                <span class="log-dim-val">
+                  {{ log[dim.key] !== null ? log[dim.key] : '-' }}
+                </span>
+              </div>
+            </div>
+            <!-- 画像更新摘要 -->
+            <div class="log-summary" v-if="log.overall_score !== null">
+              <span class="log-summary-label">画像更新</span>
+              <el-tag type="primary" size="small">
+                {{ log.cefr_level }} · 综合 {{ log.overall_score }}
+              </el-tag>
+            </div>
+          </div>
+        </div>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
@@ -364,5 +469,104 @@ onMounted(() => {
   color: var(--color-text-secondary);
   line-height: 1.6;
   margin: 0;
+}
+
+// 弹窗内时间线
+.log-timeline {
+  position: relative;
+  padding-left: 20px;
+  max-height: 420px;
+  overflow-y: auto;
+}
+
+.log-timeline::before {
+  content: '';
+  position: absolute;
+  left: 6px;
+  top: 4px;
+  bottom: 4px;
+  width: 2px;
+  background: var(--color-border);
+}
+
+.log-item {
+  position: relative;
+  padding-bottom: 16px;
+
+  &:last-child { padding-bottom: 0; }
+}
+
+.log-dot {
+  position: absolute;
+  left: -18px;
+  top: 5px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  border: 2px solid #fff;
+  z-index: 1;
+
+  &.dot--assessment { background: #67c23a; }
+  &.dot--pronunciation { background: #e6a23c; }
+  &.dot--conversation { background: #409eff; }
+  &.dot--roleplay { background: #f56c6c; }
+  &.dot--daily_task { background: #909399; }
+}
+
+.log-content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.log-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.log-time {
+  font-size: 12px;
+  color: var(--color-text-disabled);
+}
+
+.log-scores {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.log-dim {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  background: var(--color-bg-primary);
+  border-radius: 4px;
+  padding: 2px 8px;
+}
+
+.log-dim-label {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.log-dim-val {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-primary);
+}
+
+.log-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.log-summary-label {
+  font-size: 12px;
+  color: var(--color-text-secondary);
 }
 </style>

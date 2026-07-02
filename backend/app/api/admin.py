@@ -25,6 +25,10 @@ from app.schemas.admin import (
     FeedbackStatusRequest,
     ContentCreateRequest,
     ContentUpdateRequest,
+    KnowledgeDocListResponse,
+    KnowledgeDocCreateRequest,
+    KnowledgeDocUpdateRequest,
+    SearchLogListResponse,
 )
 from app.services.admin import teacher_service, admin_service
 
@@ -380,3 +384,111 @@ def resolve_feedback(
     except ValueError as e:
         db.rollback()
         raise HTTPException(status_code=404, detail=str(e))
+
+
+# ============================================================
+# 运营端 — 知识库管理
+# ============================================================
+
+@router.get("/knowledge", response_model=KnowledgeDocListResponse)
+def get_knowledge_docs(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    search: str = Query(""),
+    category: str = Query(""),
+    admin: UserProfile = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """获取知识库文档列表（分页+搜索+分类）"""
+    result = admin_service.get_knowledge_docs(page, page_size, search, category, db)
+    return KnowledgeDocListResponse(**result)
+
+
+@router.post("/knowledge", response_model=dict)
+def create_knowledge_doc(
+    req: KnowledgeDocCreateRequest,
+    admin: UserProfile = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """新增知识库文档"""
+    try:
+        result = admin_service.create_knowledge_doc(req.model_dump(), admin.id, db)
+        db.commit()
+        return {"code": 0, "data": result, "message": "创建成功"}
+    except ValueError as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.put("/knowledge/{doc_id}", response_model=dict)
+def update_knowledge_doc(
+    doc_id: int,
+    req: KnowledgeDocUpdateRequest,
+    admin: UserProfile = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """编辑知识库文档"""
+    try:
+        # 只传有值的字段
+        data = {k: v for k, v in req.model_dump().items() if v is not None}
+        if not data:
+            raise HTTPException(status_code=400, detail="至少提供一个更新字段")
+        result = admin_service.update_knowledge_doc(doc_id, data, admin.id, db)
+        db.commit()
+        return {"code": 0, "data": result, "message": "更新成功"}
+    except ValueError as e:
+        db.rollback()
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.delete("/knowledge/{doc_id}", response_model=dict)
+def delete_knowledge_doc(
+    doc_id: int,
+    admin: UserProfile = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """删除知识库文档（软删除）"""
+    try:
+        result = admin_service.delete_knowledge_doc(doc_id, admin.id, db)
+        db.commit()
+        return {"code": 0, "data": result, "message": "删除成功"}
+    except ValueError as e:
+        db.rollback()
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.post("/knowledge/{doc_id}/reindex", response_model=dict)
+def reindex_knowledge_doc(
+    doc_id: int,
+    admin: UserProfile = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """重新索引单条文档"""
+    try:
+        result = admin_service.reindex_document(doc_id, db)
+        return {"code": 0, "data": result, "message": result.get("message", "")}
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.post("/knowledge/rebuild-index", response_model=dict)
+def rebuild_knowledge_index(
+    admin: UserProfile = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """全量重建向量索引"""
+    result = admin_service.rebuild_index(db)
+    return {"code": 0, "data": result, "message": result.get("message", "")}
+
+
+@router.get("/knowledge/logs", response_model=SearchLogListResponse)
+def get_search_logs(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    user_id: int = Query(None),
+    admin: UserProfile = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """获取检索日志列表（分页）"""
+    result = admin_service.get_search_logs(page, page_size, user_id, db)
+    return SearchLogListResponse(**result)

@@ -27,6 +27,7 @@ from app.schemas.learning_path import (
     RecommendationFactor,
     RecommendationLogic,
     ProfileSummaryResponse,
+    ScoreLogItem,
 )
 
 router = APIRouter()
@@ -321,4 +322,5 @@ def get_profile_summary(
         dimension_scores=dimension_scores,
         recent_stats=recent_stats,
         recommendation_logic=recommendation_logic,
+        score_logs=profile_updater.get_score_logs(current_user.id, db),
     )

@@ -166,6 +166,7 @@ const adminNavs = [
       { path: '/admin/users', title: '用户管理' },
       { path: '/admin/content', title: '内容管理' },
       { path: '/admin/feedback', title: '反馈管理' },
+      { path: '/admin/knowledge', title: '知识库管理' },
     ],
   },
 ]

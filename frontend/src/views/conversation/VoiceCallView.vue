@@ -137,6 +137,61 @@ function toggleUtterance(index) {
   expandedUtterance.value = expandedUtterance.value === index ? null : index
 }
 
+// 将 transcript、utterances、fluency 按轮次合并为统一聊天记录
+const chatRounds = computed(() => {
+  const rounds = []
+  let roundIdx = 0
+  const transcript = scoreReport.value?.transcript || []
+  const utterances = scoreReport.value?.utterances || []
+  const fluencyRounds = scoreReport.value?.fluency?.rounds || []
+  let grammarBuffer = null
+  let aiGreeting = ''
+
+  for (const msg of transcript) {
+    if (msg.role === 'ai' && rounds.length === 0) {
+      // AI 开场白暂存，附加到第 1 轮
+      aiGreeting = msg.text
+    } else if (msg.role === 'user') {
+      if (grammarBuffer && rounds.length > 0) {
+        rounds[rounds.length - 1].grammar = grammarBuffer
+        grammarBuffer = null
+      }
+      rounds.push({
+        round: roundIdx + 1,
+        userText: msg.text,
+        aiText: roundIdx === 0 ? aiGreeting : '',
+        grammar: null,
+        pronunciation: utterances[roundIdx] || null,
+        fluency: fluencyRounds[roundIdx] || null,
+      })
+      roundIdx++
+    } else if (msg.role === 'ai' && rounds.length > 0) {
+      rounds[rounds.length - 1].aiText = msg.text
+    } else if (msg.role === 'grammar') {
+      if (rounds.length > 0 && rounds[rounds.length - 1].userText) {
+        rounds[rounds.length - 1].grammar = msg.text
+      } else {
+        grammarBuffer = msg.text
+      }
+    }
+  }
+  return rounds
+})
+
+const showRoundDetail = ref(false)
+const selectedRound = ref(null)
+const detailActiveTab = ref('pron')
+function openRoundDetail(round) {
+  selectedRound.value = round
+  showRoundDetail.value = true
+}
+function roundScoreColor(score) {
+  if (score == null) return '#909399'
+  if (score >= 80) return '#5AD8A6'
+  if (score >= 60) return '#F6BD16'
+  return '#FF6B8A'
+}
+
 // 最新消息滚动到可视区域中间，上方可见历史消息
 async function scrollToCenter() {
   await nextTick()
@@ -712,7 +767,7 @@ onUnmounted(() => {
         <!-- 加载中 -->
         <template v-if="isScoring || !scoreReport">
           <div class="report-header">
-            <div class="report-mascot">🌟</div>
+            <div class="report-mascot"></div>
             <h2>对话报告</h2>
           </div>
           <div class="report-loading">
@@ -726,9 +781,9 @@ onUnmounted(() => {
           <!-- 顶部：标题 + 综合分 + 方法论 -->
           <div class="report-top">
             <div class="report-header">
-              <div class="report-mascot">🌟</div>
+              <div class="report-mascot"></div>
               <h2>对话报告</h2>
-              <p class="report-scene">{{ selectedScenario?.emoji }} {{ selectedScenario?.title }} 场景</p>
+              <p class="report-scene">{{ selectedScenario?.title }} 场景</p>
             </div>
 
             <div class="overall-area">
@@ -736,35 +791,71 @@ onUnmounted(() => {
                 <span class="overall-num">{{ scoreReport.overall }}</span>
                 <span class="overall-unit">分</span>
                 <span class="overall-level">
-                  {{ scoreReport.overall >= 80 ? '🎉 优秀' : scoreReport.overall >= 60 ? '👍 良好' : '💪 加油' }}
+                  {{ scoreReport.overall >= 80 ? '优秀' : scoreReport.overall >= 60 ? '良好' : '加油' }}
                 </span>
               </div>
               <div class="methodology-card" v-if="scoreReport.scoring_methodology">
-                <div class="methodology-title">📐 评分计算方式</div>
+                <div class="methodology-title">评分计算方式</div>
                 <pre class="methodology-text">{{ scoreReport.scoring_methodology }}</pre>
               </div>
             </div>
           </div>
 
-          <!-- 主体：双列网格 -->
-          <div class="report-main">
-            <!-- 左列：语音评测 -->
-            <section class="report-card" v-if="scoreReport.pronunciation?.length">
-              <div class="card-title">
-                <span class="card-icon">🎤</span> 语音评测
-              </div>
-              <div class="dimension-list">
-                <div v-for="dim in scoreReport.pronunciation" :key="dim.label" class="dimension-item">
-                  <div class="dim-header">
-                    <span class="dim-label">{{ dim.label }}</span>
-                    <span class="dim-score" :style="{ color: dimScoreColor(dim.score) }">{{ dim.score }}</span>
+          <!-- 对话记录（合并流利度+发音+语法） -->
+          <section class="report-card report-card--full" v-if="chatRounds.length">
+            <div class="card-title">
+              对话记录
+              <span class="fluency-badge" v-if="scoreReport.fluency?.grade" :class="'grade-' + scoreReport.fluency.grade">
+                流利度 {{ scoreReport.fluency.grade }}
+              </span>
+            </div>
+            <div class="chat-record-list">
+              <div
+                v-for="round in chatRounds"
+                :key="round.round"
+                class="cr-item"
+                @click="openRoundDetail(round)"
+              >
+                <div class="cr-round-badge">#{{ round.round }}</div>
+                <div class="cr-body">
+                  <div class="cr-bubble user">
+                    <span class="cr-role-icon">我</span>
+                    <span class="cr-text">{{ round.userText }}</span>
                   </div>
-                  <div class="dim-bar-bg">
-                    <div class="dim-bar-fill" :style="{ width: dim.score + '%', background: dimBarColor(dim.score) }"></div>
+                  <div class="cr-bubble ai" v-if="round.aiText">
+                    <span class="cr-role-icon">AI</span>
+                    <span class="cr-text">{{ round.aiText }}</span>
                   </div>
                 </div>
+                <div class="cr-badges">
+                  <span v-if="round.pronunciation?.overall != null" class="cr-badge pron" :style="{ color: roundScoreColor(round.pronunciation.overall) }">
+                    发音 {{ round.pronunciation.overall }}
+                  </span>
+                  <span v-if="round.grammar?.errors?.length" class="cr-badge grammar">
+                    语法 {{ round.grammar.errors.length }} 个提示
+                  </span>
+                  <span v-if="round.grammar && !round.grammar.errors?.length" class="cr-badge perfect">
+                    语法正确
+                  </span>
+                  <span v-if="round.fluency?.total != null" class="cr-badge fluency" :style="{ color: roundScoreColor(round.fluency.total) }">
+                    流利 {{ round.fluency.total }}
+                  </span>
+                </div>
+                <span class="cr-arrow">›</span>
               </div>
+            </div>
+          </section>
 
+          <!-- 综合评测 -->
+          <div class="report-main">
+            <section class="report-card" v-if="scoreReport.pronunciation?.length">
+              <div class="card-title">综合语音评测<span class="card-subtitle">（所有轮次平均）</span></div>
+              <div class="dimension-list">
+                <div v-for="dim in scoreReport.pronunciation" :key="dim.label" class="dimension-item">
+                  <div class="dim-header"><span class="dim-label">{{ dim.label }}</span><span class="dim-score" :style="{ color: dimScoreColor(dim.score) }">{{ dim.score }}</span></div>
+                  <div class="dim-bar-bg"><div class="dim-bar-fill" :style="{ width: dim.score + '%', background: dimBarColor(dim.score) }"></div></div>
+                </div>
+              </div>
               <div class="error-section" v-if="aggregatedErrors.length > 0">
                 <div class="error-title">⚠️ 问题音素</div>
                 <div v-for="err in aggregatedErrors" :key="err.phoneme" class="error-item">
@@ -774,168 +865,112 @@ onUnmounted(() => {
                 </div>
               </div>
             </section>
-
-            <!-- 右列：文本评测 -->
             <section class="report-card" v-if="scoreReport.text_dimension_details?.length">
-              <div class="card-title">
-                <span class="card-icon">📝</span> 文本评测（LLM）
-              </div>
+              <div class="card-title">综合文本评测（LLM）<span class="card-subtitle">（整段对话评价）</span></div>
               <div class="text-dim-cards">
                 <div v-for="dim in scoreReport.text_dimension_details" :key="dim.label" class="text-dim-card">
-                  <div class="tdc-header">
-                    <span class="tdc-label">{{ dim.label }}</span>
-                    <span class="tdc-score" :style="{ color: dimScoreColor(dim.score) }">{{ dim.score }}</span>
-                  </div>
-                  <div class="dim-bar-bg" style="margin-bottom: 8px;">
-                    <div class="dim-bar-fill" :style="{ width: dim.score + '%', background: dimBarColor(dim.score) }"></div>
-                  </div>
+                  <div class="tdc-header"><span class="tdc-label">{{ dim.label }}</span><span class="tdc-score" :style="{ color: dimScoreColor(dim.score) }">{{ dim.score }}</span></div>
+                  <div class="dim-bar-bg" style="margin-bottom: 8px;"><div class="dim-bar-fill" :style="{ width: dim.score + '%', background: dimBarColor(dim.score) }"></div></div>
                   <div class="tdc-feedback" v-if="dim.feedback">{{ dim.feedback }}</div>
-                  <div class="tdc-tags">
-                    <span v-if="dim.strengths" class="tdc-tag good">✅ {{ dim.strengths }}</span>
-                    <span v-if="dim.weaknesses" class="tdc-tag improve">📌 {{ dim.weaknesses }}</span>
-                  </div>
+                  <div class="tdc-tags"><span v-if="dim.strengths" class="tdc-tag good">{{ dim.strengths }}</span><span v-if="dim.weaknesses" class="tdc-tag improve">{{ dim.weaknesses }}</span></div>
                 </div>
               </div>
             </section>
           </div>
 
-          <!-- 流利度评估（SRS 3.3.3） -->
-          <section class="report-card report-card--full" v-if="scoreReport.fluency?.rounds?.length">
-            <div class="card-title">
-              <span class="card-icon">🌊</span> 流利度评估
-              <span class="fluency-badge" :class="'grade-' + scoreReport.fluency.grade">
-                {{ scoreReport.fluency.grade }}
-              </span>
-              <span class="fluency-overall">综合 {{ scoreReport.fluency.overall }} 分</span>
-            </div>
-
-            <!-- 每轮明细 -->
-            <div class="fluency-rounds">
-              <div
-                v-for="round in scoreReport.fluency.rounds"
-                :key="round.round"
-                class="fluency-round-card"
-                :class="{ 'best-round': round.round === scoreReport.fluency.best_round }"
-              >
-                <div class="fr-header">
-                  <span class="fr-label">第 {{ round.round }} 轮</span>
-                  <span v-if="round.round === scoreReport.fluency.best_round" class="fr-best">⭐ 最佳</span>
-                  <span class="fr-total">{{ round.total }} 分</span>
-                </div>
-                <div class="fr-text">{{ round.text?.slice(0, 80) }}{{ round.text?.length > 80 ? '...' : '' }}</div>
-                <div class="fr-dims">
-                  <div class="fr-dim">
-                    <span class="fd-label">语速</span>
-                    <span class="fd-value" :style="{ color: dimScoreColor(round.wpm?.score) }">{{ round.wpm?.score }}/25</span>
-                    <span class="fd-detail">{{ round.wpm?.value }} wpm</span>
-                  </div>
-                  <div class="fr-dim">
-                    <span class="fd-label">停顿</span>
-                    <span class="fd-value" :style="{ color: dimScoreColor(round.pause_frequency?.score * 5) }">{{ round.pause_frequency?.score }}/20</span>
-                    <span class="fd-detail">{{ round.pause_frequency?.pauses_per_min }}次/分</span>
-                  </div>
-                  <div class="fr-dim">
-                    <span class="fd-label">重复</span>
-                    <span class="fd-value" :style="{ color: dimScoreColor(round.repetition?.score * 5) }">{{ round.repetition?.score }}/20</span>
-                    <span class="fd-detail">{{ (round.repetition?.rate * 100).toFixed(0) }}%</span>
-                  </div>
-                  <div class="fr-dim">
-                    <span class="fd-label">语法</span>
-                    <span class="fd-value" :style="{ color: dimScoreColor(round.grammar?.score * 5) }">{{ round.grammar?.score || '—' }}/20</span>
-                    <span class="fd-detail" v-if="round.grammar?.errors?.length">{{ round.grammar.errors.length }} 个错误</span>
-                  </div>
-                  <div class="fr-dim">
-                    <span class="fd-label">相关性</span>
-                    <span class="fd-value" :style="{ color: dimScoreColor(round.relevance?.score / 15 * 100) }">{{ round.relevance?.score || '—' }}/15</span>
-                    <span class="fd-detail" v-if="round.relevance?.note">{{ round.relevance.note }}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div class="fluency-suggestions" v-if="scoreReport.fluency.suggestions">
-              💡 {{ scoreReport.fluency.suggestions }}
-            </div>
+          <!-- 改进建议 -->
+          <section class="report-card report-card--full" v-if="scoreReport.suggestions">
+            <div class="card-title">改进建议</div>
+            <p class="suggestions-text">{{ scoreReport.suggestions }}</p>
           </section>
-
-          <!-- 逐句发音分析（全宽） -->
-          <section class="report-card report-card--full" v-if="hasDetailedReport">
-            <div class="card-title">
-              <span class="card-icon">📋</span> 逐句发音分析
-            </div>
-            <div class="utterance-grid">
-              <div
-                v-for="(utt, idx) in scoreReport.utterances"
-                :key="idx"
-                class="utterance-item"
-                :class="{ expanded: expandedUtterance === idx }"
-              >
-                <div class="utterance-header" @click="toggleUtterance(idx)">
-                  <span class="utterance-num">#{{ idx + 1 }}</span>
-                  <span class="utterance-text-preview">{{ utt.text?.slice(0, 60) }}{{ utt.text?.length > 60 ? '...' : '' }}</span>
-                  <span class="utterance-score" :style="{ color: dimScoreColor(utt.overall) }">{{ utt.overall }}</span>
-                  <span class="utterance-arrow" :class="{ expanded: expandedUtterance === idx }">▶</span>
-                </div>
-                <div class="utterance-detail-wrap" v-show="expandedUtterance === idx">
-                  <UtteranceDetailPanel :pronunciation-data="utt" :text="utt.text" />
-                </div>
-              </div>
-            </div>
-          </section>
-
-          <!-- 底部双列：对话记录 + 建议 -->
-          <div class="report-bottom">
-            <section class="report-card" v-if="scoreReport.transcript?.length">
-              <div class="card-title">
-                <span class="card-icon">💬</span> 对话记录
-              </div>
-              <div class="transcript-list">
-                <div v-for="(msg, idx) in scoreReport.transcript" :key="idx" class="transcript-msg" :class="msg.role">
-                  <template v-if="msg.role === 'grammar'">
-                    <div class="transcript-role">📝 语法纠错</div>
-                    <div class="transcript-grammar">
-                      <div class="tg-corrected" v-if="msg.text.corrected_text !== msg.text.original_text">
-                        <span class="tg-label">修正：</span>
-                        <span class="tg-corrected-text">{{ msg.text.corrected_text }}</span>
-                      </div>
-                      <div v-for="(err, i) in msg.text.errors" :key="i" class="tg-error">
-                        <span class="tg-error-original">{{ err.original }}</span>
-                        <span>→</span>
-                        <span class="tg-error-correction">{{ err.correction }}</span>
-                        <span class="tg-error-type" :style="{ background: ERROR_TYPE_COLORS[err.error_type] || '#909399' }">{{ ERROR_TYPE_LABELS[err.error_type] || err.error_type }}</span>
-                        <span class="tg-error-explain">{{ err.explanation }}</span>
-                      </div>
-                    </div>
-                  </template>
-                  <template v-else>
-                    <div class="transcript-role">{{ msg.role === 'user' ? '😊 你' : '🐱 AI' }}</div>
-                    <div class="transcript-bubble">{{ msg.text }}</div>
-                  </template>
-                </div>
-              </div>
-            </section>
-
-            <section class="report-card" v-if="scoreReport.suggestions">
-              <div class="card-title">
-                <span class="card-icon">💡</span> 改进建议
-              </div>
-              <div class="suggestions-content">
-                <p>{{ scoreReport.suggestions }}</p>
-              </div>
-            </section>
-          </div>
 
           <!-- 操作按钮 -->
           <div class="report-actions">
             <button class="retry-btn" @click="selectScenario(selectedScenario)">
-              <span>🔄</span> 再来一次
+              再来一次
             </button>
             <button class="back-btn" @click="backToScenes">
-              <span>🏠</span> 返回场景
+              返回场景
             </button>
           </div>
         </template>
       </div>
+
+      <!-- 轮次详情弹窗 -->
+      <el-dialog
+        v-model="showRoundDetail"
+        :title="'第 ' + selectedRound?.round + ' 轮详情'"
+        width="900px"
+        :close-on-click-modal="false"
+        destroy-on-close
+        class="round-detail-dialog"
+      >
+        <el-tabs v-model="detailActiveTab" type="border-card">
+          <el-tab-pane label="发音评测" name="pron">
+            <div v-if="selectedRound?.pronunciation" class="detail-tab-body">
+              <UtteranceDetailPanel :pronunciation-data="selectedRound.pronunciation" :text="selectedRound.userText" />
+            </div>
+            <div v-else class="detail-empty">该轮无发音数据</div>
+          </el-tab-pane>
+          <el-tab-pane label="语法纠错" name="grammar">
+            <div v-if="selectedRound?.grammar" class="detail-tab-body">
+              <div class="detail-grammar-card">
+                <div class="dg-corrected" v-if="selectedRound.grammar.corrected_text && selectedRound.grammar.corrected_text !== selectedRound.grammar.original_text">
+                  <span class="dg-label">修正后文本：</span>
+                  <span class="dg-corrected-text">{{ selectedRound.grammar.corrected_text }}</span>
+                </div>
+                <div v-if="selectedRound.grammar.errors?.length" class="dg-errors">
+                  <div v-for="(err, i) in selectedRound.grammar.errors" :key="i" class="dg-error-item">
+                    <span class="dge-original">{{ err.original }}</span>
+                    <span class="dge-arrow">→</span>
+                    <span class="dge-correction">{{ err.correction }}</span>
+                    <span class="dge-type" :style="{ background: ERROR_TYPE_COLORS[err.error_type] || '#909399' }">{{ ERROR_TYPE_LABELS[err.error_type] || err.error_type }}</span>
+                    <span class="dge-explain">{{ err.explanation }}</span>
+                  </div>
+                </div>
+                <div v-else class="detail-perfect">语法完全正确，无需纠错</div>
+              </div>
+            </div>
+            <div v-else class="detail-empty">
+              <div v-if="selectedRound?.grammar && !selectedRound.grammar.errors?.length" class="detail-perfect">语法完全正确</div>
+              <span v-else>该轮无语法数据</span>
+            </div>
+          </el-tab-pane>
+          <el-tab-pane label="流利度" name="fluency">
+            <div v-if="selectedRound?.fluency" class="detail-tab-body">
+              <div class="detail-fluency-grid">
+                <div class="df-item">
+                  <div class="df-label">语速</div>
+                  <div class="df-score" :style="{ color: dimScoreColor(selectedRound.fluency.wpm?.score) }">{{ selectedRound.fluency.wpm?.score }}/25</div>
+                  <div class="df-detail">{{ selectedRound.fluency.wpm?.value }} wpm</div>
+                </div>
+                <div class="df-item">
+                  <div class="df-label">停顿</div>
+                  <div class="df-score" :style="{ color: dimScoreColor(selectedRound.fluency.pause_frequency?.score * 5) }">{{ selectedRound.fluency.pause_frequency?.score }}/20</div>
+                  <div class="df-detail">{{ selectedRound.fluency.pause_frequency?.pauses_per_min }}次/分</div>
+                </div>
+                <div class="df-item">
+                  <div class="df-label">重复</div>
+                  <div class="df-score" :style="{ color: dimScoreColor(selectedRound.fluency.repetition?.score * 5) }">{{ selectedRound.fluency.repetition?.score }}/20</div>
+                  <div class="df-detail">{{ (selectedRound.fluency.repetition?.rate * 100).toFixed(0) }}%</div>
+                </div>
+                <div class="df-item">
+                  <div class="df-label">语法</div>
+                  <div class="df-score" :style="{ color: dimScoreColor(selectedRound.fluency.grammar?.score * 5) }">{{ selectedRound.fluency.grammar?.score || '—' }}/20</div>
+                  <div class="df-detail" v-if="selectedRound.fluency.grammar?.errors?.length">{{ selectedRound.fluency.grammar.errors.length }} 个错误</div>
+                </div>
+                <div class="df-item">
+                  <div class="df-label">相关性</div>
+                  <div class="df-score" :style="{ color: dimScoreColor(selectedRound.fluency.relevance?.score / 15 * 100) }">{{ selectedRound.fluency.relevance?.score || '—' }}/15</div>
+                  <div class="df-detail" v-if="selectedRound.fluency.relevance?.note">{{ selectedRound.fluency.relevance.note }}</div>
+                </div>
+              </div>
+              <div class="df-total">本轮流利度总分：<strong :style="{ color: roundScoreColor(selectedRound.fluency.total) }">{{ selectedRound.fluency.total }}</strong> / 100</div>
+            </div>
+            <div v-else class="detail-empty">该轮无流利度数据</div>
+          </el-tab-pane>
+        </el-tabs>
+      </el-dialog>
     </template>
   </div>
 </template>
@@ -1630,9 +1665,10 @@ onUnmounted(() => {
   gap: 24px;
   margin-bottom: 20px;
   padding: 20px 28px;
-  background: #fff;
+  background: linear-gradient(135deg, #FDFCFF 0%, #FFF8FA 100%);
+  border: 1.5px solid rgba(124,111,247,0.12);
   border-radius: 20px;
-  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 4px 20px rgba(124,111,247,0.08);
 }
 
 .overall-area {
@@ -1646,8 +1682,8 @@ onUnmounted(() => {
   width: 110px;
   height: 110px;
   border-radius: 50%;
-  background: #fff;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+  background: #F8F6FF;
+  box-shadow: 0 4px 20px rgba(124,111,247,0.08);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1678,20 +1714,89 @@ onUnmounted(() => {
   margin-bottom: 16px;
 }
 
-// 底部双列
-.report-bottom {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
-  margin-bottom: 16px;
+// 对话记录合并视图
+.chat-record-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cr-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  background: #FAFBFC;
+  border: 1px solid #EBEEF5;
+  border-radius: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+  &:hover { background: #F0EEFA; border-color: #D5D0F0; }
+}
+
+.cr-round-badge {
+  font-size: 12px; font-weight: 700; color: #7C6FF7;
+  background: rgba(124,111,247,0.08);
+  padding: 4px 10px; border-radius: 10px;
+  flex-shrink: 0;
+}
+
+.cr-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.cr-bubble {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  .cr-role-icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+  .cr-text {
+    font-size: 13px; line-height: 1.5; color: #4A4A5A;
+    overflow: hidden; text-overflow: ellipsis;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  }
+  &.user .cr-text { color: #5B5B8A; }
+  &.ai .cr-text { color: #8A5B7A; }
+}
+
+.cr-badges {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex-shrink: 0;
+  min-width: 90px;
+}
+
+.cr-badge {
+  font-size: 11px; font-weight: 600;
+  &.pron { color: #5AD8A6; }
+  &.grammar { color: #E6A23C; }
+  &.perfect { color: #67C23A; }
+  &.fluency { color: #5B8DEF; }
+}
+
+.cr-arrow {
+  font-size: 10px; color: #ccc; flex-shrink: 0;
+  transition: transform 0.2s;
+  .cr-item:hover & { color: #7C6FF7; transform: translateX(2px); }
+}
+
+// 建议文本
+.suggestions-text {
+  font-size: 15px; font-weight: 600; color: #555; line-height: 1.8; margin: 0;
 }
 
 // 通用卡片
 .report-card {
-  background: #fff;
+  background: linear-gradient(135deg, #FBF9FF 0%, #FDFBFF 100%);
+  border: 1.5px solid rgba(124,111,247,0.15);
   border-radius: 20px;
   padding: 20px 28px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 4px 20px rgba(124,111,247,0.1);
 
   &--full {
     grid-column: 1 / -1;
@@ -1700,14 +1805,14 @@ onUnmounted(() => {
 }
 
 .card-title {
-  font-size: 16px;
-  font-weight: 700;
-  color: #3D3D5C;
+  font-size: 18px;
+  font-weight: 800;
+  color: #2D2D4A;
   margin-bottom: 16px;
   display: flex;
   align-items: center;
   gap: 8px;
-  .card-icon { font-size: 18px; }
+  .card-subtitle { font-size: 12px; font-weight: 400; color: #999; margin-left: 4px; }
 }
 
 // 维度列表
@@ -1781,104 +1886,64 @@ onUnmounted(() => {
   .tdc-tag { font-size: 11px; &.good { color: #5AD8A6; } &.improve { color: #FF6B8A; } }
 }
 
-// 逐句网格
-.utterance-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
-  gap: 10px;
+// 轮次详情弹窗
+.round-detail-dialog {
+  :deep(.el-dialog__body) { max-height: 65vh; overflow-y: auto; padding: 8px 20px 20px; }
 }
 
-.utterance-item {
-  border: 1px solid #F0E8FF;
-  border-radius: 12px;
-  overflow: hidden;
-  &.expanded { grid-column: 1 / -1; }
+.detail-tab-body { min-height: 200px; }
+
+.detail-empty {
+  text-align: center; padding: 60px 20px; color: #999; font-size: 14px;
 }
 
-.utterance-header {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 14px;
-  cursor: pointer;
-  transition: background 0.2s;
-  &:hover { background: #FAFAFF; }
-  .utterance-num {
-    font-size: 11px; font-weight: 600; color: #7C6FF7;
-    background: rgba(124, 111, 247, 0.08);
-    padding: 2px 8px; border-radius: 8px; flex-shrink: 0;
-  }
-  .utterance-text-preview {
-    font-size: 13px; color: #666;
-    flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  }
-  .utterance-score { font-size: 15px; font-weight: 700; flex-shrink: 0; }
-  .utterance-arrow {
-    font-size: 10px; color: #ccc; flex-shrink: 0;
-    transition: transform 0.25s;
-    &.expanded { transform: rotate(90deg); }
+.detail-perfect {
+  text-align: center; padding: 60px 20px; font-size: 18px; font-weight: 600; color: #67C23A;
+}
+
+// 详情-语法纠错
+.detail-grammar-card {
+  .dg-corrected {
+    display: flex; gap: 8px; padding: 12px 16px;
+    background: #F0F8FF; border-radius: 10px; margin-bottom: 16px;
+    .dg-label { font-size: 13px; color: #5B8DEF; font-weight: 600; flex-shrink: 0; }
+    .dg-corrected-text { font-size: 14px; color: #4A4A5A; line-height: 1.5; }
   }
 }
 
-.utterance-detail-wrap {
-  border-top: 1px solid #F0E8FF;
-  padding: 0 16px 8px;
-}
+.dg-errors { display: flex; flex-direction: column; gap: 10px; }
 
-// 对话记录
-.transcript-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  max-height: 300px;
-  overflow-y: auto;
-}
-
-.transcript-msg {
-  display: flex;
-  flex-direction: column;
-  max-width: 90%;
-  &.user { align-self: flex-end; }
-  &.ai { align-self: flex-start; }
-  &.grammar { align-self: flex-start; }
-  .transcript-role { font-size: 10px; color: #999; margin-bottom: 2px; padding: 0 4px; }
-  &.user .transcript-role { text-align: right; }
-  .transcript-bubble {
-    padding: 8px 12px; border-radius: 12px; font-size: 12px; line-height: 1.5; color: #4A4A5A;
-  }
-  &.user .transcript-bubble { background: #F0F0FF; border-bottom-right-radius: 4px; }
-  &.ai .transcript-bubble { background: #FFF0F3; border-bottom-left-radius: 4px; }
-}
-
-// 报告中的语法纠错
-.transcript-grammar {
-  background: #FFFBEB;
-  border: 1px solid #FDE68A;
+.dg-error-item {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 10px 14px; background: #FFFBEB; border: 1px solid #FDE68A;
   border-radius: 10px;
-  padding: 10px 12px;
-  font-size: 11px;
-  .tg-corrected {
-    display: flex; gap: 4px; margin-bottom: 6px; padding-bottom: 6px;
-    border-bottom: 1px dashed #FDE68A;
-    .tg-label { color: #92400E; font-weight: 600; flex-shrink: 0; }
-    .tg-corrected-text { color: #4A4A5A; }
-  }
-  .tg-error {
-    display: flex; align-items: center; gap: 4px; padding: 3px 0; flex-wrap: wrap;
-    font-size: 11px; color: #666;
-    .tg-error-original { color: #DC2626; text-decoration: line-through; background: #FEE2E2; padding: 0 4px; border-radius: 3px; }
-    .tg-error-correction { color: #059669; font-weight: 600; background: #D1FAE5; padding: 0 4px; border-radius: 3px; }
-    .tg-error-type { font-size: 10px; color: #fff; padding: 0 5px; border-radius: 8px; }
-    .tg-error-explain { width: 100%; color: #999; font-size: 10px; margin-top: 1px; }
-  }
+  .dge-original { font-size: 13px; color: #DC2626; text-decoration: line-through; background: #FEE2E2; padding: 2px 6px; border-radius: 4px; }
+  .dge-arrow { font-size: 12px; color: #999; }
+  .dge-correction { font-size: 13px; color: #059669; font-weight: 600; background: #D1FAE5; padding: 2px 6px; border-radius: 4px; }
+  .dge-type { font-size: 10px; color: #fff; padding: 2px 6px; border-radius: 8px; flex-shrink: 0; }
+  .dge-explain { font-size: 11px; color: #999; width: 100%; margin-top: 4px; }
 }
 
-// 建议
-.suggestions-content {
-  p { font-size: 13px; color: #666; line-height: 1.7; margin: 0; }
+// 详情-流利度
+.detail-fluency-grid {
+  display: flex; gap: 16px; flex-wrap: wrap; justify-content: center;
 }
 
-// ========== 流利度评估 ==========
+.df-item {
+  display: flex; flex-direction: column; align-items: center;
+  background: #FAFBFC; border: 1px solid #EBEEF5; border-radius: 12px;
+  padding: 16px 20px; min-width: 100px;
+  .df-label { font-size: 12px; color: #999; margin-bottom: 4px; }
+  .df-score { font-size: 22px; font-weight: 800; }
+  .df-detail { font-size: 11px; color: #bbb; margin-top: 4px; }
+}
+
+.df-total {
+  text-align: center; margin-top: 20px; font-size: 15px; color: #666;
+  strong { font-size: 20px; }
+}
+
+// 流利度标签
 .fluency-badge {
   display: inline-block;
   padding: 2px 10px;
@@ -1891,70 +1956,6 @@ onUnmounted(() => {
   &.grade-中等 { background: #FFF8E8; color: #F0A030; }
   &.grade-初级 { background: #FFF0E8; color: #F08040; }
   &.grade-入门 { background: #FFE8E8; color: #E05050; }
-}
-.fluency-overall {
-  font-size: 13px;
-  color: #888;
-  margin-left: auto;
-}
-.fluency-rounds {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  margin-top: 12px;
-}
-.fluency-round-card {
-  background: #FAFBFC;
-  border: 1px solid #EBEEF5;
-  border-radius: 10px;
-  padding: 12px 16px;
-  &.best-round {
-    border-color: #F6BD16;
-    background: #FFFDF5;
-  }
-}
-.fr-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 6px;
-}
-.fr-label { font-size: 13px; font-weight: 600; color: #555; }
-.fr-best { font-size: 11px; color: #F0A030; }
-.fr-total { font-size: 14px; font-weight: 700; color: #4A4A5A; margin-left: auto; }
-.fr-text {
-  font-size: 12px;
-  color: #999;
-  margin-bottom: 10px;
-  font-style: italic;
-  line-height: 1.5;
-}
-.fr-dims {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-.fr-dim {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  background: #fff;
-  border-radius: 8px;
-  padding: 8px 12px;
-  min-width: 70px;
-  border: 1px solid #F0F0F0;
-}
-.fd-label { font-size: 11px; color: #999; margin-bottom: 2px; }
-.fd-value { font-size: 15px; font-weight: 700; }
-.fd-detail { font-size: 10px; color: #bbb; margin-top: 2px; }
-.fluency-suggestions {
-  margin-top: 14px;
-  padding: 12px;
-  background: #F0F8FF;
-  border-radius: 8px;
-  font-size: 13px;
-  color: #5B8DEF;
-  line-height: 1.6;
 }
 
 // 加载

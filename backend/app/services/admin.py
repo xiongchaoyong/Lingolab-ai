@@ -3,7 +3,7 @@
 import logging
 import secrets
 from datetime import date, datetime, timedelta
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from sqlalchemy.orm import Session
 from sqlalchemy import func, desc, case
@@ -15,6 +15,8 @@ from app.models.assessment import AssessmentQuestion
 from app.models.pronunciation import PronunciationContent
 from app.models.learning import LearningMaterial
 from app.models.gamification import DubbingContent
+from app.models.knowledge_base import KnowledgeDocument, SearchLog
+from app.services.rag_service import rag_service
 
 logger = logging.getLogger(__name__)
 
@@ -829,6 +831,191 @@ class AdminService:
         ))
         db.flush()
         return {"id": item_id, "message": "删除成功"}
+
+
+    # ===== 知识库管理 =====
+
+    def get_knowledge_docs(self, page: int, page_size: int, search: str, category: str, db: Session) -> Dict:
+        """获取知识库文档列表（分页+搜索+分类筛选）"""
+        query = db.query(KnowledgeDocument)
+
+        if search:
+            query = query.filter(
+                KnowledgeDocument.title.contains(search) |
+                KnowledgeDocument.content.contains(search)
+            )
+        if category:
+            query = query.filter(KnowledgeDocument.category == category)
+
+        total = query.count()
+        docs = (
+            query.order_by(KnowledgeDocument.created_at.desc())
+            .offset((page - 1) * page_size)
+            .limit(page_size)
+            .all()
+        )
+
+        items = []
+        for d in docs:
+            items.append({
+                "id": d.id,
+                "title": d.title,
+                "content": d.content[:500] if d.content else "",
+                "category": d.category or "general",
+                "source_type": d.source_type or "manual",
+                "is_active": d.is_active if d.is_active is not None else 1,
+                "created_at": d.created_at.isoformat() if d.created_at else "",
+                "updated_at": d.updated_at.isoformat() if d.updated_at else "",
+            })
+
+        return {"items": items, "total": total}
+
+    def create_knowledge_doc(self, data: Dict, admin_id: int, db: Session) -> Dict:
+        """新增知识库文档并自动向量化"""
+        doc = KnowledgeDocument(
+            title=data["title"],
+            content=data["content"],
+            category=data.get("category", "general"),
+            source_type="manual",
+            is_active=1,
+        )
+        db.add(doc)
+        db.flush()
+
+        # 向量化入库
+        text = f"问题：{doc.title}\n回答：{doc.content}" if doc.category == "faq" else f"{doc.title}\n{doc.content}"
+        rag_service.add_document(
+            str(doc.id),
+            text,
+            {"title": doc.title, "category": doc.category, "source_type": doc.source_type},
+        )
+
+        db.add(AdminLog(
+            admin_id=admin_id, action="knowledge_create",
+            target_type="knowledge", target_id=doc.id,
+            detail=f"创建知识库文档: {doc.title}",
+        ))
+        db.flush()
+        return {"id": doc.id, "title": doc.title, "message": "创建成功"}
+
+    def update_knowledge_doc(self, doc_id: int, data: Dict, admin_id: int, db: Session) -> Dict:
+        """更新知识库文档并更新向量"""
+        doc = db.query(KnowledgeDocument).filter(KnowledgeDocument.id == doc_id).first()
+        if not doc:
+            raise ValueError("文档不存在")
+
+        if "title" in data and data["title"] is not None:
+            doc.title = data["title"]
+        if "content" in data and data["content"] is not None:
+            doc.content = data["content"]
+        if "category" in data and data["category"] is not None:
+            doc.category = data["category"]
+        if "is_active" in data and data["is_active"] is not None:
+            doc.is_active = data["is_active"]
+
+        db.flush()
+
+        # 更新向量
+        if doc.is_active:
+            text = f"问题：{doc.title}\n回答：{doc.content}" if doc.category == "faq" else f"{doc.title}\n{doc.content}"
+            rag_service.add_document(
+                str(doc.id),
+                text,
+                {"title": doc.title, "category": doc.category, "source_type": doc.source_type},
+            )
+        else:
+            rag_service.delete_document(str(doc.id))
+
+        db.add(AdminLog(
+            admin_id=admin_id, action="knowledge_update",
+            target_type="knowledge", target_id=doc_id,
+            detail=f"更新知识库文档: {doc.title}",
+        ))
+        db.flush()
+        return {"id": doc_id, "title": doc.title, "message": "更新成功"}
+
+    def delete_knowledge_doc(self, doc_id: int, admin_id: int, db: Session) -> Dict:
+        """删除知识库文档（软删除 + 从向量库移除）"""
+        doc = db.query(KnowledgeDocument).filter(KnowledgeDocument.id == doc_id).first()
+        if not doc:
+            raise ValueError("文档不存在")
+
+        doc.is_active = 0
+        db.flush()
+
+        rag_service.delete_document(str(doc_id))
+
+        db.add(AdminLog(
+            admin_id=admin_id, action="knowledge_delete",
+            target_type="knowledge", target_id=doc_id,
+            detail=f"删除知识库文档: {doc.title}",
+        ))
+        db.flush()
+        return {"id": doc_id, "message": "删除成功"}
+
+    def reindex_document(self, doc_id: int, db: Session) -> Dict:
+        """重新索引单条文档"""
+        doc = db.query(KnowledgeDocument).filter(KnowledgeDocument.id == doc_id).first()
+        if not doc:
+            raise ValueError("文档不存在")
+
+        text = f"问题：{doc.title}\n回答：{doc.content}" if doc.category == "faq" else f"{doc.title}\n{doc.content}"
+        ok = rag_service.add_document(
+            str(doc.id),
+            text,
+            {"title": doc.title, "category": doc.category, "source_type": doc.source_type},
+        )
+        return {"id": doc_id, "success": ok, "message": "重新索引成功" if ok else "索引失败"}
+
+    def rebuild_index(self, db: Session) -> Dict:
+        """全量重建向量索引"""
+        rag_service.clear()
+
+        docs = db.query(KnowledgeDocument).filter(KnowledgeDocument.is_active == 1).all()
+        items = []
+        for doc in docs:
+            text = f"问题：{doc.title}\n回答：{doc.content}" if doc.category == "faq" else f"{doc.title}\n{doc.content}"
+            items.append({
+                "id": str(doc.id),
+                "text": text,
+                "metadata": {"title": doc.title, "category": doc.category, "source_type": doc.source_type},
+            })
+
+        count = rag_service.add_documents_batch(items)
+        return {"total": len(docs), "indexed": count, "message": f"全量重建完成: {count}/{len(docs)} 条"}
+
+    def get_search_logs(self, page: int, page_size: int, user_id: Optional[int], db: Session) -> Dict:
+        """获取检索日志列表（分页）"""
+        query = db.query(SearchLog)
+
+        if user_id:
+            query = query.filter(SearchLog.user_id == user_id)
+
+        total = query.count()
+        logs = (
+            query.order_by(SearchLog.created_at.desc())
+            .offset((page - 1) * page_size)
+            .limit(page_size)
+            .all()
+        )
+
+        items = []
+        for log in logs:
+            username = ""
+            if log.user_id:
+                user = db.query(UserProfile).filter(UserProfile.id == log.user_id).first()
+                username = user.username if user else ""
+            items.append({
+                "id": log.id,
+                "user_id": log.user_id,
+                "username": username,
+                "query": log.query,
+                "retrieved_docs": log.retrieved_docs,
+                "reply": log.reply,
+                "created_at": log.created_at.isoformat() if log.created_at else "",
+            })
+
+        return {"items": items, "total": total}
 
 
 # 单例

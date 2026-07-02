@@ -216,3 +216,57 @@ class ContentUpdateRequest(BaseModel):
     """通用内容更新"""
     content_type: str = Field(..., description="questions/shadow/materials/dubbing")
     data: dict = Field(..., description="更新的字段")
+
+
+# ============================================================
+# 知识库管理
+# ============================================================
+
+class KnowledgeDocItem(BaseModel):
+    """知识库文档条目"""
+    id: int
+    title: str
+    content: str = ""
+    category: str = "general"
+    source_type: str = "manual"
+    is_active: int = 1
+    created_at: str = ""
+    updated_at: str = ""
+
+
+class KnowledgeDocListResponse(BaseModel):
+    """知识库文档列表"""
+    items: List[KnowledgeDocItem] = Field(default_factory=list)
+    total: int = 0
+
+
+class KnowledgeDocCreateRequest(BaseModel):
+    """新增知识库文档"""
+    title: str = Field(..., max_length=500)
+    content: str = Field(..., min_length=1)
+    category: str = Field(default="general", pattern="^(product_use|study_advice|tech_issue|refund|general)$")
+
+
+class KnowledgeDocUpdateRequest(BaseModel):
+    """更新知识库文档"""
+    title: Optional[str] = Field(default=None, max_length=500)
+    content: Optional[str] = None
+    category: Optional[str] = Field(default=None, pattern="^(product_use|study_advice|tech_issue|refund|general)$")
+    is_active: Optional[int] = Field(default=None, ge=0, le=1)
+
+
+class SearchLogItem(BaseModel):
+    """检索日志条目"""
+    id: int
+    user_id: Optional[int] = None
+    username: str = ""
+    query: str
+    retrieved_docs: Optional[list] = None
+    reply: Optional[str] = None
+    created_at: str = ""
+
+
+class SearchLogListResponse(BaseModel):
+    """检索日志列表"""
+    items: List[SearchLogItem] = Field(default_factory=list)
+    total: int = 0
