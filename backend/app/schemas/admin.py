@@ -137,6 +137,18 @@ class UserStatusRequest(BaseModel):
     is_active: int = Field(..., ge=0, le=1)
 
 
+class UserRoleRequest(BaseModel):
+    """修改用户角色"""
+    role: str = Field(..., pattern="^(learner|teacher|admin)$")
+
+
+class UpdateClassRequest(BaseModel):
+    """编辑班级"""
+    name: Optional[str] = Field(default=None, max_length=100)
+    description: Optional[str] = Field(default=None, max_length=500)
+    level_range: Optional[str] = Field(default=None)
+
+
 # ============================================================
 # 数据仪表盘
 # ============================================================

@@ -1,3 +1,35 @@
+## 2026-07-03: 用户管理 + 班级管理功能增强
+
+### 用户管理新增
+- **角色变更**：管理员可修改用户角色（学生↔教师↔管理员），操作前有确认弹窗，记录操作日志
+- **用户详情弹窗**：点击"详情"查看完整资料（邮箱/年龄段/学习目标/自评等级/积分/对话次数/发音练习次数/维度平均分）
+- **操作列扩展**：详情 + 角色下拉 + 禁用/启用，宽度220→260
+
+### 班级管理新增
+- **编辑班级**：修改名称/等级范围/描述，操作栏新增"编辑"按钮
+- **删除班级**：软删除（is_active=0），操作前确认，已有学生数据不丢失
+- **移除学生**：学生列表对话框新增"移出"按钮，可逐出班级成员
+
+### 后端新增 API（4个）
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| PUT | `/api/admin/users/{id}/role` | 修改用户角色 |
+| GET | `/api/admin/users/{id}` | 用户详细信息 |
+| PUT | `/api/admin/classes/{id}` | 编辑班级信息 |
+| DELETE | `/api/admin/classes/{id}` | 软删除班级 |
+| DELETE | `/api/admin/classes/{id}/students/{uid}` | 移除班级学生 |
+
+### 文件变更
+- `backend/app/schemas/admin.py` — 新增 UserRoleRequest + UpdateClassRequest
+- `backend/app/services/admin.py` — AdminService 新增 set_user_role/get_user_detail；TeacherService 新增 update_class/delete_class/remove_student
+- `backend/app/api/admin.py` — 新增 5 个路由端点
+- `frontend/src/api/admin.js` — 新增 5 个 API 封装函数
+- `frontend/src/stores/admin.js` — 新增对应 store actions
+- `frontend/src/views/admin/UserManageView.vue` — 重写，新增角色变更+详情弹窗
+- `frontend/src/views/teacher/ClassManageView.vue` — 重写，新增编辑/删除班级+移除学生
+
+---
+
 ## 2026-07-03: 知识库 API 加载耗时优化 — RAG 服务懒加载 + SQL 优化
 
 ### 根因

@@ -10,9 +10,14 @@ const store = useAssessmentStore()
 const report = computed(() => store.report)
 const showDetail = ref(false)
 
+const SPEAKING_TYPES = ['pronunciation', 'fluency', 'interaction']
+
 const dimensionList = computed(() => {
   if (!report.value) return []
-  const labels = { speaking: '口语表达', reading: '阅读理解', grammar: '语法选择' }
+  const labels = {
+    pronunciation: '发音', fluency: '流利度', grammar: '语法',
+    vocabulary: '词汇运用', interaction: '互动参与',
+  }
   return Object.entries(report.value.dimensionScores).map(([key, score]) => ({
     label: labels[key] || key,
     score,
@@ -24,7 +29,7 @@ const questionsDetail = computed(() => report.value?.questionsDetail || [])
 
 const correctCount = computed(() => questionsDetail.value.filter(q => q.is_correct).length)
 const wrongCount = computed(() => questionsDetail.value.filter(q => q.is_correct === false).length)
-const speakingCount = computed(() => questionsDetail.value.filter(q => q.type === 'speaking').length)
+const speakingCount = computed(() => questionsDetail.value.filter(q => SPEAKING_TYPES.includes(q.type)).length)
 
 const scoreColor = computed(() => {
   const s = report.value?.overall || 0
@@ -50,7 +55,7 @@ function getScoreColor(score) {
 }
 
 function handleGoHome() {
-  router.push('/home')
+  router.push('/')
 }
 
 onMounted(() => {
@@ -120,7 +125,7 @@ onMounted(() => {
             :class="{
               'item-correct': q.is_correct === true,
               'item-wrong': q.is_correct === false,
-              'item-speaking': q.type === 'speaking',
+              'item-speaking': SPEAKING_TYPES.includes(q.type),
             }"
           >
             <div class="item-top">
@@ -134,7 +139,7 @@ onMounted(() => {
               </span>
             </div>
             <div class="item-content" v-if="q.content">{{ q.content }}</div>
-            <div class="item-answer-row" v-if="q.type !== 'speaking'">
+            <div class="item-answer-row" v-if="!SPEAKING_TYPES.includes(q.type)">
               <span class="answer-label">你的答案：</span>
               <span :class="q.is_correct ? 'answer-ok' : 'answer-err'">{{ q.user_answer || '未答' }}</span>
               <span v-if="!q.is_correct && q.correct_answer" class="correct-hint">

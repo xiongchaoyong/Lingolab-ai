@@ -19,6 +19,8 @@ from app.schemas.admin import (
     ReviewRequest,
     UserListResponse,
     UserStatusRequest,
+    UserRoleRequest,
+    UpdateClassRequest,
     DashboardResponse,
     FeedbackListResponse,
     FeedbackReplyRequest,
@@ -128,6 +130,59 @@ def refresh_invite_code(
         raise HTTPException(status_code=400, detail=str(e))
 
 
+@router.put("/classes/{class_id}", response_model=dict)
+def update_class(
+    class_id: int,
+    req: UpdateClassRequest,
+    teacher: UserProfile = Depends(require_teacher),
+    db: Session = Depends(get_db),
+):
+    """编辑班级信息"""
+    try:
+        data = {k: v for k, v in req.model_dump().items() if v is not None}
+        if not data:
+            raise HTTPException(status_code=400, detail="至少提供一个更新字段")
+        result = teacher_service.update_class(class_id, teacher.id, data, db)
+        db.commit()
+        return {"code": 0, "data": result, "message": "更新成功"}
+    except ValueError as e:
+        db.rollback()
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.delete("/classes/{class_id}", response_model=dict)
+def delete_class(
+    class_id: int,
+    teacher: UserProfile = Depends(require_teacher),
+    db: Session = Depends(get_db),
+):
+    """删除班级（软删除）"""
+    try:
+        result = teacher_service.delete_class(class_id, teacher.id, db)
+        db.commit()
+        return {"code": 0, "data": result, "message": "班级已删除"}
+    except ValueError as e:
+        db.rollback()
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.delete("/classes/{class_id}/students/{user_id}", response_model=dict)
+def remove_student_from_class(
+    class_id: int,
+    user_id: int,
+    teacher: UserProfile = Depends(require_teacher),
+    db: Session = Depends(get_db),
+):
+    """从班级移除学生"""
+    try:
+        result = teacher_service.remove_student(class_id, user_id, teacher.id, db)
+        db.commit()
+        return {"code": 0, "data": result, "message": "学生已移除"}
+    except ValueError as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 # ============================================================
 # 教师端 — 作业管理
 # ============================================================
@@ -223,6 +278,36 @@ def set_user_status(
         return {"code": 0, "data": result, "message": "操作成功"}
     except ValueError as e:
         db.rollback()
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.put("/users/{user_id}/role", response_model=dict)
+def set_user_role(
+    user_id: int,
+    req: UserRoleRequest,
+    admin: UserProfile = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """修改用户角色（learner/teacher/admin）"""
+    try:
+        result = admin_service.set_user_role(user_id, req.role, admin.id, db)
+        db.commit()
+        return {"code": 0, "data": result, "message": f"角色已更新为 {req.role}"}
+    except ValueError as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/users/{user_id}", response_model=dict)
+def get_user_detail(
+    user_id: int,
+    admin: UserProfile = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """获取用户详细信息"""
+    try:
+        return admin_service.get_user_detail(user_id, db)
+    except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
 

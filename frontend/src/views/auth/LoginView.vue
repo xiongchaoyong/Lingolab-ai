@@ -35,7 +35,7 @@ async function handleLogin() {
   errorMsg.value = ''
   try {
     const res = await authStore.login(form.username, form.password)
-    router.push(res.redirect || '/home')
+    router.push(res.redirect || '/')
   } catch (e) {
     const detail = e?.response?.data?.detail
     errorMsg.value = typeof detail === 'string' ? detail : '登录失败，请稍后重试'

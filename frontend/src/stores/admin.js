@@ -2,8 +2,9 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import {
   getMyClassesApi, createClassApi, getClassStudentsApi, joinClassApi,
+  updateClassApi, deleteClassApi, removeClassStudentApi,
   getAssignmentsApi, createAssignmentApi, getSubmissionsApi, reviewSubmissionApi,
-  getUsersApi, setUserStatusApi, getDashboardApi,
+  getUsersApi, setUserStatusApi, setUserRoleApi, getUserDetailApi, getDashboardApi,
 } from '@/api/admin'
 
 export const useAdminStore = defineStore('admin', () => {
@@ -29,6 +30,21 @@ export const useAdminStore = defineStore('admin', () => {
   async function joinClass(inviteCode) {
     const res = await joinClassApi(inviteCode)
     return res
+  }
+
+  async function updateClass(classId, data) {
+    await updateClassApi(classId, data)
+    await fetchClasses()
+  }
+
+  async function deleteClass(classId) {
+    await deleteClassApi(classId)
+    await fetchClasses()
+  }
+
+  async function removeStudent(classId, userId) {
+    await removeClassStudentApi(classId, userId)
+    await fetchStudents(classId)
   }
 
   // ===== 作业 =====
@@ -68,6 +84,15 @@ export const useAdminStore = defineStore('admin', () => {
     await setUserStatusApi(userId, isActive)
   }
 
+  async function setUserRole(userId, role) {
+    await setUserRoleApi(userId, role)
+  }
+
+  async function fetchUserDetail(userId) {
+    const res = await getUserDetailApi(userId)
+    return res
+  }
+
   // ===== 仪表盘 =====
   const dashboard = ref(null)
 
@@ -78,8 +103,9 @@ export const useAdminStore = defineStore('admin', () => {
 
   return {
     classes, students, fetchClasses, createClass, fetchStudents, joinClass,
+    updateClass, deleteClass, removeStudent,
     assignments, submissions, fetchAssignments, createAssignment, fetchSubmissions, reviewSubmission,
-    users, userTotal, fetchUsers, setUserStatus,
+    users, userTotal, fetchUsers, setUserStatus, setUserRole, fetchUserDetail,
     dashboard, fetchDashboard,
   }
 })

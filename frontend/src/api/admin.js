@@ -22,6 +22,18 @@ export function refreshInviteCodeApi(classId) {
   return request.post(`/api/admin/classes/${classId}/refresh-code`)
 }
 
+export function updateClassApi(classId, data) {
+  return request.put(`/api/admin/classes/${classId}`, data)
+}
+
+export function deleteClassApi(classId) {
+  return request.delete(`/api/admin/classes/${classId}`)
+}
+
+export function removeClassStudentApi(classId, userId) {
+  return request.delete(`/api/admin/classes/${classId}/students/${userId}`)
+}
+
 // ===== 作业管理 =====
 
 export function getAssignmentsApi() {
@@ -48,6 +60,14 @@ export function getUsersApi(params = {}) {
 
 export function setUserStatusApi(userId, isActive) {
   return request.put(`/api/admin/users/${userId}/status`, { is_active: isActive })
+}
+
+export function setUserRoleApi(userId, role) {
+  return request.put(`/api/admin/users/${userId}/role`, { role })
+}
+
+export function getUserDetailApi(userId) {
+  return request.get(`/api/admin/users/${userId}`)
 }
 
 // ===== 仪表盘 =====

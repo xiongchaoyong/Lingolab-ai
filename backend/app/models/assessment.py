@@ -12,10 +12,10 @@ class AssessmentQuestion(Base):
     options = Column(JSON, nullable=False)
     correct_option = Column(Integer, nullable=False, comment="正确选项序号 1-4")
     dimension = Column(
-        Enum("speaking", "reading", "grammar", name="question_dimension_enum"),
-        nullable=False,
+        String(20), nullable=False,
+        comment="题目维度: pronunciation/fluency/grammar/vocabulary/interaction"
     )
-    difficulty = Column(String(5), nullable=False, comment="CEFR难度：A1/A2/B1/B2/C1/C2")
+    difficulty = Column(String(5), nullable=False, comment="CEFR难度：A1/A2/B1/B2/C1")
     is_active = Column(Integer, default=1, nullable=False)
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
@@ -29,8 +29,8 @@ class AssessmentRecord(Base):
     session_id = Column(String(36), nullable=False, comment="测评会话UUID")
     question_id = Column(Integer, ForeignKey("assessment_questions.id"), nullable=True, comment="题库题目ID（动态生成时为NULL）")
     question_type = Column(
-        Enum("multiple_choice", "speaking", name="question_type_enum"),
-        nullable=False,
+        String(20), nullable=False,
+        comment="题目类型: pronunciation/fluency/grammar/vocabulary/interaction"
     )
     user_answer = Column(Text, default=None, comment="选项ID 或 录音URL")
     is_correct = Column(Integer, default=None, comment="客观题是否正确，口语题为NULL")

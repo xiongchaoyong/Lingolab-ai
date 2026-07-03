@@ -42,7 +42,7 @@ async def roleplay_start(
     db: Session = Depends(get_db),
 ):
     session_id = uuid.uuid4().hex[:12]
-    topic = req.role
+    topic = req.topic
     cefr_level = req.cefr_level
 
     db_session_id = None
@@ -166,7 +166,7 @@ async def roleplay_stream_start(
 ):
     from app.schemas.voice_chat import VoiceChatStartRequest
     from app.api.voice_chat import voice_chat_stream_start
-    voice_req = VoiceChatStartRequest(topic=req.role, mode="role", cefr_level=req.cefr_level)
+    voice_req = VoiceChatStartRequest(topic=req.topic, mode="role", cefr_level=req.cefr_level)
     return await voice_chat_stream_start(voice_req, current_user, db)
 
 

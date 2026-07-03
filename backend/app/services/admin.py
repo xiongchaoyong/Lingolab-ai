@@ -132,6 +132,54 @@ class TeacherService:
         db.flush()
         return {"invite_code": cls.invite_code, "invite_expires_at": cls.invite_expires_at.isoformat()}
 
+    def update_class(self, class_id: int, teacher_id: int, data: Dict, db: Session) -> Dict:
+        """编辑班级信息"""
+        cls = db.query(Class).filter(Class.id == class_id, Class.teacher_id == teacher_id).first()
+        if not cls:
+            raise ValueError("班级不存在")
+
+        if "name" in data and data["name"]:
+            cls.name = data["name"]
+        if "description" in data:
+            cls.description = data["description"]
+        if "level_range" in data:
+            cls.level_range = data["level_range"]
+        db.flush()
+        return {
+            "id": cls.id, "name": cls.name, "description": cls.description or "",
+            "level_range": cls.level_range or "", "student_count": cls.student_count,
+            "invite_code": cls.invite_code, "is_active": cls.is_active,
+            "created_at": cls.created_at.isoformat() if cls.created_at else "",
+        }
+
+    def delete_class(self, class_id: int, teacher_id: int, db: Session) -> Dict:
+        """删除班级（软删除）"""
+        cls = db.query(Class).filter(Class.id == class_id, Class.teacher_id == teacher_id).first()
+        if not cls:
+            raise ValueError("班级不存在")
+        cls.is_active = 0
+        db.flush()
+        return {"id": cls.id, "deleted": True}
+
+    def remove_student(self, class_id: int, user_id: int, teacher_id: int, db: Session) -> Dict:
+        """从班级移除学生"""
+        cls = db.query(Class).filter(Class.id == class_id, Class.teacher_id == teacher_id).first()
+        if not cls:
+            raise ValueError("班级不存在")
+
+        membership = (
+            db.query(ClassStudent)
+            .filter(ClassStudent.class_id == class_id, ClassStudent.user_id == user_id)
+            .first()
+        )
+        if not membership:
+            raise ValueError("学生不在该班级中")
+
+        db.delete(membership)
+        cls.student_count = max(0, cls.student_count - 1)
+        db.flush()
+        return {"class_id": class_id, "user_id": user_id, "removed": True}
+
     # ===== 作业管理 =====
 
     def get_assignments(self, teacher_id: int, db: Session) -> List[Dict]:
@@ -429,6 +477,98 @@ class AdminService:
         ))
         db.flush()
         return {"id": user.id, "is_active": user.is_active}
+
+    def set_user_role(self, user_id: int, role: str, admin_id: int, db: Session) -> Dict:
+        """修改用户角色"""
+        if user_id == admin_id:
+            raise ValueError("不能修改自己的角色")
+
+        valid_roles = ("learner", "teacher", "admin")
+        if role not in valid_roles:
+            raise ValueError(f"无效角色: {role}，可选值: {', '.join(valid_roles)}")
+
+        user = db.query(UserProfile).filter(UserProfile.id == user_id).first()
+        if not user:
+            raise ValueError("用户不存在")
+
+        old_role = user.role
+        user.role = role
+        db.flush()
+
+        db.add(AdminLog(
+            admin_id=admin_id,
+            action="user_role_change",
+            target_type="user",
+            target_id=user_id,
+            detail=f"用户角色 {old_role} → {role}",
+        ))
+        db.flush()
+        return {"id": user.id, "role": user.role}
+
+    def get_user_detail(self, user_id: int, db: Session) -> Dict:
+        """获取用户详细信息（含学习统计）"""
+        user = db.query(UserProfile).filter(UserProfile.id == user_id).first()
+        if not user:
+            raise ValueError("用户不存在")
+
+        # 维度分数
+        dim_scores = {}
+        scores = (
+            db.query(UserSkillScore)
+            .filter(UserSkillScore.user_id == user_id)
+            .order_by(UserSkillScore.created_at.desc())
+            .limit(50)
+            .all()
+        )
+        for s in scores:
+            dim = s.dimension
+            if dim not in dim_scores:
+                dim_scores[dim] = []
+            dim_scores[dim].append(float(s.score))
+
+        dimension_averages = {
+            dim: round(sum(vals) / len(vals), 1)
+            for dim, vals in dim_scores.items()
+        } if dim_scores else {}
+
+        # 积分
+        total_points_raw = (
+            db.query(func.sum(UserScore.score)).filter(UserScore.user_id == user_id).scalar()
+        )
+        total_points = float(total_points_raw) if total_points_raw else 0
+
+        # 对话次数
+        conversation_count = (
+            db.query(func.count(ConversationSession.id))
+            .filter(ConversationSession.user_id == user_id)
+            .scalar()
+        ) or 0
+
+        # 发音练习次数
+        pronunciation_count = (
+            db.query(func.count(PronunciationRecord.id))
+            .filter(PronunciationRecord.user_id == user_id)
+            .scalar()
+        ) or 0
+
+        return {
+            "id": user.id,
+            "username": user.username,
+            "email": user.email,
+            "role": user.role,
+            "age_group": user.age_group,
+            "learning_goal": user.learning_goal,
+            "level_self": user.level_self,
+            "level_test": user.level_test,
+            "level_final": user.level_final,
+            "is_active": user.is_active,
+            "assessment_completed": user.assessment_completed,
+            "total_points": total_points,
+            "conversation_count": conversation_count,
+            "pronunciation_count": pronunciation_count,
+            "dimension_averages": dimension_averages,
+            "created_at": user.created_at.isoformat() if user.created_at else "",
+        }
 
     def get_dashboard(self, db: Session) -> Dict:
         """获取运营仪表盘数据"""
