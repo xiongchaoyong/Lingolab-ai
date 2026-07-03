@@ -35,20 +35,31 @@ def _build_score_factors(factors: dict) -> list:
         if val > 0:
             meta = FACTOR_META.get(key, {"label": key, "icon": ""})
             detail = _factor_detail(key, val)
-            result.append(ScoreFactor(label=meta["label"], weight=val / 100, detail=detail))
+            result.append(ScoreFactor(
+                label=f"{meta['icon']} {meta['label']}",
+                weight=val / 100,
+                detail=detail,
+            ))
     result.sort(key=lambda x: x.weight, reverse=True)
     return result
 
 
 def _factor_detail(key: str, val: float) -> str:
+    """为每个因子生成具体可读的说明"""
+    score_label = "高度" if val >= 70 else "中等" if val >= 40 else "一般"
     if key == "weakness":
-        return "针对你的学习短板"
+        return f"该资料针对你的学习短板，匹配度{score_label}"
     elif key == "level":
-        return f"匹配你的语言等级（{val:.0f}%符合）"
+        return f"资料难度与你的CEFR等级匹配度{score_label}"
     elif key == "interest":
-        return "与你的兴趣标签一致"
+        return f"内容标签与你的兴趣偏好契合度{score_label}"
     elif key == "novelty":
-        return "最近未推荐过的新内容"
+        if val >= 70:
+            return "近期未推荐过，是全新的学习内容"
+        elif val >= 40:
+            return "近期较少推荐，有一定新鲜度"
+        else:
+            return "最近推荐过类似内容，可回顾巩固"
     return ""
 
 
@@ -56,8 +67,11 @@ def _build_reason(factors: list) -> str:
     """根据因子生成推荐原因摘要"""
     if not factors:
         return ""
-    labels = [f.label for f in factors[:2]]
-    return "、".join(labels)
+    # 取前2个最重要因子，生成自然语句
+    parts = []
+    for f in factors[:2]:
+        parts.append(f.detail)
+    return "；".join(parts)
 
 
 @router.get("/", response_model=RecommendationsResponse)

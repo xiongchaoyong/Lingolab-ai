@@ -109,7 +109,7 @@ class RecommendationService:
 
     def recommend_materials(
         self, user: UserProfile, db: Session,
-        videos_count: int = 3, articles_count: int = 3,
+        videos_count: int = 5, articles_count: int = 5,
     ) -> Dict[str, List[dict]]:
         """为用户推荐资料，按 sub_type 分组返回
 
