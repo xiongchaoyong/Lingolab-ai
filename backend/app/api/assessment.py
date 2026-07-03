@@ -42,9 +42,9 @@ NUMERIC_CEFR = {v: k for k, v in CEFR_NUMERIC.items()}
 
 # 基础维度序列（前7题固定覆盖四维，后3题自适应弱项）
 BASE_DIMENSION_SEQUENCE = [
-    "listening", "reading", "grammar",
-    "listening", "speaking", "reading",
-    "grammar",
+    "speaking", "reading", "grammar",
+    "speaking", "reading", "grammar",
+    "speaking",
 ]
 TOTAL_QUESTIONS = 10
 
@@ -58,14 +58,12 @@ CEFR_THRESHOLDS = [
 ]
 
 DIMENSION_LABELS = {
-    "listening": "听力理解",
     "speaking": "口语表达",
     "reading": "阅读理解",
     "grammar": "语法选择",
 }
 
 SUGGESTIONS = {
-    "listening": "建议每天听15分钟英语播客或新闻，逐步提升听力理解能力",
     "speaking": "建议多进行口语练习，可以先从简单的自我介绍和日常话题开始",
     "reading": "建议每天阅读一篇英语短文，注意积累词汇和理解文章结构",
     "grammar": "建议系统复习基础语法知识，重点关注时态和句型结构",
@@ -141,7 +139,7 @@ def _pick_next_dimension(session: dict) -> str:
     if weak:
         # 弱项维度多出现一次
         remaining_slots = TOTAL_QUESTIONS - answered_count
-        all_dims = ["listening", "reading", "grammar", "speaking"]
+        all_dims = ["speaking", "reading", "grammar"]
         # 弱项占 60%，其他轮流
         if answered_count % 5 in (0, 2) and remaining_slots > 1:
             return weak
@@ -157,7 +155,7 @@ async def _generate_question(
     age_group: str,
 ) -> tuple[dict, str | None]:
     """
-    LLM 动态生成题目 + 听力题生成 TTS 音频
+    LLM 动态生成题目
 
     Returns:
         (question_dict, audio_base64 | None)
@@ -186,21 +184,7 @@ async def _generate_question(
         age_group=age_group,
     )
 
-    # 听力题：同步生成 TTS 音频
-    audio_base64 = None
-    if dimension == "listening":
-        try:
-            question_text = result.get("question_text", "")
-            # 提取对话/独白部分（去掉 Question: 行）
-            audio_text = question_text.split("Question:")[0].strip() if "Question:" in question_text else question_text
-            if audio_text:
-                audio_bytes = await synthesize_speech(audio_text, voice="en-US-JennyNeural")
-                audio_base64 = base64.b64encode(audio_bytes).decode("utf-8")
-                logger.info(f"听力题 TTS 生成成功: {len(audio_bytes)} bytes")
-        except Exception as e:
-            logger.warning(f"听力题 TTS 生成失败（题目仍可用）: {e}")
-
-    return result, audio_base64
+    return result, None
 
 
 # ========== API 端点 ==========
@@ -241,7 +225,7 @@ async def start_assessment(
     _sessions[session_id] = {
         "user_id": current_user.id,
         "current_level": current_level,
-        "dimension_totals": {"listening": [], "speaking": [], "reading": [], "grammar": []},
+        "dimension_totals": {"speaking": [], "reading": [], "grammar": []},
         "question_order": 0,
         "answered_ids": set(),
         "generated_questions": {},
@@ -449,12 +433,12 @@ async def answer_assessment(
                 # 全错 → 追加 1 题 A1 兜底题
                 session["bonus_added"] = True
                 qdata, audio_b64 = await _generate_question(
-                    db, "listening", "A1", session, current_user.age_group,
+                    db, "grammar", "A1", session, current_user.age_group,
                 )
                 qid = _next_dynamic_id()
                 session["generated_questions"][qid] = qdata
                 bonus_item = QuestionItem(
-                    id=qid, type="listening", difficulty="A1",
+                    id=qid, type="grammar", difficulty="A1",
                     content=qdata["question_text"],
                     options=qdata.get("options", []),
                     audio_base64=audio_b64,
@@ -530,7 +514,7 @@ async def restore_session(
         raise HTTPException(status_code=404, detail="测评会话不存在或无答题记录")
 
     # 重建会话状态
-    dimension_totals = {"listening": [], "speaking": [], "reading": [], "grammar": []}
+    dimension_totals = {"speaking": [], "reading": [], "grammar": []}
     answered_ids = set()
     generated_questions = {}
     current_level = 3.0
@@ -623,7 +607,7 @@ async def complete_assessment(
             dimension_scores[dim] = 0.0
 
     # 综合分 = 四维均分
-    overall = round(sum(dimension_scores.values()) / 4, 1)
+    overall = round(sum(dimension_scores.values()) / 3, 1)
 
     # CEFR 定级（考虑年龄段偏移）
     level, label = _get_cefr(overall, current_user.age_group)
@@ -747,7 +731,7 @@ async def submit_assessment(
     except json.JSONDecodeError:
         raise HTTPException(status_code=422, detail="答案格式错误")
 
-    dimension_totals = {"listening": [], "speaking": [], "reading": [], "grammar": []}
+    dimension_totals = {"speaking": [], "reading": [], "grammar": []}
     record_order = 0
 
     for item in answer_list:
@@ -794,7 +778,7 @@ async def submit_assessment(
         else:
             dimension_scores[dim] = 0.0
 
-    overall = round(sum(dimension_scores.values()) / 4, 1)
+    overall = round(sum(dimension_scores.values()) / 3, 1)
     level, label = _get_cefr(overall, current_user.age_group)
 
     weakness_dim = min(dimension_scores, key=dimension_scores.get)

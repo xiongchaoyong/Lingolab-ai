@@ -286,7 +286,7 @@ class RecommendationService:
     # ============================================================
 
     def generate_daily_tasks(self, user: UserProfile, db: Session) -> List[dict]:
-        """为用户生成当天的 3 个任务（跟读/对话/听力）
+        """为用户生成当天的 3 个任务（跟读/对话/语法/词汇）
 
         步骤：
         1. 短板优先 → 取最低分维度

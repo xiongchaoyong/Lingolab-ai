@@ -12,7 +12,7 @@ class AssessmentQuestion(Base):
     options = Column(JSON, nullable=False)
     correct_option = Column(Integer, nullable=False, comment="正确选项序号 1-4")
     dimension = Column(
-        Enum("listening", "speaking", "reading", "grammar", name="question_dimension_enum"),
+        Enum("speaking", "reading", "grammar", name="question_dimension_enum"),
         nullable=False,
     )
     difficulty = Column(String(5), nullable=False, comment="CEFR难度：A1/A2/B1/B2/C1/C2")

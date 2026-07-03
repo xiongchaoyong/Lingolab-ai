@@ -842,7 +842,7 @@ class LLMService:
         动态生成测评题目 — 根据维度、CEFR等级、答题历史实时出题
 
         Args:
-            dimension: "listening" | "reading" | "grammar" | "speaking"
+            dimension: "speaking" | "reading" | "grammar"
             cefr_level: 当前估算 CEFR 等级 "A1"~"C2"
             context: 答题上下文
                 - previous_questions: 已出题目摘要列表 [{"dimension":"...", "content":"...", "score": 85}, ...]
@@ -913,14 +913,6 @@ class LLMService:
                 f"The question should test comprehension, not just word matching.\n"
                 f"Avoid overused topics (global warming, technology, education)."
             ),
-            "listening": (
-                f"Generate an English listening comprehension question at CEFR {cefr_level}.\n"
-                f"Language level: {level_guide}\n"
-                f"Write a short, natural-sounding dialogue or monologue (3-5 sentences) "
-                f"that could be spoken aloud. It should sound like a real conversation.\n"
-                f"Then ask ONE comprehension question about what was said, with 4 options.\n"
-                f"Topics: daily life, travel, work, hobbies, social situations, news snippets."
-            ),
             "speaking": (
                 f"Generate an English speaking prompt at CEFR {cefr_level}.\n"
                 f"Language level: {level_guide}\n"
@@ -943,7 +935,7 @@ class LLMService:
             f"{weak_hint}\n"
             f"{consecutive_text}\n\n"
             f"Return ONLY a JSON object (no markdown, no code fences):\n"
-            f'{{"question_text": "the full question (for listening: the full dialogue/monologue)",\n'
+            f'{{"question_text": "the full question text",\n'
             f'"options": ["A. option1", "B. option2", "C. option3", "D. option4"],\n'
             f'"correct_option": <1-4>,\n'
             f'"dimension": "{dimension}",\n'
@@ -995,14 +987,6 @@ def _fallback_question(dimension: str, cefr_level: str) -> dict:
             "dimension": "reading",
             "difficulty": cefr_level,
             "explanation": "文中明确提到 Tom 喜欢 reading books and playing basketball。",
-        },
-        "listening": {
-            "question_text": "Listen to the dialogue:\nA: Excuse me, where is the nearest post office?\nB: Go straight ahead and turn left at the second crossing. It's on your right.\n\nQuestion: Where does the person want to go?",
-            "options": ["A. Bank", "B. Post office", "C. Supermarket", "D. Hospital"],
-            "correct_option": 2,
-            "dimension": "listening",
-            "difficulty": cefr_level,
-            "explanation": "对话中明确问的是 post office 的位置。",
         },
         "speaking": {
             "question_text": "Please describe your favorite season and explain why you like it.",

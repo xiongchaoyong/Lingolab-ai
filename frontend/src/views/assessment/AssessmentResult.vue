@@ -12,7 +12,7 @@ const showDetail = ref(false)
 
 const dimensionList = computed(() => {
   if (!report.value) return []
-  const labels = { listening: '听力理解', speaking: '口语表达', reading: '阅读理解', grammar: '语法选择' }
+  const labels = { speaking: '口语表达', reading: '阅读理解', grammar: '语法选择' }
   return Object.entries(report.value.dimensionScores).map(([key, score]) => ({
     label: labels[key] || key,
     score,

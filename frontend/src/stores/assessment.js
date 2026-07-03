@@ -4,7 +4,6 @@ import { startAssessmentApi, answerQuestionApi, completeAssessmentApi, restoreSe
 import { useAuthStore } from '@/stores/auth'
 
 const TYPE_LABELS = {
-  listening: '听力理解',
   reading: '阅读理解',
   grammar: '语法选择',
   speaking: '口语表达',

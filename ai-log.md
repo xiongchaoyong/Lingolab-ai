@@ -4,6 +4,42 @@
 
 ---
 
+## 2026-07-03: 测评模块移除听力维度 — 数据库迁移 + 前后端全面清理
+
+### 变更内容
+1. **DB 迁移**：`assessment_questions` 表 3 条 listening 题目 → speaking，ALTER TABLE 移除 ENUM 'listening'
+2. **后端全面清理**：
+   - `assessment.py`：BASE_DIMENSION_SEQUENCE 移除 listening、dimension_totals 移除 listening（2 处）、_generate_question 移除 TTS 听力生成块、overall 除数 /4→/3（2 处）、追加题 listening→grammar
+   - `llm.py`：移除 dimension_prompts["listening"] 模板、移除 JSON 模板中听力描述、docstring 更新
+   - `profile_updater.py`：TASK_DIM_MAP 移除 listening + ASSESSMENT_DIM_MAP 移除 listening
+   - `assessment.py models/schemas`：ENUM 移除 listening、QuestionItem type 描述更新
+   - `recommendation.py`：_get_today_tasks + get_task_progress 过滤旧 listening 数据
+3. **前端全面清理**：
+   - `stores/assessment.js`：TYPE_LABELS 移除 listening
+   - `AssessmentResult.vue`：labels 移除 listening
+   - `ContentManageView.vue`：题型/维度 options 移除 listening、资料类型移除 audio
+   - `HelpView.vue`：帮助文案"听力"→"语法、词汇"
+4. **推荐系统增强**：MaterialItem 新增 score_factors（四因子详细分解）+ reason 字段；TaskItem 新增 reason 字段；新增语法+词汇任务类型（每日任务 2→4 种）
+
+### 影响文件
+- `backend/app/api/assessment.py` — 移除 listening 维度
+- `backend/app/models/assessment.py` — ENUM 移除 listening
+- `backend/app/schemas/assessment.py` — 描述更新
+- `backend/app/services/llm.py` — 移除 listening prompt
+- `backend/app/services/profile_updater.py` — 映射表更新
+- `backend/app/services/recommendation.py` — 过滤旧数据 + 新任务类型
+- `backend/app/schemas/learning_path.py` — ScoreFactor + MaterialItem 增强
+- `backend/app/api/learning_path.py` — 任务推荐原因
+- `backend/app/api/recommendation.py` — 推荐原因因子分解
+- `frontend/src/stores/assessment.js` — 移除 listening label
+- `frontend/src/views/assessment/AssessmentResult.vue` — 移除 listening label
+- `frontend/src/views/admin/ContentManageView.vue` — 移除 listening/audio 选项
+- `frontend/src/views/help/HelpView.vue` — 帮助文案更新
+- `frontend/src/views/learning/LearningPathView.vue` — 语法+词汇任务类型 + 推荐原因
+- `frontend/src/views/learning/RecommendationView.vue` — 推荐依据展示 + 移除音频
+
+---
+
 ## 2026-07-03: 语音对话模块融合 — AI 智能对话 + 角色扮演
 
 ### 变更内容
