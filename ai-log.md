@@ -16,7 +16,7 @@
 7. **删除旧文件**：VoiceCallView.vue + RolePlayView.vue（原 2974 行大幅精简）
 8. **UI 交互优化**：移除独立选择页，模式+话题选择集成在通话界面；自由对话无需选场景，点击按钮直接开始；角色扮演保留角色选择卡片网格
 9. **推荐资料展示推荐原因**：MaterialItem 新增 score_factors 字段（四因子：短板匹配/难度适中/兴趣相关/新鲜推荐），前端卡片展示推荐原因标签
-10. **移除听力任务类型**：LearningPathView 去 listening，task type 改为 conversation→语音对话、shadowing→发音评测
+10. **移除听力任务类型**：LearningPathView 去 listening，task type 改为 conversation→语音对话、shadowing→发音评测；资料推荐移除音频类，推荐总数保持6条（视频3+文章3）
 
 ### 影响文件
 - `backend/app/schemas/voice_chat.py` — **新建**，统一 Schema

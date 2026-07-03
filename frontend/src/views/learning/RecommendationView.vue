@@ -6,7 +6,7 @@ import {
   refreshRecommendationsApi,
 } from '@/api/recommendation'
 
-const recommendations = ref({ videos: [], articles: [], audios: [] })
+const recommendations = ref({ videos: [], articles: [] })
 const dislikedIds = ref(new Set())
 const generatedAt = ref('')
 const loading = ref(false)
@@ -18,7 +18,6 @@ async function fetchRecommendations() {
     recommendations.value = {
       videos: res.videos || [],
       articles: res.articles || [],
-      audios: res.audios || [],
     }
     generatedAt.value = res.generated_at || ''
     dislikedIds.value = new Set()
@@ -36,7 +35,6 @@ async function refreshAll() {
     recommendations.value = {
       videos: res.videos || [],
       articles: res.articles || [],
-      audios: res.audios || [],
     }
     generatedAt.value = res.generated_at || ''
     dislikedIds.value = new Set()
@@ -63,7 +61,6 @@ function isDisliked(id) {
 const typeMeta = {
   videos: { label: '视频推荐', icon: 'VideoCamera' },
   articles: { label: '文章推荐', icon: 'Document' },
-  audios: { label: '音频推荐', icon: 'Headset' },
 }
 
 function getMaterialIcon(type) {

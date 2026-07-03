@@ -111,7 +111,7 @@ class RecommendationService:
 
     def recommend_materials(
         self, user: UserProfile, db: Session,
-        videos_count: int = 2, articles_count: int = 2, audios_count: int = 2,
+        videos_count: int = 3, articles_count: int = 3,
     ) -> Dict[str, List[dict]]:
         """为用户推荐资料，按 sub_type 分组返回
 
@@ -136,9 +136,9 @@ class RecommendationService:
         scored.sort(key=lambda x: x[1], reverse=True)
 
         # 按 sub_type 分组
-        result = {"videos": [], "articles": [], "audios": []}
-        type_map = {"video": "videos", "article": "articles", "audio": "audios"}
-        type_counts = {"videos": videos_count, "articles": articles_count, "audios": audios_count}
+        result = {"videos": [], "articles": []}
+        type_map = {"video": "videos", "article": "articles"}
+        type_counts = {"videos": videos_count, "articles": articles_count}
 
         for mat, score, factors in scored:
             sub_type = mat.get("sub_type", "video")

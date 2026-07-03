@@ -101,7 +101,6 @@ class RecommendationsResponse(BaseModel):
     """资料推荐响应"""
     videos: List[MaterialItem]
     articles: List[MaterialItem]
-    audios: List[MaterialItem]
     generated_at: str = Field(..., description="生成时间")
 
 

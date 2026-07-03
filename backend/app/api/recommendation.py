@@ -102,7 +102,6 @@ def get_recommendations(
     return RecommendationsResponse(
         videos=to_items("videos"),
         articles=to_items("articles"),
-        audios=to_items("audios"),
         generated_at=datetime.now().isoformat(),
     )
 
@@ -176,7 +175,6 @@ def refresh_recommendations(
     return RecommendationsResponse(
         videos=to_items("videos"),
         articles=to_items("articles"),
-        audios=to_items("audios"),
         generated_at=datetime.now().isoformat(),
     )
 
