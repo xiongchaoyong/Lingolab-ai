@@ -1,3 +1,22 @@
+## 2026-07-03: 知识库 API 加载耗时优化 — RAG 服务懒加载 + SQL 优化
+
+### 根因
+`admin.py` 第21行 `from app.services.rag_service import rag_service` 在模块导入时触发链式加载：
+`admin.py` → `rag_service.py` → `embedding.py` → `import torch`(2-5秒!) + `import numpy`
+
+每次后端启动（或 uvicorn reload）都要等 torch 加载完才能响应第一个请求。而 `get_knowledge_docs`（文档列表）根本不需要 RAG 服务。
+
+### 修复
+1. **admin.py + help.py**：移除模块级 `rag_service` 导入，改为 `_rag()` 静态方法懒加载，torch 推迟到首次写操作/检索时才加载
+2. **get_knowledge_docs SQL 优化**：`func.left(content, 500)` 在 DB 层截断 + `func.count(id)` 独立计数查询，避免传输完整 TEXT 列
+3. 导入耗时：~2-5秒 → **229ms**（torch 不再预加载）
+
+### 文件变更
+- 修改: `backend/app/services/admin.py`
+- 修改: `backend/app/services/help.py`
+
+---
+
 ## 2026-07-03: 知识库管理页面彻底重写 — 消除加载卡顿
 
 ### 根因（深入排查后）

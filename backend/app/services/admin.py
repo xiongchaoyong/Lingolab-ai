@@ -18,7 +18,6 @@ from app.models.gamification import DubbingContent, UserScore
 from app.models.knowledge_graph import DailyTask
 from app.models.conversation import ConversationSession
 from app.models.knowledge_base import KnowledgeDocument, SearchLog
-from app.services.rag_service import rag_service
 
 logger = logging.getLogger(__name__)
 
@@ -370,6 +369,12 @@ class TeacherService:
 
 class AdminService:
     """运营端服务"""
+
+    @staticmethod
+    def _rag():
+        """懒加载 RAG 服务 — 避免模块导入时触发 torch 加载"""
+        from app.services.rag_service import rag_service
+        return rag_service
 
     def get_users(self, page: int, page_size: int, search: str, role: str, db: Session) -> Dict:
         """获取用户列表（分页+搜索+筛选）"""
@@ -894,8 +899,22 @@ class AdminService:
     # ===== 知识库管理 =====
 
     def get_knowledge_docs(self, page: int, page_size: int, search: str, category: str, db: Session) -> Dict:
-        """获取知识库文档列表（分页+搜索+分类筛选）"""
-        query = db.query(KnowledgeDocument)
+        """获取知识库文档列表（分页+搜索+分类筛选）
+
+        优化：① 只查询需要的列 ② 在 DB 层截断 content（避免传输完整 TEXT）
+        """
+        # 只 select 需要的列，content 在 DB 层截断
+        cols = [
+            KnowledgeDocument.id,
+            KnowledgeDocument.title,
+            func.left(KnowledgeDocument.content, 500).label('content'),
+            KnowledgeDocument.category,
+            KnowledgeDocument.source_type,
+            KnowledgeDocument.is_active,
+            KnowledgeDocument.created_at,
+            KnowledgeDocument.updated_at,
+        ]
+        query = db.query(*cols)
 
         if search:
             query = query.filter(
@@ -905,7 +924,17 @@ class AdminService:
         if category:
             query = query.filter(KnowledgeDocument.category == category)
 
-        total = query.count()
+        # COUNT 查询用简化子查询（不携带 LEFT/列选择开销）
+        count_query = db.query(func.count(KnowledgeDocument.id))
+        if search:
+            count_query = count_query.filter(
+                KnowledgeDocument.title.contains(search) |
+                KnowledgeDocument.content.contains(search)
+            )
+        if category:
+            count_query = count_query.filter(KnowledgeDocument.category == category)
+        total = count_query.scalar() or 0
+
         docs = (
             query.order_by(KnowledgeDocument.created_at.desc())
             .offset((page - 1) * page_size)
@@ -918,7 +947,7 @@ class AdminService:
             items.append({
                 "id": d.id,
                 "title": d.title,
-                "content": d.content[:500] if d.content else "",
+                "content": d.content or "",
                 "category": d.category or "general",
                 "source_type": d.source_type or "manual",
                 "is_active": d.is_active if d.is_active is not None else 1,
@@ -942,7 +971,7 @@ class AdminService:
 
         # 向量化入库
         text = f"问题：{doc.title}\n回答：{doc.content}" if doc.category == "faq" else f"{doc.title}\n{doc.content}"
-        rag_service.add_document(
+        self._rag().add_document(
             str(doc.id),
             text,
             {"title": doc.title, "category": doc.category, "source_type": doc.source_type},
@@ -976,13 +1005,13 @@ class AdminService:
         # 更新向量
         if doc.is_active:
             text = f"问题：{doc.title}\n回答：{doc.content}" if doc.category == "faq" else f"{doc.title}\n{doc.content}"
-            rag_service.add_document(
+            self._rag().add_document(
                 str(doc.id),
                 text,
                 {"title": doc.title, "category": doc.category, "source_type": doc.source_type},
             )
         else:
-            rag_service.delete_document(str(doc.id))
+            self._rag().delete_document(str(doc.id))
 
         db.add(AdminLog(
             admin_id=admin_id, action="knowledge_update",
@@ -1001,7 +1030,7 @@ class AdminService:
         doc.is_active = 0
         db.flush()
 
-        rag_service.delete_document(str(doc_id))
+        self._rag().delete_document(str(doc_id))
 
         db.add(AdminLog(
             admin_id=admin_id, action="knowledge_delete",
@@ -1018,7 +1047,7 @@ class AdminService:
             raise ValueError("文档不存在")
 
         text = f"问题：{doc.title}\n回答：{doc.content}" if doc.category == "faq" else f"{doc.title}\n{doc.content}"
-        ok = rag_service.add_document(
+        ok = self._rag().add_document(
             str(doc.id),
             text,
             {"title": doc.title, "category": doc.category, "source_type": doc.source_type},
@@ -1027,7 +1056,7 @@ class AdminService:
 
     def rebuild_index(self, db: Session) -> Dict:
         """全量重建向量索引"""
-        rag_service.clear()
+        self._rag().clear()
 
         docs = db.query(KnowledgeDocument).filter(KnowledgeDocument.is_active == 1).all()
         items = []
@@ -1039,7 +1068,7 @@ class AdminService:
                 "metadata": {"title": doc.title, "category": doc.category, "source_type": doc.source_type},
             })
 
-        count = rag_service.add_documents_batch(items)
+        count = self._rag().add_documents_batch(items)
         return {"total": len(docs), "indexed": count, "message": f"全量重建完成: {count}/{len(docs)} 条"}
 
     def get_search_logs(self, page: int, page_size: int, user_id: Optional[int], db: Session) -> Dict:
