@@ -25,14 +25,12 @@ TASK_TEMPLATES = {
     "shadowing": {
         "title": "跟读练习：{skill_label}",
         "description": "模仿标准发音，重点练习 {skill_label}，提升口语准确度",
+        "reason": "针对你的「{weakness}」短板，通过跟读训练改善发音",
     },
     "conversation": {
         "title": "对话练习：{scene_label}",
         "description": "在 {scene_label} 场景中进行 AI 对话，练习实际应用",
-    },
-    "listening": {
-        "title": "听力练习：{material_label}",
-        "description": "收听 {material_label}，训练听力理解能力",
+        "reason": "匹配你的学习目标「{goal}」，实战练习口语表达",
     },
 }
 
@@ -361,31 +359,6 @@ class RecommendationService:
             "scene": scene_name,
         })
 
-        # --- 听力任务 (listening) — 基于资料 ---
-        listening_material = self._pick_listening_material(
-            weakness_skills, user_level, user_interests, preferred_topics_set
-        )
-        listening_node = kg_service.get_node(listening_material) if listening_material else None
-        listening_label = listening_node["label"] if listening_node else "英语听力"
-        listening_data = (listening_node.get("extra_data", {}) or {}) if listening_node else {}
-
-        # 听力任务关联的技能
-        listening_skill = None
-        if listening_material:
-            teaches = kg_service.get_neighbors(listening_material, relation="TEACHES", direction="out")
-            if teaches:
-                listening_skill = teaches[0]["id"]
-
-        tasks.append({
-            "task_type": "listening",
-            "title": f"听力练习：{listening_label}",
-            "description": f"收听 {listening_label}，训练听力理解能力",
-            "difficulty": listening_data.get("difficulty", user_level),
-            "focus_skill_id": listening_skill,
-            "material_id": listening_material,
-            "scene": None,
-        })
-
         # Step 6: 写入 daily_tasks
         for t in tasks:
             db_task = DailyTask(
@@ -466,48 +439,6 @@ class RecommendationService:
             return random.choice(all_topics)["id"]
 
         return "topic:self_introduction"
-
-    def _pick_listening_material(
-        self, weakness_skills: List[str], user_level: str,
-        user_interests: List[str], preferred_topics: set,
-    ) -> Optional[str]:
-        """选择最佳听力资料"""
-        # 获取同等级音频资料
-        materials = kg_service.get_materials_by_cefr(user_level)
-        audio_materials = [m for m in materials if m.get("sub_type") == "audio"]
-
-        if not audio_materials:
-            # 放宽等级
-            all_audio = [m for m in kg_service.get_material_nodes() if m.get("sub_type") == "audio"]
-            audio_materials = all_audio
-
-        if not audio_materials:
-            return None
-
-        # 按多个维度打分
-        scored = []
-        for m in audio_materials:
-            score = 0.0
-            extra = m.get("extra_data", {}) or {}
-            tags = extra.get("tags", [])
-
-            # 兴趣匹配
-            if user_interests:
-                score += len(set(tags) & set(user_interests)) * 0.3
-
-            # 场景偏好匹配
-            covers = {c["id"] for c in kg_service.get_neighbors(m["id"], relation="COVERS", direction="out")}
-            score += len(covers & preferred_topics) * 0.4
-
-            # 难度匹配
-            mat_level = extra.get("difficulty", "")
-            if mat_level == user_level:
-                score += 0.3
-
-            scored.append((m, score))
-
-        scored.sort(key=lambda x: x[1], reverse=True)
-        return scored[0][0]["id"] if scored else None
 
     # ============================================================
     # 任务读取 & 操作
@@ -620,21 +551,6 @@ class RecommendationService:
                 description=f"在 {label} 场景中进行 AI 对话",
                 difficulty=user_level, scene=chosen.replace("topic:", ""), status="pending",
             )
-        else:
-            # listening
-            materials = kg_service.get_materials_by_cefr(user_level)
-            audio = [m for m in materials if m.get("sub_type") == "audio"]
-            chosen = random.choice(audio)["id"] if audio else None
-            extra = kg_service.get_node(chosen) or {}
-            label = extra.get("label", "听力练习")
-
-            new_task = DailyTask(
-                user_id=user_id, task_date=today, task_type="listening",
-                title=f"听力练习：{label}",
-                description=f"收听 {label}，训练听力理解能力",
-                difficulty=user_level, material_id=chosen, status="pending",
-            )
-
         db.add(new_task)
         db.commit()
 

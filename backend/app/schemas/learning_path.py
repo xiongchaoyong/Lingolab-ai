@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field
 class TaskItem(BaseModel):
     """单条任务"""
     id: int
-    type: str = Field(..., description="shadowing / conversation / listening")
+    type: str = Field(..., description="shadowing / conversation")
     title: str
     description: Optional[str] = ""
     difficulty: Optional[str] = None
@@ -21,6 +21,7 @@ class TaskItem(BaseModel):
     scene: Optional[str] = Field(default=None, description="对话场景标识")
     status: str = Field(default="pending", description="pending / skipped / completed")
     score: Optional[float] = None
+    reason: str = Field(default="", description="推荐原因说明")
 
 
 class TaskProgress(BaseModel):

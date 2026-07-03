@@ -106,6 +106,10 @@ onMounted(() => {
             <span class="task-duration">{{ task.duration }}</span>
           </div>
           <p class="task-desc">{{ task.description }}</p>
+          <div class="task-reason" v-if="task.reason">
+            <span class="reason-icon">📌</span>
+            <span class="reason-text">{{ task.reason }}</span>
+          </div>
 
           <!-- 未完成操作 -->
           <div v-if="task.status === 'pending'" class="task-actions">
@@ -236,6 +240,18 @@ onMounted(() => {
   color: var(--color-text-secondary);
   font-size: var(--font-size-sm);
   margin-bottom: var(--spacing-md);
+}
+
+.task-reason {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  background: linear-gradient(135deg, rgba(124, 111, 247, 0.06), rgba(255, 107, 138, 0.04));
+  border-radius: 8px;
+  margin-bottom: var(--spacing-md);
+  .reason-icon { font-size: 12px; flex-shrink: 0; }
+  .reason-text { font-size: 12px; color: #7C6FF7; font-weight: 500; }
 }
 
 .task-actions {
