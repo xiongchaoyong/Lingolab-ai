@@ -3,16 +3,19 @@ import { ref, onMounted } from 'vue'
 import { Plus } from '@element-plus/icons-vue'
 import { useAdminStore } from '@/stores/admin'
 import { refreshInviteCodeApi } from '@/api/admin'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 
 const store = useAdminStore()
 
 const showCreateDialog = ref(false)
+const showEditDialog = ref(false)
 const showStudentsDialog = ref(false)
 const showJoinDialog = ref(false)
 const newClass = ref({ name: '', description: '', level_range: 'A1-A2' })
+const editClass = ref({ id: null, name: '', description: '', level_range: '' })
 const inviteCode = ref('')
 const loading = ref(false)
+const viewingClass = ref(null)
 
 onMounted(() => {
   store.fetchClasses()
@@ -37,12 +40,69 @@ async function createClass() {
   }
 }
 
+function openEditDialog(cls) {
+  editClass.value = {
+    id: cls.id,
+    name: cls.name,
+    description: cls.description || '',
+    level_range: cls.level_range || '',
+  }
+  showEditDialog.value = true
+}
+
+async function submitEdit() {
+  if (!editClass.value.name) return
+  loading.value = true
+  try {
+    await store.updateClass(editClass.value.id, {
+      name: editClass.value.name,
+      description: editClass.value.description,
+      level_range: editClass.value.level_range,
+    })
+    ElMessage.success('班级信息已更新')
+    showEditDialog.value = false
+  } catch (e) {
+    ElMessage.error(e.response?.data?.detail || '更新失败')
+  } finally {
+    loading.value = false
+  }
+}
+
+async function deleteClass(cls) {
+  try {
+    await ElMessageBox.confirm(
+      `确定要删除班级「${cls.name}」吗？此操作将停用班级，已有学生数据不会丢失。`,
+      '确认删除',
+      { type: 'warning' }
+    )
+  } catch { return }
+  try {
+    await store.deleteClass(cls.id)
+    ElMessage.success('班级已删除')
+  } catch (e) {
+    ElMessage.error(e.response?.data?.detail || '删除失败')
+  }
+}
+
 async function viewStudents(cls) {
+  viewingClass.value = cls
   try {
     await store.fetchStudents(cls.id)
     showStudentsDialog.value = true
   } catch (e) {
     ElMessage.error('获取学生列表失败')
+  }
+}
+
+async function removeStudent(user) {
+  try {
+    await ElMessageBox.confirm(`确定要将「${user.username}」移出班级吗？`, '确认移除', { type: 'warning' })
+  } catch { return }
+  try {
+    await store.removeStudent(viewingClass.value.id, user.id)
+    ElMessage.success(`${user.username} 已移出班级`)
+  } catch (e) {
+    ElMessage.error(e.response?.data?.detail || '移除失败')
   }
 }
 
@@ -98,7 +158,7 @@ function getLevelTag(level) {
 
     <div class="class-table-wrap">
       <el-table :data="store.classes" stripe v-loading="loading" height="100%">
-      <el-table-column prop="name" label="班级名称" min-width="140" />
+      <el-table-column prop="name" label="班级名称" min-width="120" />
       <el-table-column prop="level_range" label="等级范围" width="100">
         <template #default="{ row }">
           <el-tag size="small" v-if="row.level_range">{{ row.level_range }}</el-tag>
@@ -116,9 +176,11 @@ function getLevelTag(level) {
       <el-table-column prop="created_at" label="创建时间" width="120">
         <template #default="{ row }">{{ row.created_at?.slice(0, 10) }}</template>
       </el-table-column>
-      <el-table-column label="操作" width="120">
+      <el-table-column label="操作" width="220" fixed="right">
         <template #default="{ row }">
-          <el-button size="small" text type="primary" @click="viewStudents(row)">查看学生</el-button>
+          <el-button size="small" text type="primary" @click="viewStudents(row)">学生</el-button>
+          <el-button size="small" text type="warning" @click="openEditDialog(row)">编辑</el-button>
+          <el-button size="small" text type="danger" @click="deleteClass(row)">删除</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -149,10 +211,33 @@ function getLevelTag(level) {
       </template>
     </el-dialog>
 
+    <!-- 编辑班级对话框 -->
+    <el-dialog v-model="showEditDialog" title="编辑班级" width="440px" :close-on-click-modal="false">
+      <el-form label-position="top">
+        <el-form-item label="班级名称">
+          <el-input v-model="editClass.name" placeholder="班级名称" maxlength="100" />
+        </el-form-item>
+        <el-form-item label="等级范围">
+          <el-select v-model="editClass.level_range" style="width:100%">
+            <el-option label="A1 - A2 (入门-基础)" value="A1-A2" />
+            <el-option label="B1 - B2 (中级-中高级)" value="B1-B2" />
+            <el-option label="C1 - C2 (高级-精通)" value="C1-C2" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="班级描述">
+          <el-input v-model="editClass.description" type="textarea" :rows="3" placeholder="班级描述（选填）" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="showEditDialog = false">取消</el-button>
+        <el-button type="primary" @click="submitEdit" :disabled="!editClass.name" :loading="loading">保存</el-button>
+      </template>
+    </el-dialog>
+
     <!-- 学生列表对话框 -->
-    <el-dialog v-model="showStudentsDialog" title="班级学生" width="560px" :close-on-click-modal="false">
+    <el-dialog v-model="showStudentsDialog" title="班级学生" width="600px" :close-on-click-modal="false">
       <el-table :data="store.students" stripe max-height="400">
-        <el-table-column prop="username" label="用户名" width="140" />
+        <el-table-column prop="username" label="用户名" width="120" />
         <el-table-column prop="level_final" label="CEFR" width="80">
           <template #default="{ row }">
             <el-tag size="small" :type="getLevelTag(row.level_final)">{{ row.level_final || '-' }}</el-tag>
@@ -163,6 +248,11 @@ function getLevelTag(level) {
         </el-table-column>
         <el-table-column prop="joined_at" label="加入时间" width="120">
           <template #default="{ row }">{{ row.joined_at?.slice(0, 10) }}</template>
+        </el-table-column>
+        <el-table-column label="操作" width="100" fixed="right">
+          <template #default="{ row }">
+            <el-button size="small" text type="danger" @click="removeStudent(row)">移出</el-button>
+          </template>
         </el-table-column>
       </el-table>
       <el-empty v-if="store.students.length === 0" description="暂无学生" />

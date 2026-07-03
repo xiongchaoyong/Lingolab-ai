@@ -7,11 +7,11 @@ from pydantic import BaseModel, Field
 class QuestionItem(BaseModel):
     """单道题目"""
     id: int = Field(..., description="题目 ID（动态生成时为负值）")
-    type: str = Field(..., description="题型：listening/speaking/reading/grammar")
+    type: str = Field(..., description="题型：speaking/reading/grammar")
     difficulty: str = Field(..., description="CEFR 难度")
     content: str = Field(..., description="题目文本")
     options: List[str] = Field(default_factory=list, description="客观题选项数组（口语题为空）")
-    audio_base64: Optional[str] = Field(default=None, description="听力题 TTS 音频 base64 编码")
+    audio_base64: Optional[str] = Field(default=None, description="TTS 音频 base64 编码")
 
 
 class AssessmentStartResponse(BaseModel):
@@ -56,7 +56,7 @@ class CEFRLevel(BaseModel):
 class QuestionResultItem(BaseModel):
     """单题答题结果"""
     order: int = Field(..., description="题号 1-10")
-    type: str = Field(..., description="题型：listening/speaking/reading/grammar")
+    type: str = Field(..., description="题型：speaking/reading/grammar")
     type_label: str = Field(..., description="题型中文名")
     difficulty: str = Field(..., description="CEFR 难度")
     content: str = Field(default="", description="题目文本（截取前60字）")

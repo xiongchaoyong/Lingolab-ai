@@ -73,7 +73,7 @@ async function handleSpeakingComplete(recording) {
 // 退出测评
 function handleExit() {
   store.saveProgress()
-  router.push('/home')
+  router.push('/')
 }
 
 // 提前结束（口语跳过）

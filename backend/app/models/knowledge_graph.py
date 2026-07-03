@@ -51,7 +51,7 @@ class DailyTask(Base):
     user_id = Column(Integer, ForeignKey("user_profiles.id"), nullable=False)
     task_date = Column(Date, nullable=False, comment="任务日期")
     task_type = Column(
-        Enum("shadowing", "conversation", "listening", name="task_type_enum"),
+        Enum("shadowing", "conversation", "listening", "grammar", "vocabulary", name="task_type_enum"),
         nullable=False,
     )
     title = Column(String(200), nullable=False, comment="任务标题")

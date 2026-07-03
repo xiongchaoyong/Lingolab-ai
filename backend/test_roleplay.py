@@ -12,7 +12,7 @@ from app.schemas.roleplay import (
     RoleplaySpeakResponse,
     RoleplayEndResponse,
 )
-from app.api.roleplay import ROLE_OPENERS, ROLE_NAMES, MAX_CONVERSATION_ROUNDS
+from app.api.roleplay import ROLE_OPENERS, ROLE_NAMES, MAX_ROUNDS
 
 
 # ============================================================
@@ -23,13 +23,13 @@ class TestRoleplayStartRequest:
     """RoleplayStartRequest 字段验证"""
 
     def test_default_values(self):
-        req = RoleplayStartRequest()
-        assert req.role == "interviewee"
+        req = RoleplayStartRequest(topic="interviewee")
+        assert req.topic == "interviewee"
         assert req.cefr_level == "B1"
 
     def test_custom_values(self):
-        req = RoleplayStartRequest(role="waiter", cefr_level="A2")
-        assert req.role == "waiter"
+        req = RoleplayStartRequest(topic="waiter", cefr_level="A2")
+        assert req.topic == "waiter"
         assert req.cefr_level == "A2"
 
 
@@ -115,20 +115,22 @@ class TestRoleplayEndResponse:
 class TestRoleConfiguration:
     """角色配置一致性验证"""
 
-    def test_three_roles(self):
-        """3 个角色场景"""
-        assert len(ROLE_OPENERS) == 3
-        assert len(ROLE_NAMES) == 3
+    def test_eight_roles(self):
+        """8 个角色场景"""
+        assert len(ROLE_OPENERS) == 8
+        assert len(ROLE_NAMES) == 8
 
     def test_role_keys_match(self):
         """OPENERS 和 NAMES 的角色 key 一致"""
         assert set(ROLE_OPENERS.keys()) == set(ROLE_NAMES.keys())
 
     def test_expected_roles(self):
-        """包含预期的 3 个角色"""
+        """包含预期的角色"""
         assert "interviewee" in ROLE_OPENERS
         assert "waiter" in ROLE_OPENERS
         assert "guide" in ROLE_OPENERS
+        assert "doctor" in ROLE_OPENERS
+        assert "colleague" in ROLE_OPENERS
 
     def test_opener_not_empty(self):
         """每个角色都有开场白 Prompt"""
@@ -140,6 +142,7 @@ class TestRoleConfiguration:
         assert ROLE_NAMES["interviewee"] == "面试者"
         assert ROLE_NAMES["waiter"] == "服务员"
         assert ROLE_NAMES["guide"] == "导游"
+        assert ROLE_NAMES["doctor"] == "医生"
 
 
 # ============================================================
@@ -151,7 +154,7 @@ class TestConversationLimits:
 
     def test_max_rounds(self):
         """最大轮次为 6"""
-        assert MAX_CONVERSATION_ROUNDS == 6
+        assert MAX_ROUNDS == 6
 
 
 # ============================================================

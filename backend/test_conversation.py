@@ -304,13 +304,13 @@ class TestConversationStartRequest:
     """对话开始请求 Schema"""
 
     def test_default_values(self):
-        req = ConversationStartRequest()
-        assert req.scene == "self_intro"
+        req = ConversationStartRequest(topic="self_intro")
+        assert req.topic == "self_intro"
         assert req.cefr_level == "B1"
 
     def test_custom_values(self):
-        req = ConversationStartRequest(scene="restaurant", cefr_level="A2")
-        assert req.scene == "restaurant"
+        req = ConversationStartRequest(topic="restaurant", cefr_level="A2")
+        assert req.topic == "restaurant"
         assert req.cefr_level == "A2"
 
 

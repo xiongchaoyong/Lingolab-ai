@@ -4,11 +4,14 @@ import { startAssessmentApi, answerQuestionApi, completeAssessmentApi, restoreSe
 import { useAuthStore } from '@/stores/auth'
 
 const TYPE_LABELS = {
-  listening: '听力理解',
-  reading: '阅读理解',
-  grammar: '语法选择',
-  speaking: '口语表达',
+  pronunciation: '发音',
+  fluency: '流利度',
+  grammar: '语法',
+  vocabulary: '词汇运用',
+  interaction: '互动参与',
 }
+
+const SPEAKING_TYPES = ['pronunciation', 'fluency', 'interaction']
 
 const DIFFICULTY_COLORS = {
   A1: 'success', A2: 'success',
@@ -29,7 +32,7 @@ export const useAssessmentStore = defineStore('assessment', () => {
 
   // ------- getters -------
   const progress = computed(() => (answeredCount.value / totalQuestions.value) * 100)
-  const isSpeakingQuestion = computed(() => currentQuestion.value?.type === 'speaking')
+  const isSpeakingQuestion = computed(() => SPEAKING_TYPES.includes(currentQuestion.value?.type))
   const isLastQuestion = computed(() => answeredCount.value >= totalQuestions.value - 1)
 
   const typeLabel = computed(() => TYPE_LABELS[currentQuestion.value?.type] || '')

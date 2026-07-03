@@ -67,9 +67,9 @@ const typeMeta = {
 }
 
 function getMaterialIcon(type) {
-  if (type === 'video') return 'VideoCamera'
   if (type === 'article') return 'Document'
-  return 'Headset'
+  if (type === 'audio') return 'Headset'
+  return 'VideoCamera'
 }
 
 function getLevelType(level) {
@@ -89,7 +89,7 @@ onMounted(() => {
     <div class="page-header">
       <div>
         <h2 class="page-title">为你推荐</h2>
-        <p class="page-subtitle">基于你的学习短板和兴趣，每日精选 6 条学习资料</p>
+        <p class="page-subtitle">基于你的学习短板和兴趣，每日精选 10 条学习资料</p>
       </div>
       <el-button @click="refreshAll" :icon="Refresh" type="primary" plain :loading="loading">换一批</el-button>
     </div>
@@ -125,6 +125,15 @@ onMounted(() => {
               </div>
               <div class="material-score" v-if="item.score">
                 推荐分：{{ item.score }}
+              </div>
+              <div class="material-reason" v-if="item.score_factors?.length">
+                <div class="reason-title">推荐依据</div>
+                <div class="reason-factors">
+                  <div v-for="sf in item.score_factors" :key="sf.label" class="reason-factor">
+                    <span class="rf-label">{{ sf.label }}</span>
+                    <span class="rf-detail">{{ sf.detail }}</span>
+                  </div>
+                </div>
               </div>
               <div class="material-actions" v-if="!isDisliked(item.id)">
                 <el-button size="small" text type="primary">查看</el-button>
@@ -229,6 +238,46 @@ onMounted(() => {
   }
 }
 
+.material-score {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  margin-bottom: var(--spacing-sm);
+}
+.material-reason {
+  padding: 8px 12px;
+  background: linear-gradient(135deg, rgba(124, 111, 247, 0.04), rgba(255, 107, 138, 0.02));
+  border: 1px solid rgba(124, 111, 247, 0.1);
+  border-radius: 10px;
+  margin-bottom: var(--spacing-sm);
+  .reason-title {
+    font-size: 11px;
+    font-weight: 700;
+    color: #7C6FF7;
+    margin-bottom: 6px;
+  }
+  .reason-factors {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .reason-factor {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    .rf-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: #666;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .rf-detail {
+      font-size: 11px;
+      color: #999;
+      line-height: 1.4;
+    }
+  }
+}
 .material-actions {
   display: flex;
   gap: var(--spacing-sm);

@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { ElMessage } from 'element-plus'
 import VoiceRecorder from '@/components/common/VoiceRecorder.vue'
 import DimensionBars from '@/components/common/DimensionBars.vue'
@@ -209,6 +209,8 @@ async function fetchReferenceAudio() {
       const blob = await response.blob()
       if (referenceUrl.value) URL.revokeObjectURL(referenceUrl.value)
       referenceUrl.value = URL.createObjectURL(blob)
+      await nextTick()
+      toggleRefPlay()
     }
   } catch (e) {
     console.warn('获取标准音失败:', e)

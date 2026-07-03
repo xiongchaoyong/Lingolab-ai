@@ -11,6 +11,7 @@ from app.models.knowledge_graph import MaterialRecommendation
 from app.services.recommendation import recommendation_service
 from app.schemas.learning_path import (
     MaterialItem,
+    ScoreFactor,
     RecommendationsResponse,
     DislikeResponse,
     ClickRequest,
@@ -18,13 +19,67 @@ from app.schemas.learning_path import (
 
 router = APIRouter()
 
+FACTOR_META = {
+    "weakness": {"label": "短板匹配", "icon": "🎯"},
+    "level": {"label": "难度适中", "icon": "📊"},
+    "interest": {"label": "兴趣相关", "icon": "💡"},
+    "novelty": {"label": "新鲜推荐", "icon": "🆕"},
+}
+
+
+def _build_score_factors(factors: dict) -> list:
+    """将因子 dict 转为 ScoreFactor 列表（按权重降序）"""
+    result = []
+    for key in ["weakness", "level", "interest", "novelty"]:
+        val = factors.get(key, 0)
+        if val > 0:
+            meta = FACTOR_META.get(key, {"label": key, "icon": ""})
+            detail = _factor_detail(key, val)
+            result.append(ScoreFactor(
+                label=f"{meta['icon']} {meta['label']}",
+                weight=val / 100,
+                detail=detail,
+            ))
+    result.sort(key=lambda x: x.weight, reverse=True)
+    return result
+
+
+def _factor_detail(key: str, val: float) -> str:
+    """为每个因子生成具体可读的说明"""
+    score_label = "高度" if val >= 70 else "中等" if val >= 40 else "一般"
+    if key == "weakness":
+        return f"该资料针对你的学习短板，匹配度{score_label}"
+    elif key == "level":
+        return f"资料难度与你的CEFR等级匹配度{score_label}"
+    elif key == "interest":
+        return f"内容标签与你的兴趣偏好契合度{score_label}"
+    elif key == "novelty":
+        if val >= 70:
+            return "近期未推荐过，是全新的学习内容"
+        elif val >= 40:
+            return "近期较少推荐，有一定新鲜度"
+        else:
+            return "最近推荐过类似内容，可回顾巩固"
+    return ""
+
+
+def _build_reason(factors: list) -> str:
+    """根据因子生成推荐原因摘要"""
+    if not factors:
+        return ""
+    # 取前2个最重要因子，生成自然语句
+    parts = []
+    for f in factors[:2]:
+        parts.append(f.detail)
+    return "；".join(parts)
+
 
 @router.get("/", response_model=RecommendationsResponse)
 def get_recommendations(
     current_user: UserProfile = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """获取今日个性化资料推荐（视频/文章/音频各2条）"""
+    """获取今日个性化资料推荐（视频4+文章4+音频2）"""
     materials = recommendation_service.recommend_materials(current_user, db)
     recommendation_service.save_recommendations(current_user.id, materials, db)
 
@@ -41,6 +96,7 @@ def get_recommendations(
                 .order_by(MaterialRecommendation.created_at.desc())
                 .first()
             )
+            score_factors = _build_score_factors(m.get("score_factors", {}))
             items.append(MaterialItem(
                 id=rec.id if rec else 0,
                 material_id=m["material_id"],
@@ -52,6 +108,8 @@ def get_recommendations(
                 tag=m["tag"],
                 cefr=m["cefr"],
                 score=m["score"],
+                score_factors=score_factors,
+                reason=_build_reason(score_factors),
             ))
         return items
 
@@ -112,6 +170,7 @@ def refresh_recommendations(
                 .order_by(MaterialRecommendation.created_at.desc())
                 .first()
             )
+            score_factors = _build_score_factors(m.get("score_factors", {}))
             items.append(MaterialItem(
                 id=rec.id if rec else 0,
                 material_id=m["material_id"],
@@ -123,6 +182,8 @@ def refresh_recommendations(
                 tag=m["tag"],
                 cefr=m["cefr"],
                 score=m["score"],
+                score_factors=score_factors,
+                reason=_build_reason(score_factors),
             ))
         return items
 

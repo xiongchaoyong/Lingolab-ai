@@ -12,11 +12,12 @@ from app.models.admin import Class, ClassStudent, Assignment, AssignmentSubmissi
 from app.models.user import UserProfile
 from app.models.profile import UserSkillScore
 from app.models.assessment import AssessmentQuestion
-from app.models.pronunciation import PronunciationContent
+from app.models.pronunciation import PronunciationContent, PronunciationRecord
 from app.models.learning import LearningMaterial
-from app.models.gamification import DubbingContent
+from app.models.gamification import DubbingContent, UserScore
+from app.models.knowledge_graph import DailyTask
+from app.models.conversation import ConversationSession
 from app.models.knowledge_base import KnowledgeDocument, SearchLog
-from app.services.rag_service import rag_service
 
 logger = logging.getLogger(__name__)
 
@@ -130,6 +131,54 @@ class TeacherService:
         cls.invite_expires_at = datetime.utcnow() + timedelta(hours=24)
         db.flush()
         return {"invite_code": cls.invite_code, "invite_expires_at": cls.invite_expires_at.isoformat()}
+
+    def update_class(self, class_id: int, teacher_id: int, data: Dict, db: Session) -> Dict:
+        """编辑班级信息"""
+        cls = db.query(Class).filter(Class.id == class_id, Class.teacher_id == teacher_id).first()
+        if not cls:
+            raise ValueError("班级不存在")
+
+        if "name" in data and data["name"]:
+            cls.name = data["name"]
+        if "description" in data:
+            cls.description = data["description"]
+        if "level_range" in data:
+            cls.level_range = data["level_range"]
+        db.flush()
+        return {
+            "id": cls.id, "name": cls.name, "description": cls.description or "",
+            "level_range": cls.level_range or "", "student_count": cls.student_count,
+            "invite_code": cls.invite_code, "is_active": cls.is_active,
+            "created_at": cls.created_at.isoformat() if cls.created_at else "",
+        }
+
+    def delete_class(self, class_id: int, teacher_id: int, db: Session) -> Dict:
+        """删除班级（软删除）"""
+        cls = db.query(Class).filter(Class.id == class_id, Class.teacher_id == teacher_id).first()
+        if not cls:
+            raise ValueError("班级不存在")
+        cls.is_active = 0
+        db.flush()
+        return {"id": cls.id, "deleted": True}
+
+    def remove_student(self, class_id: int, user_id: int, teacher_id: int, db: Session) -> Dict:
+        """从班级移除学生"""
+        cls = db.query(Class).filter(Class.id == class_id, Class.teacher_id == teacher_id).first()
+        if not cls:
+            raise ValueError("班级不存在")
+
+        membership = (
+            db.query(ClassStudent)
+            .filter(ClassStudent.class_id == class_id, ClassStudent.user_id == user_id)
+            .first()
+        )
+        if not membership:
+            raise ValueError("学生不在该班级中")
+
+        db.delete(membership)
+        cls.student_count = max(0, cls.student_count - 1)
+        db.flush()
+        return {"class_id": class_id, "user_id": user_id, "removed": True}
 
     # ===== 作业管理 =====
 
@@ -369,6 +418,12 @@ class TeacherService:
 class AdminService:
     """运营端服务"""
 
+    @staticmethod
+    def _rag():
+        """懒加载 RAG 服务 — 避免模块导入时触发 torch 加载"""
+        from app.services.rag_service import rag_service
+        return rag_service
+
     def get_users(self, page: int, page_size: int, search: str, role: str, db: Session) -> Dict:
         """获取用户列表（分页+搜索+筛选）"""
         query = db.query(UserProfile)
@@ -423,6 +478,98 @@ class AdminService:
         db.flush()
         return {"id": user.id, "is_active": user.is_active}
 
+    def set_user_role(self, user_id: int, role: str, admin_id: int, db: Session) -> Dict:
+        """修改用户角色"""
+        if user_id == admin_id:
+            raise ValueError("不能修改自己的角色")
+
+        valid_roles = ("learner", "teacher", "admin")
+        if role not in valid_roles:
+            raise ValueError(f"无效角色: {role}，可选值: {', '.join(valid_roles)}")
+
+        user = db.query(UserProfile).filter(UserProfile.id == user_id).first()
+        if not user:
+            raise ValueError("用户不存在")
+
+        old_role = user.role
+        user.role = role
+        db.flush()
+
+        db.add(AdminLog(
+            admin_id=admin_id,
+            action="user_role_change",
+            target_type="user",
+            target_id=user_id,
+            detail=f"用户角色 {old_role} → {role}",
+        ))
+        db.flush()
+        return {"id": user.id, "role": user.role}
+
+    def get_user_detail(self, user_id: int, db: Session) -> Dict:
+        """获取用户详细信息（含学习统计）"""
+        user = db.query(UserProfile).filter(UserProfile.id == user_id).first()
+        if not user:
+            raise ValueError("用户不存在")
+
+        # 维度分数
+        dim_scores = {}
+        scores = (
+            db.query(UserSkillScore)
+            .filter(UserSkillScore.user_id == user_id)
+            .order_by(UserSkillScore.created_at.desc())
+            .limit(50)
+            .all()
+        )
+        for s in scores:
+            dim = s.dimension
+            if dim not in dim_scores:
+                dim_scores[dim] = []
+            dim_scores[dim].append(float(s.score))
+
+        dimension_averages = {
+            dim: round(sum(vals) / len(vals), 1)
+            for dim, vals in dim_scores.items()
+        } if dim_scores else {}
+
+        # 积分
+        total_points_raw = (
+            db.query(func.sum(UserScore.score)).filter(UserScore.user_id == user_id).scalar()
+        )
+        total_points = float(total_points_raw) if total_points_raw else 0
+
+        # 对话次数
+        conversation_count = (
+            db.query(func.count(ConversationSession.id))
+            .filter(ConversationSession.user_id == user_id)
+            .scalar()
+        ) or 0
+
+        # 发音练习次数
+        pronunciation_count = (
+            db.query(func.count(PronunciationRecord.id))
+            .filter(PronunciationRecord.user_id == user_id)
+            .scalar()
+        ) or 0
+
+        return {
+            "id": user.id,
+            "username": user.username,
+            "email": user.email,
+            "role": user.role,
+            "age_group": user.age_group,
+            "learning_goal": user.learning_goal,
+            "level_self": user.level_self,
+            "level_test": user.level_test,
+            "level_final": user.level_final,
+            "is_active": user.is_active,
+            "assessment_completed": user.assessment_completed,
+            "total_points": total_points,
+            "conversation_count": conversation_count,
+            "pronunciation_count": pronunciation_count,
+            "dimension_averages": dimension_averages,
+            "created_at": user.created_at.isoformat() if user.created_at else "",
+        }
+
     def get_dashboard(self, db: Session) -> Dict:
         """获取运营仪表盘数据"""
         today = date.today()
@@ -431,7 +578,54 @@ class AdminService:
         total_users = db.query(func.count(UserProfile.id)).scalar() or 0
         active_users = db.query(func.count(UserProfile.id)).filter(UserProfile.is_active == 1).scalar() or 0
 
-        # DAU — 今日活跃用户
+        # 角色分布
+        teacher_count = db.query(func.count(UserProfile.id)).filter(UserProfile.role == 'teacher').scalar() or 0
+        learner_count = db.query(func.count(UserProfile.id)).filter(UserProfile.role == 'learner').scalar() or 0
+
+        # 班级概况
+        total_classes = db.query(func.count(Class.id)).filter(Class.is_active == 1).scalar() or 0
+        total_class_students = db.query(func.count(ClassStudent.user_id)).scalar() or 0
+        avg_students_per_class = round(total_class_students / total_classes, 1) if total_classes > 0 else 0
+
+        # 真实对话完成率
+        conversation_total = db.query(func.count(ConversationSession.id)).scalar() or 0
+        conversation_completed = (
+            db.query(func.count(ConversationSession.id))
+            .filter(ConversationSession.status == 'completed')
+            .scalar()
+        ) or 0
+        conversation_completion = round(conversation_completed / conversation_total * 100, 1) if conversation_total > 0 else 0.0
+
+        # 任务完成率
+        task_total = db.query(func.count(DailyTask.id)).scalar() or 0
+        task_completed = (
+            db.query(func.count(DailyTask.id))
+            .filter(DailyTask.status == 'completed')
+            .scalar()
+        ) or 0
+        task_completion_rate = round(task_completed / task_total * 100, 1) if task_total > 0 else 0.0
+
+        # 今日活动
+        today_tasks_completed = (
+            db.query(func.count(DailyTask.id))
+            .filter(DailyTask.task_date == today, DailyTask.status == 'completed')
+            .scalar()
+        ) or 0
+        today_pronunciation = (
+            db.query(func.count(PronunciationRecord.id))
+            .filter(func.date(PronunciationRecord.created_at) == today)
+            .scalar()
+        ) or 0
+        today_conversations = (
+            db.query(func.count(ConversationSession.id))
+            .filter(func.date(ConversationSession.created_at) == today)
+            .scalar()
+        ) or 0
+
+        # 总积分
+        total_points = db.query(func.sum(UserScore.score)).scalar() or 0
+
+        # DAU — 今日活跃用户（多表 union）
         dau = (
             db.query(func.count(func.distinct(UserSkillScore.user_id)))
             .filter(func.date(UserSkillScore.created_at) == today)
@@ -443,6 +637,13 @@ class AdminService:
         mau = (
             db.query(func.count(func.distinct(UserSkillScore.user_id)))
             .filter(func.date(UserSkillScore.created_at) >= month_start)
+            .scalar()
+        ) or 0
+
+        # 日新增
+        daily_new_users = (
+            db.query(func.count(UserProfile.id))
+            .filter(func.date(UserProfile.created_at) == today)
             .scalar()
         ) or 0
 
@@ -465,6 +666,17 @@ class AdminService:
                 .scalar()
             ) or 0
             user_trend.append({"label": f"{month}月", "value": count})
+
+        # 7 日 DAU 趋势
+        daily_activity = []
+        for i in range(6, -1, -1):
+            d = today - timedelta(days=i)
+            count = (
+                db.query(func.count(func.distinct(UserSkillScore.user_id)))
+                .filter(func.date(UserSkillScore.created_at) == d)
+                .scalar()
+            ) or 0
+            daily_activity.append({"label": d.strftime("%m/%d"), "value": count})
 
         # 内容类型分布
         type_dist = dict(
@@ -493,7 +705,6 @@ class AdminService:
         ) or 0
 
         if yesterday_active > 0:
-            # D1 留存：昨天活跃用户中，今天也活跃的比例
             yesterday_users = (
                 db.query(func.distinct(UserSkillScore.user_id))
                 .filter(func.date(UserSkillScore.created_at) == yesterday)
@@ -517,7 +728,6 @@ class AdminService:
         ) or 0
 
         if seven_ago_active > 0:
-            # D7 留存：7天前活跃用户中，今天也活跃的比例
             seven_ago_users = (
                 db.query(func.distinct(UserSkillScore.user_id))
                 .filter(func.date(UserSkillScore.created_at) == seven_days_ago)
@@ -543,24 +753,6 @@ class AdminService:
         active_user_count = db.query(func.count(func.distinct(UserSkillScore.user_id))).scalar() or 1
         avg_duration_minutes = round(total_duration_minutes / active_user_count, 1)
 
-        # 对话完成率
-        total_sessions = (
-            db.query(func.count(AssignmentSubmission.id)).scalar()
-        ) or 0
-        completed_sessions = (
-            db.query(func.count(AssignmentSubmission.id))
-            .filter(AssignmentSubmission.status == "reviewed")
-            .scalar()
-        ) or 0
-        conversation_completion = round(completed_sessions / total_sessions * 100, 1) if total_sessions > 0 else 0.0
-
-        # 日新增
-        daily_new_users = (
-            db.query(func.count(UserProfile.id))
-            .filter(func.date(UserProfile.created_at) == today)
-            .scalar()
-        ) or 0
-
         return {
             "metrics": {
                 "dau": dau,
@@ -569,12 +761,23 @@ class AdminService:
                 "retention_d7": retention_d7,
                 "total_users": total_users,
                 "active_users": active_users,
+                "daily_new_users": daily_new_users,
                 "total_duration_minutes": total_duration_minutes,
                 "avg_duration_minutes": avg_duration_minutes,
                 "conversation_completion_rate": conversation_completion,
-                "daily_new_users": daily_new_users,
+                # 新增指标
+                "teacher_count": teacher_count,
+                "learner_count": learner_count,
+                "total_classes": total_classes,
+                "avg_students_per_class": avg_students_per_class,
+                "today_tasks_completed": today_tasks_completed,
+                "today_pronunciation": today_pronunciation,
+                "today_conversations": today_conversations,
+                "task_completion_rate": task_completion_rate,
+                "total_points": total_points,
             },
             "user_trend": user_trend,
+            "daily_activity": daily_activity,
             "content_type_distribution": type_dist,
             "level_distribution": level_dist,
         }
@@ -836,8 +1039,22 @@ class AdminService:
     # ===== 知识库管理 =====
 
     def get_knowledge_docs(self, page: int, page_size: int, search: str, category: str, db: Session) -> Dict:
-        """获取知识库文档列表（分页+搜索+分类筛选）"""
-        query = db.query(KnowledgeDocument)
+        """获取知识库文档列表（分页+搜索+分类筛选）
+
+        优化：① 只查询需要的列 ② 在 DB 层截断 content（避免传输完整 TEXT）
+        """
+        # 只 select 需要的列，content 在 DB 层截断
+        cols = [
+            KnowledgeDocument.id,
+            KnowledgeDocument.title,
+            func.left(KnowledgeDocument.content, 500).label('content'),
+            KnowledgeDocument.category,
+            KnowledgeDocument.source_type,
+            KnowledgeDocument.is_active,
+            KnowledgeDocument.created_at,
+            KnowledgeDocument.updated_at,
+        ]
+        query = db.query(*cols)
 
         if search:
             query = query.filter(
@@ -847,7 +1064,17 @@ class AdminService:
         if category:
             query = query.filter(KnowledgeDocument.category == category)
 
-        total = query.count()
+        # COUNT 查询用简化子查询（不携带 LEFT/列选择开销）
+        count_query = db.query(func.count(KnowledgeDocument.id))
+        if search:
+            count_query = count_query.filter(
+                KnowledgeDocument.title.contains(search) |
+                KnowledgeDocument.content.contains(search)
+            )
+        if category:
+            count_query = count_query.filter(KnowledgeDocument.category == category)
+        total = count_query.scalar() or 0
+
         docs = (
             query.order_by(KnowledgeDocument.created_at.desc())
             .offset((page - 1) * page_size)
@@ -860,7 +1087,7 @@ class AdminService:
             items.append({
                 "id": d.id,
                 "title": d.title,
-                "content": d.content[:500] if d.content else "",
+                "content": d.content or "",
                 "category": d.category or "general",
                 "source_type": d.source_type or "manual",
                 "is_active": d.is_active if d.is_active is not None else 1,
@@ -884,7 +1111,7 @@ class AdminService:
 
         # 向量化入库
         text = f"问题：{doc.title}\n回答：{doc.content}" if doc.category == "faq" else f"{doc.title}\n{doc.content}"
-        rag_service.add_document(
+        self._rag().add_document(
             str(doc.id),
             text,
             {"title": doc.title, "category": doc.category, "source_type": doc.source_type},
@@ -918,13 +1145,13 @@ class AdminService:
         # 更新向量
         if doc.is_active:
             text = f"问题：{doc.title}\n回答：{doc.content}" if doc.category == "faq" else f"{doc.title}\n{doc.content}"
-            rag_service.add_document(
+            self._rag().add_document(
                 str(doc.id),
                 text,
                 {"title": doc.title, "category": doc.category, "source_type": doc.source_type},
             )
         else:
-            rag_service.delete_document(str(doc.id))
+            self._rag().delete_document(str(doc.id))
 
         db.add(AdminLog(
             admin_id=admin_id, action="knowledge_update",
@@ -943,7 +1170,7 @@ class AdminService:
         doc.is_active = 0
         db.flush()
 
-        rag_service.delete_document(str(doc_id))
+        self._rag().delete_document(str(doc_id))
 
         db.add(AdminLog(
             admin_id=admin_id, action="knowledge_delete",
@@ -960,7 +1187,7 @@ class AdminService:
             raise ValueError("文档不存在")
 
         text = f"问题：{doc.title}\n回答：{doc.content}" if doc.category == "faq" else f"{doc.title}\n{doc.content}"
-        ok = rag_service.add_document(
+        ok = self._rag().add_document(
             str(doc.id),
             text,
             {"title": doc.title, "category": doc.category, "source_type": doc.source_type},
@@ -969,7 +1196,7 @@ class AdminService:
 
     def rebuild_index(self, db: Session) -> Dict:
         """全量重建向量索引"""
-        rag_service.clear()
+        self._rag().clear()
 
         docs = db.query(KnowledgeDocument).filter(KnowledgeDocument.is_active == 1).all()
         items = []
@@ -981,7 +1208,7 @@ class AdminService:
                 "metadata": {"title": doc.title, "category": doc.category, "source_type": doc.source_type},
             })
 
-        count = rag_service.add_documents_batch(items)
+        count = self._rag().add_documents_batch(items)
         return {"total": len(docs), "indexed": count, "message": f"全量重建完成: {count}/{len(docs)} 条"}
 
     def get_search_logs(self, page: int, page_size: int, user_id: Optional[int], db: Session) -> Dict:

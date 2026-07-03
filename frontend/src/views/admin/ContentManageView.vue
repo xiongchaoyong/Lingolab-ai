@@ -52,9 +52,9 @@ const columns = {
 const formFields = {
   questions: [
     { key: 'content', label: '题目内容', type: 'textarea', required: true },
-    { key: 'type', label: '题型', type: 'select', options: ['listening', 'speaking', 'reading', 'grammar'], required: true },
+    { key: 'type', label: '题型', type: 'select', options: ['speaking', 'reading', 'grammar'], required: true },
     { key: 'difficulty', label: '难度', type: 'select', options: ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'], required: true },
-    { key: 'dimension', label: '维度', type: 'select', options: ['listening', 'speaking', 'reading', 'grammar'], required: true },
+    { key: 'dimension', label: '维度', type: 'select', options: ['speaking', 'reading', 'grammar'], required: true },
   ],
   shadow: [
     { key: 'word', label: '文本内容', type: 'textarea', required: true },

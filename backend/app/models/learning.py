@@ -27,7 +27,7 @@ class LearningMaterial(Base):
     category = Column(String(64), default=None, comment="分类标签")
     tags = Column(JSON, default=None, comment="标签数组")
     duration_seconds = Column(Integer, default=None, comment="时长（秒），视频/音频适用")
-    focus_dimensions = Column(JSON, default=None, comment="聚焦维度：listening/speaking/reading/grammar")
+    focus_dimensions = Column(JSON, default=None, comment="聚焦维度：speaking/reading/grammar")
     is_active = Column(Integer, default=1, nullable=False)
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())

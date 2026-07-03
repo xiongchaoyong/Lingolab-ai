@@ -133,7 +133,7 @@ async def login(req: LoginRequest, db: Session = Depends(get_db)):
     # 生成 JWT
     token = create_access_token(user.id, user.username)
 
-    redirect = "/assessment" if not user.assessment_completed else "/home"
+    redirect = "/assessment" if not user.assessment_completed else "/"
 
     logger.info(f"用户登录: {user.username} (id={user.id})")
 

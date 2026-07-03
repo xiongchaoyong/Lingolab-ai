@@ -10,7 +10,7 @@ const authStore = useAuthStore()
 
 // 学习者菜单
 const learnerMenus = [
-  { path: '/home', title: '首页', icon: 'HomeFilled' },
+  { path: '/', title: '首页', icon: 'HomeFilled' },
   { path: '/pronunciation', title: '发音评测', icon: 'Microphone' },
   { path: '/conversation', title: 'AI 对话', icon: 'ChatDotRound' },
   { path: '/learning-path', title: '学习路径', icon: 'Guide' },

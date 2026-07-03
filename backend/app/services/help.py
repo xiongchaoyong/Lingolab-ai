@@ -6,7 +6,6 @@ from typing import Dict, AsyncIterator
 
 import httpx
 from app.services.llm import get_llm_service, BAILIAN_API_URL
-from app.services.rag_service import rag_service
 from app.services.knowledge_graph import kg_service
 
 logger = logging.getLogger(__name__)
@@ -28,6 +27,12 @@ HELP_SYSTEM_PROMPT = """你是「Lingolab」英语学习平台的智能客服助
 class HelpService:
     """智能客服服务（RAG + 知识图谱增强版）"""
 
+    @staticmethod
+    def _rag():
+        """懒加载 RAG 服务 — 避免模块导入时触发 torch 加载"""
+        from app.services.rag_service import rag_service
+        return rag_service
+
     async def chat(self, message: str, history: list, user_id: int = None) -> Dict:
         """处理用户消息：知识图谱 → RAG 检索 → LLM 生成回复"""
         try:
@@ -35,7 +40,7 @@ class HelpService:
             kg_context = await self._extract_and_query_kg(message, history)
 
             # 2. RAG 检索
-            retrieved = rag_service.search(message, top_k=3)
+            retrieved = self._rag().search(message, top_k=3)
             rag_context = self._build_rag_context(retrieved)
 
             # 3. 合并上下文
@@ -66,7 +71,7 @@ class HelpService:
         kg_context = await self._extract_and_query_kg(message, history)
 
         # 2. RAG 检索
-        retrieved = rag_service.search(message, top_k=3)
+        retrieved = self._rag().search(message, top_k=3)
         rag_context = self._build_rag_context(retrieved)
 
         # 3. 合并上下文

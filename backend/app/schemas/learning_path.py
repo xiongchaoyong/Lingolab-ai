@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field
 class TaskItem(BaseModel):
     """单条任务"""
     id: int
-    type: str = Field(..., description="shadowing / conversation / listening")
+    type: str = Field(..., description="shadowing / conversation / grammar / vocabulary")
     title: str
     description: Optional[str] = ""
     difficulty: Optional[str] = None
@@ -21,6 +21,7 @@ class TaskItem(BaseModel):
     scene: Optional[str] = Field(default=None, description="对话场景标识")
     status: str = Field(default="pending", description="pending / skipped / completed")
     score: Optional[float] = None
+    reason: str = Field(default="", description="推荐原因说明")
 
 
 class TaskProgress(BaseModel):
@@ -74,6 +75,13 @@ class HistoryResponse(BaseModel):
 # 资料推荐
 # ============================================================
 
+class ScoreFactor(BaseModel):
+    """推荐因子"""
+    label: str = Field(..., description="因子名称，如「短板匹配」")
+    weight: float = Field(..., description="该因子权重 0-1")
+    detail: str = Field(default="", description="具体说明")
+
+
 class MaterialItem(BaseModel):
     """单条推荐资料"""
     id: int = Field(..., description="推荐记录 ID")
@@ -86,13 +94,15 @@ class MaterialItem(BaseModel):
     tag: Optional[str] = Field(default=None, description="分类标签")
     cefr: Optional[str] = Field(default=None, description="CEFR 等级")
     score: float = Field(..., description="推荐分数")
+    score_factors: List[ScoreFactor] = Field(default_factory=list, description="推荐因子分解")
+    reason: str = Field(default="", description="推荐原因摘要")
 
 
 class RecommendationsResponse(BaseModel):
     """资料推荐响应"""
     videos: List[MaterialItem]
     articles: List[MaterialItem]
-    audios: List[MaterialItem]
+    audios: List[MaterialItem] = Field(default_factory=list, description="音频资料（用于跟读/发音参考）")
     generated_at: str = Field(..., description="生成时间")
 
 

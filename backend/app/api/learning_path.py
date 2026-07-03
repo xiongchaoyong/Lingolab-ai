@@ -33,6 +33,17 @@ from app.schemas.learning_path import (
 router = APIRouter()
 
 
+def _build_task_reason(task_type: str, weakness_label: str, user_goal: str) -> str:
+    """根据任务类型生成推荐原因"""
+    reasons = {
+        "shadowing": f"针对你的「{weakness_label}」短板，通过跟读训练改善发音",
+        "conversation": f"匹配你的学习目标「{user_goal}」，实战练习口语表达",
+        "grammar": f"针对你的「{weakness_label}」短板，通过语法纠错提升准确性",
+        "vocabulary": f"针对你的「{weakness_label}」短板，通过词汇积累扩充表达能力",
+    }
+    return reasons.get(task_type, "")
+
+
 @router.get("/tasks", response_model=DailyTasksResponse)
 def get_daily_tasks(
     current_user: UserProfile = Depends(get_current_user),
@@ -44,8 +55,18 @@ def get_daily_tasks(
     tasks = recommendation_service.generate_daily_tasks(current_user, db)
     done, total = recommendation_service.get_task_progress(current_user.id, db)
 
+    # 推荐原因所需的上下文
+    DIM_LABELS = {
+        "pronunciation": "发音", "fluency": "流利度",
+        "vocabulary": "词汇运用", "grammar": "语法",
+    }
+    weakness_dim = recommendation_service.get_weakness_dimension(current_user, db)
+    weakness_label = DIM_LABELS.get(weakness_dim, weakness_dim)
+    user_goal = current_user.learning_goal or "日常交流"
+
     task_items = []
     for t in tasks:
+        reason = _build_task_reason(t["type"], weakness_label, user_goal)
         task_items.append(TaskItem(
             id=t["id"],
             type=t["type"],
@@ -57,6 +78,7 @@ def get_daily_tasks(
             scene=t.get("scene"),
             status=t.get("status", "pending"),
             score=t.get("score"),
+            reason=reason,
         ))
 
     return DailyTasksResponse(

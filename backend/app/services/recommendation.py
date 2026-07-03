@@ -30,9 +30,13 @@ TASK_TEMPLATES = {
         "title": "对话练习：{scene_label}",
         "description": "在 {scene_label} 场景中进行 AI 对话，练习实际应用",
     },
-    "listening": {
-        "title": "听力练习：{material_label}",
-        "description": "收听 {material_label}，训练听力理解能力",
+    "grammar": {
+        "title": "语法纠错：{skill_label}",
+        "description": "识别并修正 {skill_label} 相关的语法错误，提升写作和口语准确性",
+    },
+    "vocabulary": {
+        "title": "词汇练习：{skill_label}",
+        "description": "学习 {skill_label} 相关的核心词汇，扩充表达能力",
     },
 }
 
@@ -111,7 +115,7 @@ class RecommendationService:
 
     def recommend_materials(
         self, user: UserProfile, db: Session,
-        videos_count: int = 2, articles_count: int = 2, audios_count: int = 2,
+        videos_count: int = 4, articles_count: int = 4, audios_count: int = 2,
     ) -> Dict[str, List[dict]]:
         """为用户推荐资料，按 sub_type 分组返回
 
@@ -127,10 +131,10 @@ class RecommendationService:
         # 计算每个资料的得分
         scored = []
         for mat in all_materials:
-            score = self._score_material(
+            total, factors = self._score_material(
                 mat, weakness_dim, user_level, user_interests, user.id, db
             )
-            scored.append((mat, score))
+            scored.append((mat, total, factors))
 
         # 按分数降序排序
         scored.sort(key=lambda x: x[1], reverse=True)
@@ -140,7 +144,7 @@ class RecommendationService:
         type_map = {"video": "videos", "article": "articles", "audio": "audios"}
         type_counts = {"videos": videos_count, "articles": articles_count, "audios": audios_count}
 
-        for mat, score in scored:
+        for mat, score, factors in scored:
             sub_type = mat.get("sub_type", "video")
             group = type_map.get(sub_type)
             if group and len(result[group]) < type_counts[group]:
@@ -154,7 +158,8 @@ class RecommendationService:
                     "duration": extra.get("duration", ""),
                     "tag": (extra.get("tags", []) or [""])[0] if extra.get("tags") else "",
                     "cefr": extra.get("difficulty", ""),
-                    "score": round(score, 1),
+                    "score": factors["total"],
+                    "score_factors": factors,
                 })
 
         return result
@@ -162,8 +167,11 @@ class RecommendationService:
     def _score_material(
         self, mat: dict, weakness_dim: str, user_level: str,
         user_interests: List[str], user_id: int, db: Session,
-    ) -> float:
-        """四因子评分：短板40% + 难度35% + 兴趣25% + 新颖度(去重)"""
+    ) -> tuple:
+        """四因子评分：短板40% + 难度35% + 兴趣25% + 新颖度(去重)
+
+        Returns: (total_score, factors_dict)
+        """
         extra = mat.get("extra_data", {})
 
         # 1. 短板匹配 (40%)
@@ -185,8 +193,16 @@ class RecommendationService:
             + level_score * 0.35
             + interest_score * 0.25
         )
-        # 新颖度作为乘性因子：disliked→0，最近推荐过→打折
-        return base * novelty_score * 100
+        total = base * novelty_score * 100
+
+        factors = {
+            "weakness": round(weakness_score * 100, 1),
+            "level": round(level_score * 100, 1),
+            "interest": round(interest_score * 100, 1),
+            "novelty": round(novelty_score * 100, 1),
+            "total": round(total, 1),
+        }
+        return total, factors
 
     def _calc_weakness_match(self, mat: dict, weakness_dim: str) -> float:
         """计算资料与短板维度的匹配度
@@ -270,7 +286,7 @@ class RecommendationService:
     # ============================================================
 
     def generate_daily_tasks(self, user: UserProfile, db: Session) -> List[dict]:
-        """为用户生成当天的 3 个任务（跟读/对话/听力）
+        """为用户生成当天的 3 个任务（跟读/对话/语法/词汇）
 
         步骤：
         1. 短板优先 → 取最低分维度
@@ -349,28 +365,36 @@ class RecommendationService:
             "scene": scene_name,
         })
 
-        # --- 听力任务 (listening) — 基于资料 ---
-        listening_material = self._pick_listening_material(
-            weakness_skills, user_level, user_interests, preferred_topics_set
+        # --- 语法任务 (grammar) — 基于语法技能 ---
+        grammar_skill = self._pick_best_skill(
+            weakness_skills, cefr_grammar, user_interests, "grammar"
         )
-        listening_node = kg_service.get_node(listening_material) if listening_material else None
-        listening_label = listening_node["label"] if listening_node else "英语听力"
-        listening_data = (listening_node.get("extra_data", {}) or {}) if listening_node else {}
-
-        # 听力任务关联的技能
-        listening_skill = None
-        if listening_material:
-            teaches = kg_service.get_neighbors(listening_material, relation="TEACHES", direction="out")
-            if teaches:
-                listening_skill = teaches[0]["id"]
+        grammar_label = kg_service.get_node(grammar_skill)["label"] if grammar_skill else "基础语法"
+        grammar_material = self._pick_material_for_skill(grammar_skill, user_interests)
 
         tasks.append({
-            "task_type": "listening",
-            "title": f"听力练习：{listening_label}",
-            "description": f"收听 {listening_label}，训练听力理解能力",
-            "difficulty": listening_data.get("difficulty", user_level),
-            "focus_skill_id": listening_skill,
-            "material_id": listening_material,
+            "task_type": "grammar",
+            "title": f"语法纠错：{grammar_label}",
+            "description": f"识别并修正 {grammar_label} 相关的语法错误，提升写作和口语准确性",
+            "difficulty": user_level,
+            "focus_skill_id": grammar_skill,
+            "material_id": grammar_material,
+            "scene": None,
+        })
+
+        # --- 词汇任务 (vocabulary) — 基于词汇技能 ---
+        vocab_skill = self._pick_best_skill(
+            weakness_skills, cefr_vocab, user_interests, "vocabulary"
+        )
+        vocab_label = kg_service.get_node(vocab_skill)["label"] if vocab_skill else "核心词汇"
+
+        tasks.append({
+            "task_type": "vocabulary",
+            "title": f"词汇练习：{vocab_label}",
+            "description": f"学习 {vocab_label} 相关的核心词汇，扩充表达能力",
+            "difficulty": user_level,
+            "focus_skill_id": vocab_skill,
+            "material_id": None,
             "scene": None,
         })
 
@@ -455,48 +479,6 @@ class RecommendationService:
 
         return "topic:self_introduction"
 
-    def _pick_listening_material(
-        self, weakness_skills: List[str], user_level: str,
-        user_interests: List[str], preferred_topics: set,
-    ) -> Optional[str]:
-        """选择最佳听力资料"""
-        # 获取同等级音频资料
-        materials = kg_service.get_materials_by_cefr(user_level)
-        audio_materials = [m for m in materials if m.get("sub_type") == "audio"]
-
-        if not audio_materials:
-            # 放宽等级
-            all_audio = [m for m in kg_service.get_material_nodes() if m.get("sub_type") == "audio"]
-            audio_materials = all_audio
-
-        if not audio_materials:
-            return None
-
-        # 按多个维度打分
-        scored = []
-        for m in audio_materials:
-            score = 0.0
-            extra = m.get("extra_data", {}) or {}
-            tags = extra.get("tags", [])
-
-            # 兴趣匹配
-            if user_interests:
-                score += len(set(tags) & set(user_interests)) * 0.3
-
-            # 场景偏好匹配
-            covers = {c["id"] for c in kg_service.get_neighbors(m["id"], relation="COVERS", direction="out")}
-            score += len(covers & preferred_topics) * 0.4
-
-            # 难度匹配
-            mat_level = extra.get("difficulty", "")
-            if mat_level == user_level:
-                score += 0.3
-
-            scored.append((m, score))
-
-        scored.sort(key=lambda x: x[1], reverse=True)
-        return scored[0][0]["id"] if scored else None
-
     # ============================================================
     # 任务读取 & 操作
     # ============================================================
@@ -515,6 +497,8 @@ class RecommendationService:
 
         result = []
         for t in tasks:
+            if t.task_type == "listening":
+                continue
             task_dict = {
                 "id": t.id,
                 "type": t.task_type,
@@ -542,8 +526,9 @@ class RecommendationService:
             )
             .all()
         )
-        done = sum(1 for t in tasks if t.status == "completed")
-        return done, len(tasks)
+        valid = [t for t in tasks if t.task_type != "listening"]
+        done = sum(1 for t in valid if t.status == "completed")
+        return done, len(valid)
 
     def skip_task(self, task_id: int, user_id: int, reason: Optional[str], db: Session) -> Optional[dict]:
         """跳过任务"""
@@ -608,21 +593,30 @@ class RecommendationService:
                 description=f"在 {label} 场景中进行 AI 对话",
                 difficulty=user_level, scene=chosen.replace("topic:", ""), status="pending",
             )
-        else:
-            # listening
-            materials = kg_service.get_materials_by_cefr(user_level)
-            audio = [m for m in materials if m.get("sub_type") == "audio"]
-            chosen = random.choice(audio)["id"] if audio else None
-            extra = kg_service.get_node(chosen) or {}
-            label = extra.get("label", "听力练习")
+        elif task.task_type == "grammar":
+            skills = kg_service.get_skills_by_cefr(user_level, sub_type="grammar")
+            candidates = [s["id"] for s in skills]
+            chosen = random.choice(candidates) if candidates else None
+            label = kg_service.get_node(chosen)["label"] if chosen else "基础语法"
 
             new_task = DailyTask(
-                user_id=user_id, task_date=today, task_type="listening",
-                title=f"听力练习：{label}",
-                description=f"收听 {label}，训练听力理解能力",
-                difficulty=user_level, material_id=chosen, status="pending",
+                user_id=user_id, task_date=today, task_type="grammar",
+                title=f"语法纠错：{label}",
+                description=f"识别并修正 {label} 相关的语法错误",
+                difficulty=user_level, focus_skill_id=chosen, status="pending",
             )
+        elif task.task_type == "vocabulary":
+            skills = kg_service.get_skills_by_cefr(user_level, sub_type="vocabulary")
+            candidates = [s["id"] for s in skills]
+            chosen = random.choice(candidates) if candidates else None
+            label = kg_service.get_node(chosen)["label"] if chosen else "核心词汇"
 
+            new_task = DailyTask(
+                user_id=user_id, task_date=today, task_type="vocabulary",
+                title=f"词汇练习：{label}",
+                description=f"学习 {label} 相关的核心词汇",
+                difficulty=user_level, focus_skill_id=chosen, status="pending",
+            )
         db.add(new_task)
         db.commit()
 

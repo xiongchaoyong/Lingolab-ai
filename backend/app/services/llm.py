@@ -169,38 +169,40 @@ class LLMService:
 
     async def chat(
         self,
-        scene: str,
+        topic: str,
         user_text: str,
         history: list[dict],
         cefr_level: str = "B1",
+        mode: str = "scene",
     ) -> str:
         """
-        生成 AI 对话回复
+        生成 AI 对话回复（统一 scene/role 模式）
 
         Args:
-            scene: 场景标识 (self_intro/directions/shopping/restaurant)
+            topic: 场景标识(scene模式)或角色标识(role模式)
             user_text: 用户当前轮次的转写文本
             history: 对话历史 [{"role": "user", "text": "..."}, {"role": "ai", "text": "..."}]
             cefr_level: 用户 CEFR 等级
+            mode: "scene"(自由对话) | "role"(角色扮演)
 
         Returns:
             AI 回复文本
         """
-        system_prompt = SCENE_PROMPTS.get(scene, SCENE_PROMPTS["self_intro"])
+        prompt_dict = SCENE_PROMPTS if mode == "scene" else ROLE_PROMPTS
+        default_key = "self_intro" if mode == "scene" else "interviewee"
+        system_prompt = prompt_dict.get(topic, prompt_dict[default_key])
         level_instruction = CEFR_DIFFICULTY.get(cefr_level, CEFR_DIFFICULTY["B1"])
         system_prompt = system_prompt.format(level=cefr_level) + " " + level_instruction
         system_prompt += " Vary your phrasing each time — never repeat the same opening or question. Do NOT use emojis or special symbols in your replies — plain English text only."
 
         messages = [{"role": "system", "content": system_prompt}]
 
-        # 构建对话历史（最近 10 轮）
         for h in history[-10:]:
             if h["role"] == "user":
                 messages.append({"role": "user", "content": h["text"]})
             elif h["role"] == "ai":
                 messages.append({"role": "assistant", "content": h["text"]})
 
-        # 当前用户输入
         messages.append({"role": "user", "content": user_text})
 
         try:
@@ -222,7 +224,7 @@ class LLMService:
                 resp.raise_for_status()
                 data = resp.json()
                 reply = data["choices"][0]["message"]["content"].strip()
-                logger.info(f"LLM 回复: {reply[:80]}...")
+                logger.info(f"LLM 回复 ({mode}): {reply[:80]}...")
                 return reply
 
         except httpx.HTTPStatusError as e:
@@ -236,18 +238,21 @@ class LLMService:
 
     async def chat_stream(
         self,
-        scene: str,
+        topic: str,
         user_text: str,
         history: list[dict],
         cefr_level: str = "B1",
+        mode: str = "scene",
     ):
         """
-        流式生成 AI 对话回复（SSE 逐 token 返回）
+        流式生成 AI 对话回复（统一 scene/role 模式）
 
         Yields:
             str: 增量文本片段
         """
-        system_prompt = SCENE_PROMPTS.get(scene, SCENE_PROMPTS["self_intro"])
+        prompt_dict = SCENE_PROMPTS if mode == "scene" else ROLE_PROMPTS
+        default_key = "self_intro" if mode == "scene" else "interviewee"
+        system_prompt = prompt_dict.get(topic, prompt_dict[default_key])
         level_instruction = CEFR_DIFFICULTY.get(cefr_level, CEFR_DIFFICULTY["B1"])
         system_prompt = system_prompt.format(level=cefr_level) + " " + level_instruction
         system_prompt += " Vary your phrasing each time — never repeat the same opening or question. Do NOT use emojis or special symbols in your replies — plain English text only."
@@ -386,137 +391,6 @@ class LLMService:
                 "engagement_weaknesses": "",
                 "suggestions": "继续练习，多说多练！",
             }
-
-    async def chat_roleplay(
-        self,
-        role: str,
-        user_text: str,
-        history: list[dict],
-        cefr_level: str = "B1",
-    ) -> str:
-        """
-        角色扮演 — 生成 AI 对话回复
-
-        Args:
-            role: 角色标识 (interviewee/waiter/guide/doctor/teacher/customer_service/receptionist/colleague)
-            user_text: 用户当前轮次的转写文本
-            history: 对话历史
-            cefr_level: 用户 CEFR 等级
-
-        Returns:
-            AI 回复文本
-        """
-        system_prompt = ROLE_PROMPTS.get(role, ROLE_PROMPTS["interviewee"])
-        level_instruction = CEFR_DIFFICULTY.get(cefr_level, CEFR_DIFFICULTY["B1"])
-        system_prompt = system_prompt.format(level=cefr_level) + " " + level_instruction
-        system_prompt += " Vary your phrasing each time — never repeat the same opening or question. Do NOT use emojis or special symbols in your replies — plain English text only."
-
-        messages = [{"role": "system", "content": system_prompt}]
-
-        for h in history[-10:]:
-            if h["role"] == "user":
-                messages.append({"role": "user", "content": h["text"]})
-            elif h["role"] == "ai":
-                messages.append({"role": "assistant", "content": h["text"]})
-
-        messages.append({"role": "user", "content": user_text})
-
-        try:
-            async with httpx.AsyncClient(timeout=15.0) as client:
-                resp = await client.post(
-                    BAILIAN_API_URL,
-                    headers={
-                        "Authorization": f"Bearer {self.api_key}",
-                        "Content-Type": "application/json",
-                    },
-                    json={
-                        "model": self.model,
-                        "messages": messages,
-                        "max_tokens": 150,
-                        "temperature": 0.9,
-                        "enable_thinking": False,
-                    },
-                )
-                resp.raise_for_status()
-                data = resp.json()
-                reply = data["choices"][0]["message"]["content"].strip()
-                logger.info(f"角色扮演 LLM 回复: {reply[:80]}...")
-                return reply
-
-        except httpx.HTTPStatusError as e:
-            logger.error(f"百炼 API 错误 {e.response.status_code}: {e.response.text[:200]}")
-            return "I'm sorry, I'm having trouble connecting right now. Could you repeat that?"
-        except Exception as e:
-            logger.error(f"LLM 角色扮演调用失败: {e}")
-            return "I didn't catch that. Could you say it again?"
-
-    async def chat_roleplay_stream(
-        self,
-        role: str,
-        user_text: str,
-        history: list[dict],
-        cefr_level: str = "B1",
-    ):
-        """
-        角色扮演 — 流式生成 AI 回复
-
-        Yields:
-            str: 增量文本片段
-        """
-        system_prompt = ROLE_PROMPTS.get(role, ROLE_PROMPTS["interviewee"])
-        level_instruction = CEFR_DIFFICULTY.get(cefr_level, CEFR_DIFFICULTY["B1"])
-        system_prompt = system_prompt.format(level=cefr_level) + " " + level_instruction
-        system_prompt += " Vary your phrasing each time — never repeat the same opening or question. Do NOT use emojis or special symbols in your replies — plain English text only."
-
-        messages = [{"role": "system", "content": system_prompt}]
-
-        for h in history[-10:]:
-            if h["role"] == "user":
-                messages.append({"role": "user", "content": h["text"]})
-            elif h["role"] == "ai":
-                messages.append({"role": "assistant", "content": h["text"]})
-
-        messages.append({"role": "user", "content": user_text})
-
-        try:
-            async with httpx.AsyncClient(timeout=15.0) as client:
-                async with client.stream(
-                    "POST",
-                    BAILIAN_API_URL,
-                    headers={
-                        "Authorization": f"Bearer {self.api_key}",
-                        "Content-Type": "application/json",
-                    },
-                    json={
-                        "model": self.model,
-                        "messages": messages,
-                        "max_tokens": 150,
-                        "temperature": 0.9,
-                        "stream": True,
-                        "enable_thinking": False,
-                    },
-                ) as resp:
-                    resp.raise_for_status()
-                    async for line in resp.aiter_lines():
-                        if line.startswith("data: "):
-                            data_str = line[6:]
-                            if data_str == "[DONE]":
-                                break
-                            try:
-                                chunk = json.loads(data_str)
-                                delta = chunk["choices"][0].get("delta", {})
-                                content = delta.get("content", "")
-                                if content:
-                                    yield content
-                            except json.JSONDecodeError:
-                                continue
-
-        except httpx.HTTPStatusError as e:
-            logger.error(f"百炼流式 API 错误: {e}")
-            yield "I'm sorry, I'm having trouble connecting right now. Could you repeat that?"
-        except Exception as e:
-            logger.error(f"LLM 角色扮演流式调用失败: {e}")
-            yield "I didn't catch that. Could you say it again?"
 
     async def score_roleplay(self, history: list[dict], cefr_level: str = "B1", age_group: str = "大学生") -> dict:
         """
@@ -968,7 +842,7 @@ class LLMService:
         动态生成测评题目 — 根据维度、CEFR等级、答题历史实时出题
 
         Args:
-            dimension: "listening" | "reading" | "grammar" | "speaking"
+            dimension: "speaking" | "reading" | "grammar"
             cefr_level: 当前估算 CEFR 等级 "A1"~"C2"
             context: 答题上下文
                 - previous_questions: 已出题目摘要列表 [{"dimension":"...", "content":"...", "score": 85}, ...]
@@ -1039,14 +913,6 @@ class LLMService:
                 f"The question should test comprehension, not just word matching.\n"
                 f"Avoid overused topics (global warming, technology, education)."
             ),
-            "listening": (
-                f"Generate an English listening comprehension question at CEFR {cefr_level}.\n"
-                f"Language level: {level_guide}\n"
-                f"Write a short, natural-sounding dialogue or monologue (3-5 sentences) "
-                f"that could be spoken aloud. It should sound like a real conversation.\n"
-                f"Then ask ONE comprehension question about what was said, with 4 options.\n"
-                f"Topics: daily life, travel, work, hobbies, social situations, news snippets."
-            ),
             "speaking": (
                 f"Generate an English speaking prompt at CEFR {cefr_level}.\n"
                 f"Language level: {level_guide}\n"
@@ -1069,7 +935,7 @@ class LLMService:
             f"{weak_hint}\n"
             f"{consecutive_text}\n\n"
             f"Return ONLY a JSON object (no markdown, no code fences):\n"
-            f'{{"question_text": "the full question (for listening: the full dialogue/monologue)",\n'
+            f'{{"question_text": "the full question text",\n'
             f'"options": ["A. option1", "B. option2", "C. option3", "D. option4"],\n'
             f'"correct_option": <1-4>,\n'
             f'"dimension": "{dimension}",\n'
@@ -1121,14 +987,6 @@ def _fallback_question(dimension: str, cefr_level: str) -> dict:
             "dimension": "reading",
             "difficulty": cefr_level,
             "explanation": "文中明确提到 Tom 喜欢 reading books and playing basketball。",
-        },
-        "listening": {
-            "question_text": "Listen to the dialogue:\nA: Excuse me, where is the nearest post office?\nB: Go straight ahead and turn left at the second crossing. It's on your right.\n\nQuestion: Where does the person want to go?",
-            "options": ["A. Bank", "B. Post office", "C. Supermarket", "D. Hospital"],
-            "correct_option": 2,
-            "dimension": "listening",
-            "difficulty": cefr_level,
-            "explanation": "对话中明确问的是 post office 的位置。",
         },
         "speaking": {
             "question_text": "Please describe your favorite season and explain why you like it.",

@@ -53,12 +53,12 @@ TEXT_DIM_MAP = {
 TASK_DIM_MAP = {
     "shadowing": "pronunciation",
     "conversation": "pronunciation",
-    "listening": "fluency",
+    "grammar": "grammar",
+    "vocabulary": "vocabulary",
 }
 
 # 测评维度 → 用户画像维度映射
 ASSESSMENT_DIM_MAP = {
-    "listening": "fluency",
     "speaking": "pronunciation",
     "reading": "vocabulary",
     "grammar": "grammar",
@@ -169,7 +169,7 @@ class ProfileUpdater:
         """摄入测评结果 — 初次测评完成后调用，自动映射测评维度→画像维度
 
         Args:
-            dimension_scores: 测评维度分 {listening: 72.5, speaking: 68.3, reading: 80.0, grammar: 55.0}
+            dimension_scores: 测评维度分 {speaking: 68.3, reading: 80.0, grammar: 55.0}
             session_id: 测评会话 UUID
         """
         for dim, score in dimension_scores.items():

@@ -1,6 +1,213 @@
+## 2026-07-03: 用户管理 + 班级管理功能增强
+
+### 用户管理新增
+- **角色变更**：管理员可修改用户角色（学生↔教师↔管理员），操作前有确认弹窗，记录操作日志
+- **用户详情弹窗**：点击"详情"查看完整资料（邮箱/年龄段/学习目标/自评等级/积分/对话次数/发音练习次数/维度平均分）
+- **操作列扩展**：详情 + 角色下拉 + 禁用/启用，宽度220→260
+
+### 班级管理新增
+- **编辑班级**：修改名称/等级范围/描述，操作栏新增"编辑"按钮
+- **删除班级**：软删除（is_active=0），操作前确认，已有学生数据不丢失
+- **移除学生**：学生列表对话框新增"移出"按钮，可逐出班级成员
+
+### 后端新增 API（4个）
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| PUT | `/api/admin/users/{id}/role` | 修改用户角色 |
+| GET | `/api/admin/users/{id}` | 用户详细信息 |
+| PUT | `/api/admin/classes/{id}` | 编辑班级信息 |
+| DELETE | `/api/admin/classes/{id}` | 软删除班级 |
+| DELETE | `/api/admin/classes/{id}/students/{uid}` | 移除班级学生 |
+
+### 文件变更
+- `backend/app/schemas/admin.py` — 新增 UserRoleRequest + UpdateClassRequest
+- `backend/app/services/admin.py` — AdminService 新增 set_user_role/get_user_detail；TeacherService 新增 update_class/delete_class/remove_student
+- `backend/app/api/admin.py` — 新增 5 个路由端点
+- `frontend/src/api/admin.js` — 新增 5 个 API 封装函数
+- `frontend/src/stores/admin.js` — 新增对应 store actions
+- `frontend/src/views/admin/UserManageView.vue` — 重写，新增角色变更+详情弹窗
+- `frontend/src/views/teacher/ClassManageView.vue` — 重写，新增编辑/删除班级+移除学生
+
+---
+
+## 2026-07-03: 知识库 API 加载耗时优化 — RAG 服务懒加载 + SQL 优化
+
+### 根因
+`admin.py` 第21行 `from app.services.rag_service import rag_service` 在模块导入时触发链式加载：
+`admin.py` → `rag_service.py` → `embedding.py` → `import torch`(2-5秒!) + `import numpy`
+
+每次后端启动（或 uvicorn reload）都要等 torch 加载完才能响应第一个请求。而 `get_knowledge_docs`（文档列表）根本不需要 RAG 服务。
+
+### 修复
+1. **admin.py + help.py**：移除模块级 `rag_service` 导入，改为 `_rag()` 静态方法懒加载，torch 推迟到首次写操作/检索时才加载
+2. **get_knowledge_docs SQL 优化**：`func.left(content, 500)` 在 DB 层截断 + `func.count(id)` 独立计数查询，避免传输完整 TEXT 列
+3. 导入耗时：~2-5秒 → **229ms**（torch 不再预加载）
+
+### 文件变更
+- 修改: `backend/app/services/admin.py`
+- 修改: `backend/app/services/help.py`
+
+---
+
+## 2026-07-03: 知识库管理页面彻底重写 — 消除加载卡顿
+
+### 根因（深入排查后）
+之前的修复（loading初始值+防抖）未能彻底解决卡顿，进一步排查发现真正原因：
+1. **手动导入 `@element-plus/icons-vue` 6个图标** — barrel import 导致 bundler 处理整个图标库，即便 tree-shaking 后仍有解析开销
+2. **Vue `watch` 链式触发** — 搜索→重置页码→翻页 watcher→请求，复杂的响应式链路增加组件初始化负担
+3. **Element Plus `<el-icon>` + Loading 图标** — 首次渲染时的 JS 组件初始化比纯 CSS 慢
+
+### 重写要点
+- **零手动图标导入**：所有图标通过 `<template #icon>` + `<el-icon>` 插槽使用，由 `unplugin-vue-components` 逐个按需解析，构建产物中每个图标仅出现一次
+- **纯 CSS spinner**：加载占位用 CSS animation 替代 `<el-icon :is-loading><Loading /></el-icon>`，首帧零 JS 依赖
+- **移除所有 `watch`**：搜索用 `@input` + debounce，翻页用 `@current-change` / `@size-change` 显式事件，消除 watcher 链开销
+- **`catMeta` 查找表**：替代 `Array.find()` 调用，模板内直接通过 key 取值
+- 代码量从 408 行精简至 310 行
+
+---
+
+## 2026-07-03: 知识库管理页面加载卡顿修复
+
+### 根因分析
+1. `loading` 初始值为 `false`，组件挂载时 `v-if="initialLoad && loading"` 为 `false`，导致空表格先渲染一帧，然后 `onMounted` 触发 `loadDocs()` 才显示加载占位 → 视觉卡顿
+2. 搜索/分类 watcher 设 `docPage=1` 触发翻页 watcher 立即请求，同时 300ms 防抖也排队一个请求 → 重复请求
+
+### 修复
+- `loading` 初始值改为 `true`，确保首帧即渲染加载占位，表格永不在数据就绪前出现
+- 移除 `initialLoad` 标志位，简化为 `v-if="loading"` / `v-else`
+- 翻页 watcher 先 `clearTimeout(fetchTimer)` 再请求，取消搜索 watcher 排队的防抖请求，避免双发
+- 移除 `el-table` 的 `v-loading` 指令（与 `v-if` 占位重复）
+- 清理未使用的 import（`computed`、`Document`）
+
+---
+
+## 2026-07-03: 学习进度 Tab 拆分 — 进度+作业集成首页，闯关移入社区
+
+### 变更内容
+1. **TopNavLayout**：移除所有角色的"学习进度"下拉菜单（进度追踪/闯关挑战/我的作业）
+2. **HomeView 重构**：集成进度追踪区（雷达图+趋势折线图+日历热力图+学习预测+预警+时间切换）+ 我的作业区（表格+提交弹窗）；快捷入口"学习报告"替换为"语法纠错"
+3. **CommunityView**：新增第4个Tab"闯关挑战"，嵌入每日闯关+配音挑战+勋章墙（原ChallengeView全部内容）
+4. **Router**：旧路由重定向 `/progress`→`/`、`/challenge`→`/community`、`/my-homework`→`/`
+
+### 文件变更
+- 修改: `frontend/src/components/layout/TopNavLayout.vue`
+- 重写: `frontend/src/views/home/HomeView.vue`
+- 修改: `frontend/src/views/community/CommunityView.vue`
+- 修改: `frontend/src/router/index.js`
+
+---
+
+## 2026-07-03: 运营数据看板详细化升级
+
+### 变更内容
+1. **后端新指标**：新增老师数/学生数（按role统计）、班级数/班均学生、今日活动（对话数/发音练习数/任务完成数）、任务完成率、总积分；修复对话完成率为真实 ConversationSession 数据
+2. **7日DAU趋势**：新增 daily_activity 数组，前端折线图展示近7天日活变化
+3. **前端布局重构**：15个指标卡片按3组排列（用户规模5卡/学习活跃5卡/运营概况5卡），每组带小标题
+4. **新增图表**：7日DAU折线图 + 练习类型柱状图（替换原数字统计），保留CEFR饼图 + 用户增长趋势图
+
+### 影响文件
+- `backend/app/services/admin.py` — get_dashboard() 新增 10+ 指标 + 修复对话完成率
+- `backend/app/schemas/admin.py` — DashboardMetrics + DashboardResponse 新增字段
+- `frontend/src/views/admin/DashboardView.vue` — 分组卡片布局 + 4图表
+
+---
+
 # 操作日志
 
 > 记录每次 PR / AI 辅助操作的摘要
+
+---
+
+## 2026-07-03: 测评模块移除听力维度 — 数据库迁移 + 前后端全面清理
+
+### 变更内容
+1. **DB 迁移**：`assessment_questions` 表 3 条 listening 题目 → speaking，ALTER TABLE 移除 ENUM 'listening'
+2. **后端全面清理**：
+   - `assessment.py`：BASE_DIMENSION_SEQUENCE 移除 listening、dimension_totals 移除 listening（2 处）、_generate_question 移除 TTS 听力生成块、overall 除数 /4→/3（2 处）、追加题 listening→grammar
+   - `llm.py`：移除 dimension_prompts["listening"] 模板、移除 JSON 模板中听力描述、docstring 更新
+   - `profile_updater.py`：TASK_DIM_MAP 移除 listening + ASSESSMENT_DIM_MAP 移除 listening
+   - `assessment.py models/schemas`：ENUM 移除 listening、QuestionItem type 描述更新
+   - `recommendation.py`：_get_today_tasks + get_task_progress 过滤旧 listening 数据
+3. **前端全面清理**：
+   - `stores/assessment.js`：TYPE_LABELS 移除 listening
+   - `AssessmentResult.vue`：labels 移除 listening
+   - `ContentManageView.vue`：题型/维度 options 移除 listening、资料类型移除 audio
+   - `HelpView.vue`：帮助文案"听力"→"语法、词汇"
+4. **推荐系统增强**：MaterialItem 新增 score_factors（四因子详细分解）+ reason 字段；TaskItem 新增 reason 字段；新增语法+词汇任务类型（每日任务 2→4 种）
+
+### 影响文件
+- `backend/app/api/assessment.py` — 移除 listening 维度
+- `backend/app/models/assessment.py` — ENUM 移除 listening
+- `backend/app/schemas/assessment.py` — 描述更新
+- `backend/app/services/llm.py` — 移除 listening prompt
+- `backend/app/services/profile_updater.py` — 映射表更新
+- `backend/app/services/recommendation.py` — 过滤旧数据 + 新任务类型
+- `backend/app/schemas/learning_path.py` — ScoreFactor + MaterialItem 增强
+- `backend/app/api/learning_path.py` — 任务推荐原因
+- `backend/app/api/recommendation.py` — 推荐原因因子分解
+- `frontend/src/stores/assessment.js` — 移除 listening label
+- `frontend/src/views/assessment/AssessmentResult.vue` — 移除 listening label
+- `frontend/src/views/admin/ContentManageView.vue` — 移除 listening/audio 选项
+- `frontend/src/views/help/HelpView.vue` — 帮助文案更新
+- `frontend/src/views/learning/LearningPathView.vue` — 语法+词汇任务类型 + 推荐原因
+- `frontend/src/views/learning/RecommendationView.vue` — 推荐依据展示 + 移除音频
+
+---
+
+## 2026-07-03: 语音对话模块融合 — AI 智能对话 + 角色扮演
+
+### 变更内容
+1. **后端统一 Schema**：新建 `voice_chat.py`（VoiceChatStartRequest/StartResponse/SpeakResponse/EndResponse），旧 schema 文件改为 thin re-export
+2. **LLM 服务合并**：`chat()`/`chat_stream()` 增加 mode 参数（scene→SCENE_PROMPTS, role→ROLE_PROMPTS），删除 chat_roleplay/chat_roleplay_stream 重复方法
+3. **后端统一 API 路由**：新建 `voice_chat.py`（~750 行），9 个端点 `/api/voice-chat/*`，会话 `_sessions` 存储 mode，评分按 mode 分叉；旧 conversation.py + roleplay.py 改为 thin wrapper（~30 行各）
+4. **前端统一 API 层**：新建 `voiceChat.js`（readSSEStream 共享，/api/voice-chat 统一前缀），旧文件 thin re-export 向后兼容
+5. **前端统一视图组件**：新建 `VoiceChatView.vue`，模式切换分段控件，选择页/通话页/报告页 85% 代码共用
+6. **路由 + 导航更新**：新增 `/voice-chat` 路由，旧路由重定向，TopNavLayout 导航合并，首页快捷入口更新
+7. **删除旧文件**：VoiceCallView.vue + RolePlayView.vue（原 2974 行大幅精简）
+8. **UI 交互优化**：移除独立选择页，模式+话题选择集成在通话界面；自由对话无需选场景，点击按钮直接开始；角色扮演保留角色选择卡片网格
+9. **推荐资料展示推荐原因**：MaterialItem 新增 score_factors 字段（四因子：短板匹配/难度适中/兴趣相关/新鲜推荐），前端卡片展示推荐原因标签
+10. **移除听力任务 + 任务推荐原因**：前后端完全移除 listening 任务生成（TASK_TEMPLATES/generate_daily_tasks/replace_task/_pick_listening_material 全部清理）；资料推荐移除音频类（视频3+文章3=6条）；TaskItem 新增 reason 字段，跟读任务关联短板维度、对话任务关联学习目标自动生成推荐原因
+11. **前端展示推荐原因**：学习任务卡片和资料推荐卡片均显示推荐原因标签
+12. **过滤历史 listening 任务**：`_get_today_tasks` 和 `get_task_progress` 中过滤掉 listening 类型
+13. **新增语法+词汇任务类型**：每日任务从 2 种（跟读+对话）扩展为 4 种（跟读+对话+语法+词汇）；语法任务关联 grammar 技能 → 跳转 `/grammar`；词汇任务关联 vocabulary 技能；数据库 ENUM 已扩展
+
+### 影响文件
+- `backend/app/schemas/voice_chat.py` — **新建**，统一 Schema
+- `backend/app/api/voice_chat.py` — **新建**，统一 API 路由
+- `backend/app/schemas/conversation.py` — thin re-export
+- `backend/app/schemas/roleplay.py` — thin re-export
+- `backend/app/api/conversation.py` — thin wrapper
+- `backend/app/api/roleplay.py` — thin wrapper
+- `backend/app/services/llm.py` — chat/chat_stream 合并
+- `backend/main.py` — 注册 voice_chat_router
+- `frontend/src/api/voiceChat.js` — **新建**，统一前端 API
+- `frontend/src/views/voice-chat/VoiceChatView.vue` — **新建**，统一视图（含内联选择交互）
+- `frontend/src/api/conversation.js` — thin re-export
+- `frontend/src/api/roleplay.py` — thin re-export
+- `frontend/src/router/index.js` — 新路由 + 旧路由重定向
+- `frontend/src/components/layout/TopNavLayout.vue` — 导航合并
+- `frontend/src/views/home/HomeView.vue` — 快捷入口更新
+- `frontend/src/views/conversation/VoiceCallView.vue` — **删除**
+- `frontend/src/views/roleplay/RolePlayView.vue` — **删除**
+
+### 影响文件
+- `backend/app/schemas/voice_chat.py` — **新建**，统一 Schema
+- `backend/app/api/voice_chat.py` — **新建**，统一 API 路由
+- `backend/app/schemas/conversation.py` — thin re-export
+- `backend/app/schemas/roleplay.py` — thin re-export
+- `backend/app/api/conversation.py` — thin wrapper
+- `backend/app/api/roleplay.py` — thin wrapper
+- `backend/app/services/llm.py` — chat/chat_stream 合并
+- `backend/main.py` — 注册 voice_chat_router
+- `frontend/src/api/voiceChat.js` — **新建**，统一前端 API
+- `frontend/src/views/voice-chat/VoiceChatView.vue` — **新建**，统一视图
+- `frontend/src/api/conversation.js` — thin re-export
+- `frontend/src/api/roleplay.py` — thin re-export
+- `frontend/src/router/index.js` — 新路由 + 旧路由重定向
+- `frontend/src/components/layout/TopNavLayout.vue` — 导航合并
+- `frontend/src/views/home/HomeView.vue` — 快捷入口更新
+- `frontend/src/views/conversation/VoiceCallView.vue` — **删除**
+- `frontend/src/views/roleplay/RolePlayView.vue` — **删除**
 
 ---
 

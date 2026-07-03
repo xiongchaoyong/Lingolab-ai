@@ -29,14 +29,17 @@ function getStatusLabel(status) {
 }
 
 function getTypeIcon(type) {
-  if (type === 'shadowing') return 'Microphone'
   if (type === 'conversation') return 'ChatDotRound'
-  return 'Headset'
+  if (type === 'grammar') return 'EditPen'
+  if (type === 'vocabulary') return 'Collection'
+  return 'Microphone'
 }
 
 function startTask(task) {
-  if (task.type === 'conversation') router.push('/conversation')
+  if (task.type === 'conversation') router.push('/voice-chat')
+  else if (task.type === 'grammar') router.push('/grammar')
   else if (task.type === 'shadowing') router.push('/pronunciation')
+  else if (task.type === 'vocabulary') router.push('/pronunciation')
 }
 
 async function skipTask(task) {
@@ -107,6 +110,10 @@ onMounted(() => {
             <span class="task-duration">{{ task.duration }}</span>
           </div>
           <p class="task-desc">{{ task.description }}</p>
+          <div class="task-reason" v-if="task.reason">
+            <span class="reason-icon">📌</span>
+            <span class="reason-text">{{ task.reason }}</span>
+          </div>
 
           <!-- 未完成操作 -->
           <div v-if="task.status === 'pending'" class="task-actions">
@@ -114,7 +121,7 @@ onMounted(() => {
             <el-button text size="small" @click="replaceTask(task)">换一个</el-button>
             <el-button text size="small" @click="adjustDifficulty(task)">调整难度</el-button>
             <el-button type="primary" size="small" @click="startTask(task)">
-              {{ task.type === 'conversation' ? '开始对话' : task.type === 'shadowing' ? '开始跟读' : '开始听力' }}
+              {{ task.type === 'conversation' ? '开始对话' : task.type === 'grammar' ? '去练习' : task.type === 'vocabulary' ? '去练习' : '开始跟读' }}
             </el-button>
           </div>
 
@@ -208,7 +215,8 @@ onMounted(() => {
 
   &.shadowing { background: rgba(var(--color-primary-rgb), 0.1); color: var(--color-primary); }
   &.conversation { background: rgba(var(--color-success-rgb), 0.1); color: var(--color-success); }
-  &.listening { background: rgba(var(--color-warning-rgb), 0.1); color: var(--color-warning); }
+  &.grammar { background: rgba(245, 108, 108, 0.1); color: #F56C6C; }
+  &.vocabulary { background: rgba(230, 162, 60, 0.1); color: #E6A23C; }
 }
 
 .task-body {
@@ -238,6 +246,18 @@ onMounted(() => {
   color: var(--color-text-secondary);
   font-size: var(--font-size-sm);
   margin-bottom: var(--spacing-md);
+}
+
+.task-reason {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  background: linear-gradient(135deg, rgba(124, 111, 247, 0.06), rgba(255, 107, 138, 0.04));
+  border-radius: 8px;
+  margin-bottom: var(--spacing-md);
+  .reason-icon { font-size: 12px; flex-shrink: 0; }
+  .reason-text { font-size: 12px; color: #7C6FF7; font-weight: 500; }
 }
 
 .task-actions {

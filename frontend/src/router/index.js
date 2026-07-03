@@ -53,11 +53,14 @@ const routes = [
         meta: { title: '发音评测', auth: true },
       },
       {
-        path: 'role-play',
-        name: 'RolePlay',
-        component: () => import('@/views/roleplay/RolePlayView.vue'),
-        meta: { title: '角色扮演', auth: true },
+        path: 'voice-chat',
+        name: 'VoiceChat',
+        component: () => import('@/views/voice-chat/VoiceChatView.vue'),
+        meta: { title: 'AI 语音对话', auth: true },
       },
+      // 旧路由重定向（向后兼容）
+      { path: 'conversation', redirect: () => ({ path: '/voice-chat', query: { mode: 'scene' } }) },
+      { path: 'role-play', redirect: () => ({ path: '/voice-chat', query: { mode: 'role' } }) },
       {
         path: 'grammar',
         name: 'Grammar',
@@ -83,19 +86,10 @@ const routes = [
         component: () => import('@/views/learning/ProfileSummaryView.vue'),
         meta: { title: '个人情况说明', auth: true },
       },
-      // 模块四：激励服务
-      {
-        path: 'progress',
-        name: 'Progress',
-        component: () => import('@/views/progress/ProgressView.vue'),
-        meta: { title: '学习进度', auth: true },
-      },
-      {
-        path: 'challenge',
-        name: 'Challenge',
-        component: () => import('@/views/gamification/ChallengeView.vue'),
-        meta: { title: '闯关挑战', auth: true },
-      },
+      // 旧路由重定向（进度追踪+作业→首页，闯关→社区）
+      { path: 'progress', redirect: '/' },
+      { path: 'challenge', redirect: '/community' },
+      { path: 'my-homework', redirect: '/' },
       // 模块五：社区服务
       {
         path: 'community',
@@ -110,12 +104,7 @@ const routes = [
         component: () => import('@/views/student/MyClassesView.vue'),
         meta: { title: '我的班级', auth: true },
       },
-      {
-        path: 'my-homework',
-        name: 'MyHomework',
-        component: () => import('@/views/student/MyHomeworkView.vue'),
-        meta: { title: '我的作业', auth: true },
-      },
+      // my-homework 已重定向到首页（见上方旧路由重定向）
       // 模块七：智能客服
       {
         path: 'help',
@@ -128,12 +117,6 @@ const routes = [
         name: 'Notices',
         component: () => import('@/views/notice/NoticeView.vue'),
         meta: { title: '通知中心', auth: true },
-      },
-      {
-        path: 'conversation',
-        name: 'Conversation',
-        component: () => import('@/views/conversation/VoiceCallView.vue'),
-        meta: { title: 'AI 智能对话', auth: true },
       },
     ],
   },

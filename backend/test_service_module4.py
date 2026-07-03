@@ -185,7 +185,7 @@ class TestRadarSchemas:
 
     def test_five_radar_dimensions(self):
         """五维雷达图维度"""
-        expected = ["发音准确率", "流利度", "语法", "听力", "表达丰富度"]
+        expected = ["发音", "流利度", "语法", "词汇运用", "互动参与"]
         assert RADAR_DIMENSIONS == expected
 
 
