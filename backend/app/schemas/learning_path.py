@@ -74,6 +74,13 @@ class HistoryResponse(BaseModel):
 # 资料推荐
 # ============================================================
 
+class ScoreFactor(BaseModel):
+    """推荐因子"""
+    label: str = Field(..., description="因子名称，如「短板匹配」")
+    weight: float = Field(..., description="该因子权重 0-1")
+    detail: str = Field(default="", description="具体说明")
+
+
 class MaterialItem(BaseModel):
     """单条推荐资料"""
     id: int = Field(..., description="推荐记录 ID")
@@ -86,6 +93,8 @@ class MaterialItem(BaseModel):
     tag: Optional[str] = Field(default=None, description="分类标签")
     cefr: Optional[str] = Field(default=None, description="CEFR 等级")
     score: float = Field(..., description="推荐分数")
+    score_factors: List[ScoreFactor] = Field(default_factory=list, description="推荐因子分解")
+    reason: str = Field(default="", description="推荐原因摘要")
 
 
 class RecommendationsResponse(BaseModel):

@@ -126,6 +126,10 @@ onMounted(() => {
               <div class="material-score" v-if="item.score">
                 推荐分：{{ item.score }}
               </div>
+              <div class="material-reason" v-if="item.reason">
+                <span class="reason-icon">📌</span>
+                <span class="reason-text">{{ item.reason }}</span>
+              </div>
               <div class="material-actions" v-if="!isDisliked(item.id)">
                 <el-button size="small" text type="primary">查看</el-button>
                 <el-button size="small" text @click="handleDislike(item)">不感兴趣</el-button>
@@ -229,6 +233,22 @@ onMounted(() => {
   }
 }
 
+.material-score {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  margin-bottom: var(--spacing-sm);
+}
+.material-reason {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  background: linear-gradient(135deg, rgba(124, 111, 247, 0.06), rgba(255, 107, 138, 0.04));
+  border-radius: 8px;
+  margin-bottom: var(--spacing-sm);
+  .reason-icon { font-size: 12px; flex-shrink: 0; }
+  .reason-text { font-size: 12px; color: #7C6FF7; font-weight: 500; }
+}
 .material-actions {
   display: flex;
   gap: var(--spacing-sm);

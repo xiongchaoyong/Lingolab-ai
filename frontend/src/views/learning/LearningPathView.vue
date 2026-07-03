@@ -29,13 +29,12 @@ function getStatusLabel(status) {
 }
 
 function getTypeIcon(type) {
-  if (type === 'shadowing') return 'Microphone'
   if (type === 'conversation') return 'ChatDotRound'
-  return 'Headset'
+  return 'Microphone'
 }
 
 function startTask(task) {
-  if (task.type === 'conversation') router.push('/conversation')
+  if (task.type === 'conversation') router.push('/voice-chat')
   else if (task.type === 'shadowing') router.push('/pronunciation')
 }
 
@@ -114,7 +113,7 @@ onMounted(() => {
             <el-button text size="small" @click="replaceTask(task)">换一个</el-button>
             <el-button text size="small" @click="adjustDifficulty(task)">调整难度</el-button>
             <el-button type="primary" size="small" @click="startTask(task)">
-              {{ task.type === 'conversation' ? '开始对话' : task.type === 'shadowing' ? '开始跟读' : '开始听力' }}
+              {{ task.type === 'conversation' ? '开始对话' : '开始跟读' }}
             </el-button>
           </div>
 
@@ -208,7 +207,6 @@ onMounted(() => {
 
   &.shadowing { background: rgba(var(--color-primary-rgb), 0.1); color: var(--color-primary); }
   &.conversation { background: rgba(var(--color-success-rgb), 0.1); color: var(--color-success); }
-  &.listening { background: rgba(var(--color-warning-rgb), 0.1); color: var(--color-warning); }
 }
 
 .task-body {

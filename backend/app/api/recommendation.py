@@ -11,12 +11,53 @@ from app.models.knowledge_graph import MaterialRecommendation
 from app.services.recommendation import recommendation_service
 from app.schemas.learning_path import (
     MaterialItem,
+    ScoreFactor,
     RecommendationsResponse,
     DislikeResponse,
     ClickRequest,
 )
 
 router = APIRouter()
+
+FACTOR_META = {
+    "weakness": {"label": "短板匹配", "icon": "🎯"},
+    "level": {"label": "难度适中", "icon": "📊"},
+    "interest": {"label": "兴趣相关", "icon": "💡"},
+    "novelty": {"label": "新鲜推荐", "icon": "🆕"},
+}
+
+
+def _build_score_factors(factors: dict) -> list:
+    """将因子 dict 转为 ScoreFactor 列表（按权重降序）"""
+    result = []
+    for key in ["weakness", "level", "interest", "novelty"]:
+        val = factors.get(key, 0)
+        if val > 0:
+            meta = FACTOR_META.get(key, {"label": key, "icon": ""})
+            detail = _factor_detail(key, val)
+            result.append(ScoreFactor(label=meta["label"], weight=val / 100, detail=detail))
+    result.sort(key=lambda x: x.weight, reverse=True)
+    return result
+
+
+def _factor_detail(key: str, val: float) -> str:
+    if key == "weakness":
+        return "针对你的学习短板"
+    elif key == "level":
+        return f"匹配你的语言等级（{val:.0f}%符合）"
+    elif key == "interest":
+        return "与你的兴趣标签一致"
+    elif key == "novelty":
+        return "最近未推荐过的新内容"
+    return ""
+
+
+def _build_reason(factors: list) -> str:
+    """根据因子生成推荐原因摘要"""
+    if not factors:
+        return ""
+    labels = [f.label for f in factors[:2]]
+    return "、".join(labels)
 
 
 @router.get("/", response_model=RecommendationsResponse)
@@ -41,6 +82,7 @@ def get_recommendations(
                 .order_by(MaterialRecommendation.created_at.desc())
                 .first()
             )
+            score_factors = _build_score_factors(m.get("score_factors", {}))
             items.append(MaterialItem(
                 id=rec.id if rec else 0,
                 material_id=m["material_id"],
@@ -52,6 +94,8 @@ def get_recommendations(
                 tag=m["tag"],
                 cefr=m["cefr"],
                 score=m["score"],
+                score_factors=score_factors,
+                reason=_build_reason(score_factors),
             ))
         return items
 
@@ -112,6 +156,7 @@ def refresh_recommendations(
                 .order_by(MaterialRecommendation.created_at.desc())
                 .first()
             )
+            score_factors = _build_score_factors(m.get("score_factors", {}))
             items.append(MaterialItem(
                 id=rec.id if rec else 0,
                 material_id=m["material_id"],
@@ -123,6 +168,8 @@ def refresh_recommendations(
                 tag=m["tag"],
                 cefr=m["cefr"],
                 score=m["score"],
+                score_factors=score_factors,
+                reason=_build_reason(score_factors),
             ))
         return items
 

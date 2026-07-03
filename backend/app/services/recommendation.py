@@ -127,10 +127,10 @@ class RecommendationService:
         # 计算每个资料的得分
         scored = []
         for mat in all_materials:
-            score = self._score_material(
+            total, factors = self._score_material(
                 mat, weakness_dim, user_level, user_interests, user.id, db
             )
-            scored.append((mat, score))
+            scored.append((mat, total, factors))
 
         # 按分数降序排序
         scored.sort(key=lambda x: x[1], reverse=True)
@@ -140,7 +140,7 @@ class RecommendationService:
         type_map = {"video": "videos", "article": "articles", "audio": "audios"}
         type_counts = {"videos": videos_count, "articles": articles_count, "audios": audios_count}
 
-        for mat, score in scored:
+        for mat, score, factors in scored:
             sub_type = mat.get("sub_type", "video")
             group = type_map.get(sub_type)
             if group and len(result[group]) < type_counts[group]:
@@ -154,7 +154,8 @@ class RecommendationService:
                     "duration": extra.get("duration", ""),
                     "tag": (extra.get("tags", []) or [""])[0] if extra.get("tags") else "",
                     "cefr": extra.get("difficulty", ""),
-                    "score": round(score, 1),
+                    "score": factors["total"],
+                    "score_factors": factors,
                 })
 
         return result
@@ -162,8 +163,11 @@ class RecommendationService:
     def _score_material(
         self, mat: dict, weakness_dim: str, user_level: str,
         user_interests: List[str], user_id: int, db: Session,
-    ) -> float:
-        """四因子评分：短板40% + 难度35% + 兴趣25% + 新颖度(去重)"""
+    ) -> tuple:
+        """四因子评分：短板40% + 难度35% + 兴趣25% + 新颖度(去重)
+
+        Returns: (total_score, factors_dict)
+        """
         extra = mat.get("extra_data", {})
 
         # 1. 短板匹配 (40%)
@@ -185,8 +189,16 @@ class RecommendationService:
             + level_score * 0.35
             + interest_score * 0.25
         )
-        # 新颖度作为乘性因子：disliked→0，最近推荐过→打折
-        return base * novelty_score * 100
+        total = base * novelty_score * 100
+
+        factors = {
+            "weakness": round(weakness_score * 100, 1),
+            "level": round(level_score * 100, 1),
+            "interest": round(interest_score * 100, 1),
+            "novelty": round(novelty_score * 100, 1),
+            "total": round(total, 1),
+        }
+        return total, factors
 
     def _calc_weakness_match(self, mat: dict, weakness_dim: str) -> float:
         """计算资料与短板维度的匹配度
