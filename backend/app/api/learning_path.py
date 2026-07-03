@@ -35,11 +35,13 @@ router = APIRouter()
 
 def _build_task_reason(task_type: str, weakness_label: str, user_goal: str) -> str:
     """根据任务类型生成推荐原因"""
-    if task_type == "shadowing":
-        return f"针对你的「{weakness_label}」短板，通过跟读训练改善发音"
-    elif task_type == "conversation":
-        return f"匹配你的学习目标「{user_goal}」，实战练习口语表达"
-    return ""
+    reasons = {
+        "shadowing": f"针对你的「{weakness_label}」短板，通过跟读训练改善发音",
+        "conversation": f"匹配你的学习目标「{user_goal}」，实战练习口语表达",
+        "grammar": f"针对你的「{weakness_label}」短板，通过语法纠错提升准确性",
+        "vocabulary": f"针对你的「{weakness_label}」短板，通过词汇积累扩充表达能力",
+    }
+    return reasons.get(task_type, "")
 
 
 @router.get("/tasks", response_model=DailyTasksResponse)

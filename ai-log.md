@@ -19,7 +19,7 @@
 10. **移除听力任务 + 任务推荐原因**：前后端完全移除 listening 任务生成（TASK_TEMPLATES/generate_daily_tasks/replace_task/_pick_listening_material 全部清理）；资料推荐移除音频类（视频3+文章3=6条）；TaskItem 新增 reason 字段，跟读任务关联短板维度、对话任务关联学习目标自动生成推荐原因
 11. **前端展示推荐原因**：学习任务卡片和资料推荐卡片均显示推荐原因标签
 12. **过滤历史 listening 任务**：`_get_today_tasks` 和 `get_task_progress` 中过滤掉 listening 类型
-13. **推荐数量 + 原因优化**：视频/文章推荐各从 3 条增至 5 条（共 10 条）；推荐原因改为展示完整四因子分解，每个因子有具体说明文字
+13. **新增语法+词汇任务类型**：每日任务从 2 种（跟读+对话）扩展为 4 种（跟读+对话+语法+词汇）；语法任务关联 grammar 技能 → 跳转 `/grammar`；词汇任务关联 vocabulary 技能；数据库 ENUM 已扩展
 
 ### 影响文件
 - `backend/app/schemas/voice_chat.py` — **新建**，统一 Schema

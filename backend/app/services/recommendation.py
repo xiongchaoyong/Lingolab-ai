@@ -25,12 +25,18 @@ TASK_TEMPLATES = {
     "shadowing": {
         "title": "跟读练习：{skill_label}",
         "description": "模仿标准发音，重点练习 {skill_label}，提升口语准确度",
-        "reason": "针对你的「{weakness}」短板，通过跟读训练改善发音",
     },
     "conversation": {
         "title": "对话练习：{scene_label}",
         "description": "在 {scene_label} 场景中进行 AI 对话，练习实际应用",
-        "reason": "匹配你的学习目标「{goal}」，实战练习口语表达",
+    },
+    "grammar": {
+        "title": "语法纠错：{skill_label}",
+        "description": "识别并修正 {skill_label} 相关的语法错误，提升写作和口语准确性",
+    },
+    "vocabulary": {
+        "title": "词汇练习：{skill_label}",
+        "description": "学习 {skill_label} 相关的核心词汇，扩充表达能力",
     },
 }
 
@@ -359,6 +365,39 @@ class RecommendationService:
             "scene": scene_name,
         })
 
+        # --- 语法任务 (grammar) — 基于语法技能 ---
+        grammar_skill = self._pick_best_skill(
+            weakness_skills, cefr_grammar, user_interests, "grammar"
+        )
+        grammar_label = kg_service.get_node(grammar_skill)["label"] if grammar_skill else "基础语法"
+        grammar_material = self._pick_material_for_skill(grammar_skill, user_interests)
+
+        tasks.append({
+            "task_type": "grammar",
+            "title": f"语法纠错：{grammar_label}",
+            "description": f"识别并修正 {grammar_label} 相关的语法错误，提升写作和口语准确性",
+            "difficulty": user_level,
+            "focus_skill_id": grammar_skill,
+            "material_id": grammar_material,
+            "scene": None,
+        })
+
+        # --- 词汇任务 (vocabulary) — 基于词汇技能 ---
+        vocab_skill = self._pick_best_skill(
+            weakness_skills, cefr_vocab, user_interests, "vocabulary"
+        )
+        vocab_label = kg_service.get_node(vocab_skill)["label"] if vocab_skill else "核心词汇"
+
+        tasks.append({
+            "task_type": "vocabulary",
+            "title": f"词汇练习：{vocab_label}",
+            "description": f"学习 {vocab_label} 相关的核心词汇，扩充表达能力",
+            "difficulty": user_level,
+            "focus_skill_id": vocab_skill,
+            "material_id": None,
+            "scene": None,
+        })
+
         # Step 6: 写入 daily_tasks
         for t in tasks:
             db_task = DailyTask(
@@ -553,6 +592,30 @@ class RecommendationService:
                 title=f"对话练习：{label}",
                 description=f"在 {label} 场景中进行 AI 对话",
                 difficulty=user_level, scene=chosen.replace("topic:", ""), status="pending",
+            )
+        elif task.task_type == "grammar":
+            skills = kg_service.get_skills_by_cefr(user_level, sub_type="grammar")
+            candidates = [s["id"] for s in skills]
+            chosen = random.choice(candidates) if candidates else None
+            label = kg_service.get_node(chosen)["label"] if chosen else "基础语法"
+
+            new_task = DailyTask(
+                user_id=user_id, task_date=today, task_type="grammar",
+                title=f"语法纠错：{label}",
+                description=f"识别并修正 {label} 相关的语法错误",
+                difficulty=user_level, focus_skill_id=chosen, status="pending",
+            )
+        elif task.task_type == "vocabulary":
+            skills = kg_service.get_skills_by_cefr(user_level, sub_type="vocabulary")
+            candidates = [s["id"] for s in skills]
+            chosen = random.choice(candidates) if candidates else None
+            label = kg_service.get_node(chosen)["label"] if chosen else "核心词汇"
+
+            new_task = DailyTask(
+                user_id=user_id, task_date=today, task_type="vocabulary",
+                title=f"词汇练习：{label}",
+                description=f"学习 {label} 相关的核心词汇",
+                difficulty=user_level, focus_skill_id=chosen, status="pending",
             )
         db.add(new_task)
         db.commit()

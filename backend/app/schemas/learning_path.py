@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field
 class TaskItem(BaseModel):
     """单条任务"""
     id: int
-    type: str = Field(..., description="shadowing / conversation")
+    type: str = Field(..., description="shadowing / conversation / grammar / vocabulary")
     title: str
     description: Optional[str] = ""
     difficulty: Optional[str] = None

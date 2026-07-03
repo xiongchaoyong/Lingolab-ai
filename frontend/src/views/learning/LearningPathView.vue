@@ -30,12 +30,16 @@ function getStatusLabel(status) {
 
 function getTypeIcon(type) {
   if (type === 'conversation') return 'ChatDotRound'
+  if (type === 'grammar') return 'EditPen'
+  if (type === 'vocabulary') return 'Collection'
   return 'Microphone'
 }
 
 function startTask(task) {
   if (task.type === 'conversation') router.push('/voice-chat')
+  else if (task.type === 'grammar') router.push('/grammar')
   else if (task.type === 'shadowing') router.push('/pronunciation')
+  else if (task.type === 'vocabulary') router.push('/pronunciation')
 }
 
 async function skipTask(task) {
@@ -117,7 +121,7 @@ onMounted(() => {
             <el-button text size="small" @click="replaceTask(task)">换一个</el-button>
             <el-button text size="small" @click="adjustDifficulty(task)">调整难度</el-button>
             <el-button type="primary" size="small" @click="startTask(task)">
-              {{ task.type === 'conversation' ? '开始对话' : '开始跟读' }}
+              {{ task.type === 'conversation' ? '开始对话' : task.type === 'grammar' ? '去练习' : task.type === 'vocabulary' ? '去练习' : '开始跟读' }}
             </el-button>
           </div>
 
@@ -211,6 +215,8 @@ onMounted(() => {
 
   &.shadowing { background: rgba(var(--color-primary-rgb), 0.1); color: var(--color-primary); }
   &.conversation { background: rgba(var(--color-success-rgb), 0.1); color: var(--color-success); }
+  &.grammar { background: rgba(245, 108, 108, 0.1); color: #F56C6C; }
+  &.vocabulary { background: rgba(230, 162, 60, 0.1); color: #E6A23C; }
 }
 
 .task-body {
