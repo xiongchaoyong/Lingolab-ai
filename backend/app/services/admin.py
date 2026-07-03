@@ -12,9 +12,11 @@ from app.models.admin import Class, ClassStudent, Assignment, AssignmentSubmissi
 from app.models.user import UserProfile
 from app.models.profile import UserSkillScore
 from app.models.assessment import AssessmentQuestion
-from app.models.pronunciation import PronunciationContent
+from app.models.pronunciation import PronunciationContent, PronunciationRecord
 from app.models.learning import LearningMaterial
-from app.models.gamification import DubbingContent
+from app.models.gamification import DubbingContent, UserScore
+from app.models.knowledge_graph import DailyTask
+from app.models.conversation import ConversationSession
 from app.models.knowledge_base import KnowledgeDocument, SearchLog
 from app.services.rag_service import rag_service
 
@@ -431,7 +433,54 @@ class AdminService:
         total_users = db.query(func.count(UserProfile.id)).scalar() or 0
         active_users = db.query(func.count(UserProfile.id)).filter(UserProfile.is_active == 1).scalar() or 0
 
-        # DAU — 今日活跃用户
+        # 角色分布
+        teacher_count = db.query(func.count(UserProfile.id)).filter(UserProfile.role == 'teacher').scalar() or 0
+        learner_count = db.query(func.count(UserProfile.id)).filter(UserProfile.role == 'learner').scalar() or 0
+
+        # 班级概况
+        total_classes = db.query(func.count(Class.id)).filter(Class.is_active == 1).scalar() or 0
+        total_class_students = db.query(func.count(ClassStudent.user_id)).scalar() or 0
+        avg_students_per_class = round(total_class_students / total_classes, 1) if total_classes > 0 else 0
+
+        # 真实对话完成率
+        conversation_total = db.query(func.count(ConversationSession.id)).scalar() or 0
+        conversation_completed = (
+            db.query(func.count(ConversationSession.id))
+            .filter(ConversationSession.status == 'completed')
+            .scalar()
+        ) or 0
+        conversation_completion = round(conversation_completed / conversation_total * 100, 1) if conversation_total > 0 else 0.0
+
+        # 任务完成率
+        task_total = db.query(func.count(DailyTask.id)).scalar() or 0
+        task_completed = (
+            db.query(func.count(DailyTask.id))
+            .filter(DailyTask.status == 'completed')
+            .scalar()
+        ) or 0
+        task_completion_rate = round(task_completed / task_total * 100, 1) if task_total > 0 else 0.0
+
+        # 今日活动
+        today_tasks_completed = (
+            db.query(func.count(DailyTask.id))
+            .filter(DailyTask.task_date == today, DailyTask.status == 'completed')
+            .scalar()
+        ) or 0
+        today_pronunciation = (
+            db.query(func.count(PronunciationRecord.id))
+            .filter(func.date(PronunciationRecord.created_at) == today)
+            .scalar()
+        ) or 0
+        today_conversations = (
+            db.query(func.count(ConversationSession.id))
+            .filter(func.date(ConversationSession.created_at) == today)
+            .scalar()
+        ) or 0
+
+        # 总积分
+        total_points = db.query(func.sum(UserScore.score)).scalar() or 0
+
+        # DAU — 今日活跃用户（多表 union）
         dau = (
             db.query(func.count(func.distinct(UserSkillScore.user_id)))
             .filter(func.date(UserSkillScore.created_at) == today)
@@ -443,6 +492,13 @@ class AdminService:
         mau = (
             db.query(func.count(func.distinct(UserSkillScore.user_id)))
             .filter(func.date(UserSkillScore.created_at) >= month_start)
+            .scalar()
+        ) or 0
+
+        # 日新增
+        daily_new_users = (
+            db.query(func.count(UserProfile.id))
+            .filter(func.date(UserProfile.created_at) == today)
             .scalar()
         ) or 0
 
@@ -465,6 +521,17 @@ class AdminService:
                 .scalar()
             ) or 0
             user_trend.append({"label": f"{month}月", "value": count})
+
+        # 7 日 DAU 趋势
+        daily_activity = []
+        for i in range(6, -1, -1):
+            d = today - timedelta(days=i)
+            count = (
+                db.query(func.count(func.distinct(UserSkillScore.user_id)))
+                .filter(func.date(UserSkillScore.created_at) == d)
+                .scalar()
+            ) or 0
+            daily_activity.append({"label": d.strftime("%m/%d"), "value": count})
 
         # 内容类型分布
         type_dist = dict(
@@ -493,7 +560,6 @@ class AdminService:
         ) or 0
 
         if yesterday_active > 0:
-            # D1 留存：昨天活跃用户中，今天也活跃的比例
             yesterday_users = (
                 db.query(func.distinct(UserSkillScore.user_id))
                 .filter(func.date(UserSkillScore.created_at) == yesterday)
@@ -517,7 +583,6 @@ class AdminService:
         ) or 0
 
         if seven_ago_active > 0:
-            # D7 留存：7天前活跃用户中，今天也活跃的比例
             seven_ago_users = (
                 db.query(func.distinct(UserSkillScore.user_id))
                 .filter(func.date(UserSkillScore.created_at) == seven_days_ago)
@@ -543,24 +608,6 @@ class AdminService:
         active_user_count = db.query(func.count(func.distinct(UserSkillScore.user_id))).scalar() or 1
         avg_duration_minutes = round(total_duration_minutes / active_user_count, 1)
 
-        # 对话完成率
-        total_sessions = (
-            db.query(func.count(AssignmentSubmission.id)).scalar()
-        ) or 0
-        completed_sessions = (
-            db.query(func.count(AssignmentSubmission.id))
-            .filter(AssignmentSubmission.status == "reviewed")
-            .scalar()
-        ) or 0
-        conversation_completion = round(completed_sessions / total_sessions * 100, 1) if total_sessions > 0 else 0.0
-
-        # 日新增
-        daily_new_users = (
-            db.query(func.count(UserProfile.id))
-            .filter(func.date(UserProfile.created_at) == today)
-            .scalar()
-        ) or 0
-
         return {
             "metrics": {
                 "dau": dau,
@@ -569,12 +616,23 @@ class AdminService:
                 "retention_d7": retention_d7,
                 "total_users": total_users,
                 "active_users": active_users,
+                "daily_new_users": daily_new_users,
                 "total_duration_minutes": total_duration_minutes,
                 "avg_duration_minutes": avg_duration_minutes,
                 "conversation_completion_rate": conversation_completion,
-                "daily_new_users": daily_new_users,
+                # 新增指标
+                "teacher_count": teacher_count,
+                "learner_count": learner_count,
+                "total_classes": total_classes,
+                "avg_students_per_class": avg_students_per_class,
+                "today_tasks_completed": today_tasks_completed,
+                "today_pronunciation": today_pronunciation,
+                "today_conversations": today_conversations,
+                "task_completion_rate": task_completion_rate,
+                "total_points": total_points,
             },
             "user_trend": user_trend,
+            "daily_activity": daily_activity,
             "content_type_distribution": type_dist,
             "level_distribution": level_dist,
         }

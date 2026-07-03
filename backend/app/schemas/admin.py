@@ -149,10 +149,24 @@ class DashboardMetrics(BaseModel):
     retention_d7: float = 0.0
     total_users: int = 0
     active_users: int = 0
+    daily_new_users: int = 0
     total_duration_minutes: int = 0
     avg_duration_minutes: float = 0.0
     conversation_completion_rate: float = 0.0
-    daily_new_users: int = 0
+    # 角色分布
+    teacher_count: int = 0
+    learner_count: int = 0
+    # 班级概况
+    total_classes: int = 0
+    avg_students_per_class: float = 0.0
+    # 今日活动
+    today_tasks_completed: int = 0
+    today_pronunciation: int = 0
+    today_conversations: int = 0
+    # 任务
+    task_completion_rate: float = 0.0
+    # 积分
+    total_points: int = 0
 
 
 class TrendPoint(BaseModel):
@@ -165,6 +179,7 @@ class DashboardResponse(BaseModel):
     """仪表盘完整数据"""
     metrics: DashboardMetrics
     user_trend: List[TrendPoint] = Field(default_factory=list)
+    daily_activity: List[TrendPoint] = Field(default_factory=list)
     content_type_distribution: dict = Field(default_factory=dict)
     level_distribution: dict = Field(default_factory=dict)
 
