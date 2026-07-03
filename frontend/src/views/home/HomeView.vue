@@ -1,7 +1,23 @@
 <script setup>
+import { ref, computed, onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
+import { useProgressStore } from '@/stores/progress'
 
 const authStore = useAuthStore()
+const progressStore = useProgressStore()
+const loading = ref(true)
+
+const levelLabel = computed(() => {
+  const level = authStore.userInfo?.level_final
+  if (!level) return null
+  const map = { A1: '入门', A2: '基础', B1: '进阶', B2: '中高级', C1: '流利', C2: '精通' }
+  return `${level} · ${map[level] || ''}`
+})
+
+onMounted(async () => {
+  await progressStore.fetchAll()
+  loading.value = false
+})
 </script>
 
 <template>
@@ -12,34 +28,19 @@ const authStore = useAuthStore()
         <h2 class="page-title">
           欢迎回来，{{ authStore.userInfo?.username || '同学' }}
         </h2>
-        <p class="welcome-subtitle">今日学习进度</p>
+        <p class="welcome-subtitle">
+          <template v-if="levelLabel">当前等级：{{ levelLabel }}</template>
+          <template v-else>今日学习进度</template>
+        </p>
       </div>
     </div>
 
     <!-- 统计卡片 -->
-    <el-row :gutter="16" class="stats-row">
-      <el-col :span="6">
+    <el-row v-loading="loading" :gutter="16" class="stats-row">
+      <el-col v-for="stat in progressStore.statCards" :key="stat.label" :xs="12" :sm="8" :md="4">
         <el-card shadow="hover" class="stat-card">
-          <div class="stat-value">0</div>
-          <div class="stat-label">今日完成任务</div>
-        </el-card>
-      </el-col>
-      <el-col :span="6">
-        <el-card shadow="hover" class="stat-card">
-          <div class="stat-value">0 分钟</div>
-          <div class="stat-label">今日学习时长</div>
-        </el-card>
-      </el-col>
-      <el-col :span="6">
-        <el-card shadow="hover" class="stat-card">
-          <div class="stat-value">0 天</div>
-          <div class="stat-label">连续学习</div>
-        </el-card>
-      </el-col>
-      <el-col :span="6">
-        <el-card shadow="hover" class="stat-card">
-          <div class="stat-value">--</div>
-          <div class="stat-label">当前等级</div>
+          <div class="stat-value">{{ stat.value }}<small>{{ stat.unit }}</small></div>
+          <div class="stat-label">{{ stat.label }}</div>
         </el-card>
       </el-col>
     </el-row>
@@ -62,10 +63,10 @@ const authStore = useAuthStore()
         </el-card>
       </el-col>
       <el-col :span="8">
-        <el-card shadow="hover" class="action-card" @click="$router.push('/learning-path')">
-          <el-icon :size="36" color="#FDBA74"><Guide /></el-icon>
-          <h4>学习路径</h4>
-          <p>个性化每日任务，系统提升英语水平</p>
+        <el-card shadow="hover" class="action-card" @click="$router.push('/progress')">
+          <el-icon :size="36" color="#FDBA74"><DataAnalysis /></el-icon>
+          <h4>学习报告</h4>
+          <p>查看详细学习数据与趋势分析</p>
         </el-card>
       </el-col>
     </el-row>
@@ -84,7 +85,15 @@ const authStore = useAuthStore()
       flex-shrink: 0;
     }
 
+    .page-title {
+      font-family: var(--font-heading);
+      font-size: var(--font-size-xl);
+      font-weight: 700;
+      margin: 0;
+    }
+
     .welcome-subtitle {
+      margin-top: 4px;
       color: var(--color-text-secondary);
       font-family: var(--font-body);
     }
@@ -96,8 +105,8 @@ const authStore = useAuthStore()
 
   .stat-card {
     text-align: center;
-    cursor: pointer;
     transition: all var(--transition-base);
+    margin-bottom: var(--spacing-base);
 
     &:hover {
       transform: translateY(-2px);
@@ -105,9 +114,15 @@ const authStore = useAuthStore()
 
     .stat-value {
       font-family: var(--font-heading);
-      font-size: 28px;
+      font-size: 24px;
       font-weight: 700;
       color: var(--color-primary);
+      small {
+        font-size: 14px;
+        font-weight: 400;
+        color: var(--color-text-secondary);
+        margin-left: 2px;
+      }
     }
 
     .stat-label {
@@ -149,6 +164,13 @@ const authStore = useAuthStore()
         font-size: var(--font-size-sm);
       }
     }
+  }
+}
+
+/* 响应式 */
+@media (max-width: 768px) {
+  .home-page .stats-row .stat-value {
+    font-size: 18px;
   }
 }
 </style>
