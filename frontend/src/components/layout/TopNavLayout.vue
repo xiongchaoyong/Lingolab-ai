@@ -53,14 +53,6 @@ const learnerNavs = [
     ],
   },
   {
-    title: '学习进度',
-    children: [
-      { path: '/progress', title: '进度追踪' },
-      { path: '/challenge', title: '闯关挑战' },
-      { path: '/my-homework', title: '我的作业' },
-    ],
-  },
-  {
     title: '社区',
     children: [
       { path: '/community', title: '社区广场' },
@@ -86,14 +78,6 @@ const teacherNavs = [
       { path: '/learning-path', title: '路径规划' },
       { path: '/recommend', title: '资料推荐' },
       { path: '/profile-summary', title: '个人情况说明' },
-    ],
-  },
-  {
-    title: '学习进度',
-    children: [
-      { path: '/progress', title: '进度追踪' },
-      { path: '/challenge', title: '闯关挑战' },
-      { path: '/my-homework', title: '我的作业' },
     ],
   },
   {
@@ -130,14 +114,6 @@ const adminNavs = [
       { path: '/learning-path', title: '路径规划' },
       { path: '/recommend', title: '资料推荐' },
       { path: '/profile-summary', title: '个人情况说明' },
-    ],
-  },
-  {
-    title: '学习进度',
-    children: [
-      { path: '/progress', title: '进度追踪' },
-      { path: '/challenge', title: '闯关挑战' },
-      { path: '/my-homework', title: '我的作业' },
     ],
   },
   {

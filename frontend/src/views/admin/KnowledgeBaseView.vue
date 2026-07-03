@@ -1,6 +1,6 @@
 <script setup>
 import { ref, onMounted, watch, computed } from 'vue'
-import { Search, Refresh, Plus, Delete, Edit, Document } from '@element-plus/icons-vue'
+import { Search, Refresh, Plus, Delete, Edit, Document, Loading } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   getKnowledgeDocsApi,
@@ -14,6 +14,7 @@ import {
 
 // ========== 文档管理状态 ==========
 const loading = ref(false)
+const initialLoad = ref(true)
 const docs = ref([])
 const docTotal = ref(0)
 const docPage = ref(1)
@@ -76,6 +77,7 @@ async function loadDocs() {
     ElMessage.error('加载文档列表失败')
   } finally {
     loading.value = false
+    initialLoad.value = false
   }
 }
 
@@ -246,7 +248,13 @@ function truncateText(text, max = 60) {
           </div>
         </div>
 
-        <el-table :data="docs" v-loading="loading" stripe style="width: 100%; margin-top: 16px">
+        <!-- 首次加载占位 -->
+        <div v-if="initialLoad && loading" style="text-align:center;padding:80px 0;">
+          <el-icon class="is-loading" :size="36" color="var(--color-primary)"><Loading /></el-icon>
+          <p style="margin-top:12px;color:var(--color-text-secondary);">加载中...</p>
+        </div>
+
+        <el-table v-else :data="docs" v-loading="loading" stripe style="width: 100%; margin-top: 16px">
           <el-table-column prop="id" label="ID" width="70" />
           <el-table-column prop="title" label="标题" min-width="200" show-overflow-tooltip />
           <el-table-column prop="content" label="内容摘要" min-width="280" show-overflow-tooltip>

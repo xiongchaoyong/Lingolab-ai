@@ -1,3 +1,19 @@
+## 2026-07-03: 学习进度 Tab 拆分 — 进度+作业集成首页，闯关移入社区
+
+### 变更内容
+1. **TopNavLayout**：移除所有角色的"学习进度"下拉菜单（进度追踪/闯关挑战/我的作业）
+2. **HomeView 重构**：集成进度追踪区（雷达图+趋势折线图+日历热力图+学习预测+预警+时间切换）+ 我的作业区（表格+提交弹窗）；快捷入口"学习报告"替换为"语法纠错"
+3. **CommunityView**：新增第4个Tab"闯关挑战"，嵌入每日闯关+配音挑战+勋章墙（原ChallengeView全部内容）
+4. **Router**：旧路由重定向 `/progress`→`/`、`/challenge`→`/community`、`/my-homework`→`/`
+
+### 文件变更
+- 修改: `frontend/src/components/layout/TopNavLayout.vue`
+- 重写: `frontend/src/views/home/HomeView.vue`
+- 修改: `frontend/src/views/community/CommunityView.vue`
+- 修改: `frontend/src/router/index.js`
+
+---
+
 ## 2026-07-03: 运营数据看板详细化升级
 
 ### 变更内容

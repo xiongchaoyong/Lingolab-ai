@@ -23,8 +23,8 @@ const metricGroups = computed(() => [
       { label: '总用户', value: String(d.value.total_users || 0), color: '#A78BFA' },
       { label: '活跃用户', value: String(d.value.active_users || 0), color: '#C4B5FD' },
       { label: '日新增', value: String(d.value.daily_new_users || 0), color: '#FDE68A' },
-      { label: 'DAU', value: String(d.value.dau || 0), color: '#93C5FD' },
-      { label: 'MAU', value: String(d.value.mau || 0), color: '#86EFAC' },
+      { label: '日活(DAU)', value: String(d.value.dau || 0), color: '#93C5FD' },
+      { label: '月活(MAU)', value: String(d.value.mau || 0), color: '#86EFAC' },
     ],
   },
   {
@@ -156,7 +156,7 @@ const typeBarOption = computed(() => {
       <el-row :gutter="16" style="margin-top: var(--spacing-lg);">
         <el-col :span="14">
           <div class="chart-box">
-            <h4 class="chart-title">近7日 DAU 趋势</h4>
+            <h4 class="chart-title">近7日 日活趋势</h4>
             <v-chart :option="dailyActivityOption" autoresize style="height: 300px" />
           </div>
         </el-col>
