@@ -458,6 +458,8 @@ class RecommendationService:
 
         result = []
         for t in tasks:
+            if t.task_type == "listening":
+                continue
             task_dict = {
                 "id": t.id,
                 "type": t.task_type,
@@ -485,8 +487,9 @@ class RecommendationService:
             )
             .all()
         )
-        done = sum(1 for t in tasks if t.status == "completed")
-        return done, len(tasks)
+        valid = [t for t in tasks if t.task_type != "listening"]
+        done = sum(1 for t in valid if t.status == "completed")
+        return done, len(valid)
 
     def skip_task(self, task_id: int, user_id: int, reason: Optional[str], db: Session) -> Optional[dict]:
         """跳过任务"""

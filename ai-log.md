@@ -18,6 +18,7 @@
 9. **推荐资料展示推荐原因**：MaterialItem 新增 score_factors 字段（四因子：短板匹配/难度适中/兴趣相关/新鲜推荐），前端卡片展示推荐原因标签
 10. **移除听力任务 + 任务推荐原因**：前后端完全移除 listening 任务生成（TASK_TEMPLATES/generate_daily_tasks/replace_task/_pick_listening_material 全部清理）；资料推荐移除音频类（视频3+文章3=6条）；TaskItem 新增 reason 字段，跟读任务关联短板维度、对话任务关联学习目标自动生成推荐原因
 11. **前端展示推荐原因**：学习任务卡片和资料推荐卡片均显示推荐原因标签
+12. **过滤历史 listening 任务**：`_get_today_tasks` 和 `get_task_progress` 中过滤掉 listening 类型，防止数据库遗留数据导致前端仍展示听力任务
 
 ### 影响文件
 - `backend/app/schemas/voice_chat.py` — **新建**，统一 Schema
