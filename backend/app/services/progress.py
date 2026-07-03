@@ -13,8 +13,8 @@ from app.models.gamification import UserScore, DubbingRecord
 
 logger = logging.getLogger(__name__)
 
-# 五维雷达图维度
-RADAR_DIMENSIONS = ["发音准确率", "流利度", "语法", "听力", "表达丰富度"]
+# 五维雷达图维度（从画像四维度衍生）
+RADAR_DIMENSIONS = ["发音", "流利度", "语法", "词汇运用", "互动参与"]
 
 
 class ProgressService:
@@ -175,11 +175,11 @@ class ProgressService:
 
         # 映射到五维显示
         return {
-            "发音准确率": dim_map.get("speaking", 0),
-            "流利度": dim_map.get("speaking", 0) * 0.85,  # 流利度近似
+            "发音": dim_map.get("pronunciation", 0),
+            "流利度": dim_map.get("fluency", 0),
             "语法": dim_map.get("grammar", 0),
-            "听力": dim_map.get("listening", 0),
-            "表达丰富度": dim_map.get("reading", 0),
+            "词汇运用": dim_map.get("vocabulary", 0),
+            "互动参与": dim_map.get("fluency", 0) * 0.9,
         }
 
     def _get_daily_trend(
@@ -195,7 +195,7 @@ class ProgressService:
                 UserSkillScore.user_id == user_id,
                 UserSkillScore.created_at >= start,
                 UserSkillScore.created_at <= end,
-                UserSkillScore.dimension == "speaking",
+                UserSkillScore.dimension == "pronunciation",
             )
             .group_by(text("d"))
             .order_by(text("d"))
@@ -222,7 +222,7 @@ class ProgressService:
                 UserSkillScore.user_id == user_id,
                 UserSkillScore.created_at >= start,
                 UserSkillScore.created_at <= end,
-                UserSkillScore.dimension == "speaking",
+                UserSkillScore.dimension == "pronunciation",
             )
             .group_by(text("h"))
             .order_by(text("h"))
@@ -244,7 +244,7 @@ class ProgressService:
                 UserSkillScore.user_id == user_id,
                 UserSkillScore.created_at >= start,
                 UserSkillScore.created_at <= end,
-                UserSkillScore.dimension == "speaking",
+                UserSkillScore.dimension == "pronunciation",
             )
             .group_by(text("w"))
             .order_by(text("w"))
@@ -360,7 +360,7 @@ class ProgressService:
             db.query(func.count(UserSkillScore.id))
             .filter(
                 UserSkillScore.user_id == user_id,
-                UserSkillScore.dimension == "speaking",
+                UserSkillScore.dimension == "pronunciation",
             )
             .scalar()
         ) or 0

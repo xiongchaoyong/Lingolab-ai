@@ -13,7 +13,7 @@ class UserSkillScore(Base):
     user_id = Column(Integer, ForeignKey("user_profiles.id"), nullable=False, comment="用户 ID")
     dimension = Column(
         String(32), nullable=False,
-        comment="技能维度：listening / speaking / reading / grammar",
+        comment="技能维度：pronunciation / grammar / vocabulary / fluency",
     )
     skill_name = Column(
         String(64), nullable=False,
@@ -40,9 +40,9 @@ class DimensionScoreLog(Base):
         comment="触发来源：assessment / pronunciation / conversation / roleplay / daily_task",
     )
     source_id = Column(Integer, default=None, comment="来源记录 ID")
-    listening_score = Column(DECIMAL(5, 2), default=None, comment="听力 EMA 分数")
-    speaking_score = Column(DECIMAL(5, 2), default=None, comment="口语 EMA 分数")
-    reading_score = Column(DECIMAL(5, 2), default=None, comment="阅读 EMA 分数")
+    fluency_score = Column(DECIMAL(5, 2), default=None, comment="流利度/互动 EMA 分数")
+    pronunciation_score = Column(DECIMAL(5, 2), default=None, comment="发音 EMA 分数")
+    vocabulary_score = Column(DECIMAL(5, 2), default=None, comment="词汇运用 EMA 分数")
     grammar_score = Column(DECIMAL(5, 2), default=None, comment="语法 EMA 分数")
     overall_score = Column(DECIMAL(5, 2), default=None, comment="综合分")
     cefr_level = Column(String(8), default=None, comment="CEFR 等级")

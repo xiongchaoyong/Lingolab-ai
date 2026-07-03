@@ -12,33 +12,33 @@ const showLogDialog = ref(false)
 const MOCK_LOGS = [
   {
     id: 1, source: 'assessment', source_label: '初次测评',
-    listening_score: 45, speaking_score: 38, reading_score: 52, grammar_score: 41,
+    fluency_score: 45, pronunciation_score: 38, vocabulary_score: 52, grammar_score: 41,
     overall_score: 44.0, cefr_level: 'B1', created_at: new Date(Date.now() - 6 * 86400000).toISOString(),
   },
   {
     id: 2, source: 'pronunciation', source_label: '发音评测',
-    listening_score: 45, speaking_score: 46, reading_score: 52, grammar_score: 41,
+    fluency_score: 45, pronunciation_score: 46, vocabulary_score: 52, grammar_score: 41,
     overall_score: 46.0, cefr_level: 'B1', created_at: new Date(Date.now() - 5 * 86400000).toISOString(),
   },
   {
     id: 3, source: 'conversation', source_label: '智能对话',
-    listening_score: 45, speaking_score: 53, reading_score: 58, grammar_score: 48,
-    overall_score: 51.0, cefr_level: 'B1', created_at: new Date(Date.now() - 4 * 86400000).toISOString(),
+    fluency_score: 48, pronunciation_score: 53, vocabulary_score: 58, grammar_score: 48,
+    overall_score: 51.8, cefr_level: 'B1', created_at: new Date(Date.now() - 4 * 86400000).toISOString(),
   },
   {
     id: 4, source: 'daily_task', source_label: '每日任务',
-    listening_score: 52, speaking_score: 53, reading_score: 58, grammar_score: 48,
+    fluency_score: 52, pronunciation_score: 53, vocabulary_score: 58, grammar_score: 48,
     overall_score: 52.8, cefr_level: 'B1', created_at: new Date(Date.now() - 3 * 86400000).toISOString(),
   },
   {
     id: 5, source: 'pronunciation', source_label: '发音评测',
-    listening_score: 52, speaking_score: 61, reading_score: 58, grammar_score: 48,
+    fluency_score: 52, pronunciation_score: 61, vocabulary_score: 58, grammar_score: 48,
     overall_score: 54.8, cefr_level: 'B1', created_at: new Date(Date.now() - 2 * 86400000).toISOString(),
   },
   {
     id: 6, source: 'conversation', source_label: '智能对话',
-    listening_score: 52, speaking_score: 68, reading_score: 63, grammar_score: 55,
-    overall_score: 59.5, cefr_level: 'B2', created_at: new Date(Date.now() - 1 * 86400000).toISOString(),
+    fluency_score: 55, pronunciation_score: 68, vocabulary_score: 63, grammar_score: 55,
+    overall_score: 60.3, cefr_level: 'B2', created_at: new Date(Date.now() - 1 * 86400000).toISOString(),
   },
 ]
 
@@ -49,9 +49,9 @@ const displayLogs = computed(() => {
 
 // 维度显示配置
 const DIM_CONFIG = [
-  { key: 'speaking_score', label: '口语' },
-  { key: 'listening_score', label: '听力' },
-  { key: 'reading_score', label: '阅读' },
+  { key: 'pronunciation_score', label: '发音' },
+  { key: 'fluency_score', label: '流利度' },
+  { key: 'vocabulary_score', label: '词汇运用' },
   { key: 'grammar_score', label: '语法' },
 ]
 
