@@ -1,3 +1,18 @@
+## 2026-07-03: 知识库管理页面加载卡顿修复
+
+### 根因分析
+1. `loading` 初始值为 `false`，组件挂载时 `v-if="initialLoad && loading"` 为 `false`，导致空表格先渲染一帧，然后 `onMounted` 触发 `loadDocs()` 才显示加载占位 → 视觉卡顿
+2. 搜索/分类 watcher 设 `docPage=1` 触发翻页 watcher 立即请求，同时 300ms 防抖也排队一个请求 → 重复请求
+
+### 修复
+- `loading` 初始值改为 `true`，确保首帧即渲染加载占位，表格永不在数据就绪前出现
+- 移除 `initialLoad` 标志位，简化为 `v-if="loading"` / `v-else`
+- 翻页 watcher 先 `clearTimeout(fetchTimer)` 再请求，取消搜索 watcher 排队的防抖请求，避免双发
+- 移除 `el-table` 的 `v-loading` 指令（与 `v-if` 占位重复）
+- 清理未使用的 import（`computed`、`Document`）
+
+---
+
 ## 2026-07-03: 学习进度 Tab 拆分 — 进度+作业集成首页，闯关移入社区
 
 ### 变更内容
