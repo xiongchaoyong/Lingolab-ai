@@ -1,3 +1,20 @@
+## 2026-07-03: 知识库管理页面彻底重写 — 消除加载卡顿
+
+### 根因（深入排查后）
+之前的修复（loading初始值+防抖）未能彻底解决卡顿，进一步排查发现真正原因：
+1. **手动导入 `@element-plus/icons-vue` 6个图标** — barrel import 导致 bundler 处理整个图标库，即便 tree-shaking 后仍有解析开销
+2. **Vue `watch` 链式触发** — 搜索→重置页码→翻页 watcher→请求，复杂的响应式链路增加组件初始化负担
+3. **Element Plus `<el-icon>` + Loading 图标** — 首次渲染时的 JS 组件初始化比纯 CSS 慢
+
+### 重写要点
+- **零手动图标导入**：所有图标通过 `<template #icon>` + `<el-icon>` 插槽使用，由 `unplugin-vue-components` 逐个按需解析，构建产物中每个图标仅出现一次
+- **纯 CSS spinner**：加载占位用 CSS animation 替代 `<el-icon :is-loading><Loading /></el-icon>`，首帧零 JS 依赖
+- **移除所有 `watch`**：搜索用 `@input` + debounce，翻页用 `@current-change` / `@size-change` 显式事件，消除 watcher 链开销
+- **`catMeta` 查找表**：替代 `Array.find()` 调用，模板内直接通过 key 取值
+- 代码量从 408 行精简至 310 行
+
+---
+
 ## 2026-07-03: 知识库管理页面加载卡顿修复
 
 ### 根因分析
