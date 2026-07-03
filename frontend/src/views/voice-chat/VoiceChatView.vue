@@ -214,6 +214,13 @@ let isHangingUp = false
 const SILENCE_THRESHOLD = 0.02
 const SILENCE_DURATION = 2500
 
+// ========== 自由对话直接开始 ==========
+const DEFAULT_FREE_TALK = { id: 'free_talk', title: '自由对话', subtitle: '和AI随意聊聊', emoji: '💬', color: '#7C6FF7' }
+
+function startFreeTalk() {
+  selectTopic(DEFAULT_FREE_TALK)
+}
+
 // ========== 选择主题并开始对话 ==========
 async function selectTopic(topic) {
   selectedTopic.value = topic
@@ -466,7 +473,8 @@ onUnmounted(() => { hangUp() })
           </div>
 
           <div class="call-state-label" :class="callState">
-            <template v-if="!selectedTopic">选择{{ mode === 'scene' ? '场景' : '角色' }}开始对话</template>
+            <template v-if="!selectedTopic && mode === 'scene'">点击按钮开始自由对话</template>
+            <template v-else-if="!selectedTopic && mode === 'role'">选择角色开始对话</template>
             <template v-else-if="isConnecting">正在连接...</template>
             <template v-else-if="callState === 'ai_speaking'"><span class="state-dot speaking"></span> AI 正在说话</template>
             <template v-else-if="callState === 'listening'"><span class="state-dot listening"></span> 正在聆听...</template>
@@ -492,13 +500,20 @@ onUnmounted(() => { hangUp() })
           </template>
         </div>
 
-        <!-- 右侧面板：未选则展示主题卡片，已选则展示聊天 -->
+        <!-- 右侧面板：未选则展示开始按钮或角色卡片，已选则展示聊天 -->
         <div class="call-right">
-          <!-- 主题选择网格 -->
-          <div v-if="!selectedTopic" class="topic-select-area">
-            <div class="topic-select-hint">
-              {{ mode === 'scene' ? '选一个场景，和我一起练习口语吧~' : '选一个角色，和 AI 进行真实语音对话吧~' }}
-            </div>
+          <!-- 自由对话：开始按钮 -->
+          <div v-if="!selectedTopic && mode === 'scene'" class="topic-select-area">
+            <div class="free-talk-hint">无需选择场景，直接开始和 AI 自由对话</div>
+            <button class="free-talk-start-btn" @click="startFreeTalk">
+              <span class="fts-icon">💬</span>
+              <span class="fts-text">开始自由对话</span>
+            </button>
+          </div>
+
+          <!-- 角色扮演：主题选择网格 -->
+          <div v-else-if="!selectedTopic && mode === 'role'" class="topic-select-area">
+            <div class="topic-select-hint">选一个角色，和 AI 进行真实语音对话吧~</div>
             <div class="call-topic-grid">
               <div
                 v-for="topic in topicList"
@@ -806,6 +821,33 @@ onUnmounted(() => { hangUp() })
   color: #999;
   margin-bottom: 24px;
   text-align: center;
+}
+.free-talk-hint {
+  font-size: 15px;
+  color: #999;
+  margin-bottom: 28px;
+  text-align: center;
+}
+.free-talk-start-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 48px 64px;
+  background: linear-gradient(135deg, #F0E8FF 0%, #FDF2F8 100%);
+  border: 2px dashed #C4B5FD;
+  border-radius: 24px;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  .fts-icon { font-size: 56px; }
+  .fts-text { font-size: 18px; font-weight: 700; color: #7C6FF7; }
+  &:hover {
+    border-color: #7C6FF7;
+    background: linear-gradient(135deg, #EBE0FF 0%, #FDE8F2 100%);
+    transform: translateY(-3px);
+    box-shadow: 0 12px 32px rgba(124, 111, 247, 0.15);
+  }
+  &:active { transform: scale(0.97); }
 }
 .call-topic-grid {
   display: grid;
