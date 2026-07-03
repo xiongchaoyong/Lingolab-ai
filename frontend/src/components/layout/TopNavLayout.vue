@@ -30,7 +30,7 @@ onUnmounted(() => {
 
 // ========== 导航定义（按需求文档七个模块） ==========
 
-const FULLSCREEN_ROUTES = ['/conversation', '/role-play']
+const FULLSCREEN_ROUTES = ['/voice-chat']
 
 const isFullscreenRoute = computed(() => FULLSCREEN_ROUTES.includes(route.path))
 
@@ -40,8 +40,7 @@ const learnerNavs = [
     title: '学习中心',
     children: [
       { path: '/pronunciation', title: '发音评测' },
-      { path: '/conversation', title: 'AI 智能对话' },
-      { path: '/role-play', title: '角色扮演' },
+      { path: '/voice-chat', title: 'AI 语音对话' },
       { path: '/grammar', title: '语法纠错' },
     ],
   },
@@ -77,8 +76,7 @@ const teacherNavs = [
     title: '学习中心',
     children: [
       { path: '/pronunciation', title: '发音评测' },
-      { path: '/conversation', title: 'AI 智能对话' },
-      { path: '/role-play', title: '角色扮演' },
+      { path: '/voice-chat', title: 'AI 语音对话' },
       { path: '/grammar', title: '语法纠错' },
     ],
   },
@@ -122,8 +120,7 @@ const adminNavs = [
     title: '学习中心',
     children: [
       { path: '/pronunciation', title: '发音评测' },
-      { path: '/conversation', title: 'AI 智能对话' },
-      { path: '/role-play', title: '角色扮演' },
+      { path: '/voice-chat', title: 'AI 语音对话' },
       { path: '/grammar', title: '语法纠错' },
     ],
   },

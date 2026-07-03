@@ -53,11 +53,14 @@ const routes = [
         meta: { title: '发音评测', auth: true },
       },
       {
-        path: 'role-play',
-        name: 'RolePlay',
-        component: () => import('@/views/roleplay/RolePlayView.vue'),
-        meta: { title: '角色扮演', auth: true },
+        path: 'voice-chat',
+        name: 'VoiceChat',
+        component: () => import('@/views/voice-chat/VoiceChatView.vue'),
+        meta: { title: 'AI 语音对话', auth: true },
       },
+      // 旧路由重定向（向后兼容）
+      { path: 'conversation', redirect: () => ({ path: '/voice-chat', query: { mode: 'scene' } }) },
+      { path: 'role-play', redirect: () => ({ path: '/voice-chat', query: { mode: 'role' } }) },
       {
         path: 'grammar',
         name: 'Grammar',
@@ -128,12 +131,6 @@ const routes = [
         name: 'Notices',
         component: () => import('@/views/notice/NoticeView.vue'),
         meta: { title: '通知中心', auth: true },
-      },
-      {
-        path: 'conversation',
-        name: 'Conversation',
-        component: () => import('@/views/conversation/VoiceCallView.vue'),
-        meta: { title: 'AI 智能对话', auth: true },
       },
     ],
   },

@@ -83,6 +83,7 @@ def health_check():
 from app.api.pronunciation import router as pronunciation_router
 from app.api.conversation import router as conversation_router
 from app.api.roleplay import router as roleplay_router
+from app.api.voice_chat import router as voice_chat_router
 from app.api.auth import router as auth_router
 from app.api.assessment import router as assessment_router
 from app.api.learning_path import router as learning_path_router
@@ -99,6 +100,7 @@ from app.api.help import router as help_router
 app.include_router(pronunciation_router, prefix="/api/pronunciation", tags=["发音评测"])
 app.include_router(conversation_router, prefix="/api/conversation", tags=["语音对话"])
 app.include_router(roleplay_router, prefix="/api/roleplay", tags=["角色扮演"])
+app.include_router(voice_chat_router, prefix="/api/voice-chat", tags=["语音对话"])
 app.include_router(auth_router, prefix="/api/auth", tags=["用户认证"])
 app.include_router(assessment_router, prefix="/api/assessment", tags=["水平测评"])
 app.include_router(learning_path_router, prefix="/api/learning-path", tags=["学习路径"])

@@ -56,10 +56,10 @@ onMounted(async () => {
         </el-card>
       </el-col>
       <el-col :span="8">
-        <el-card shadow="hover" class="action-card" @click="$router.push('/conversation')">
+        <el-card shadow="hover" class="action-card" @click="$router.push('/voice-chat')">
           <el-icon :size="36" color="#C4B5FD"><ChatDotRound /></el-icon>
-          <h4>AI 对话</h4>
-          <p>沉浸式场景对话，提升口语流利度</p>
+          <h4>AI 语音对话</h4>
+          <p>自由对话 + 角色扮演，沉浸式口语练习</p>
         </el-card>
       </el-col>
       <el-col :span="8">
