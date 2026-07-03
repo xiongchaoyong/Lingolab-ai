@@ -1,3 +1,18 @@
+## 2026-07-03: 运营数据看板详细化升级
+
+### 变更内容
+1. **后端新指标**：新增老师数/学生数（按role统计）、班级数/班均学生、今日活动（对话数/发音练习数/任务完成数）、任务完成率、总积分；修复对话完成率为真实 ConversationSession 数据
+2. **7日DAU趋势**：新增 daily_activity 数组，前端折线图展示近7天日活变化
+3. **前端布局重构**：15个指标卡片按3组排列（用户规模5卡/学习活跃5卡/运营概况5卡），每组带小标题
+4. **新增图表**：7日DAU折线图 + 练习类型柱状图（替换原数字统计），保留CEFR饼图 + 用户增长趋势图
+
+### 影响文件
+- `backend/app/services/admin.py` — get_dashboard() 新增 10+ 指标 + 修复对话完成率
+- `backend/app/schemas/admin.py` — DashboardMetrics + DashboardResponse 新增字段
+- `frontend/src/views/admin/DashboardView.vue` — 分组卡片布局 + 4图表
+
+---
+
 # 操作日志
 
 > 记录每次 PR / AI 辅助操作的摘要
