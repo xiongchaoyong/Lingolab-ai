@@ -102,6 +102,7 @@ class RecommendationsResponse(BaseModel):
     """资料推荐响应"""
     videos: List[MaterialItem]
     articles: List[MaterialItem]
+    audios: List[MaterialItem] = Field(default_factory=list, description="音频资料（用于跟读/发音参考）")
     generated_at: str = Field(..., description="生成时间")
 
 

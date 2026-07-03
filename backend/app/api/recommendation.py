@@ -79,7 +79,7 @@ def get_recommendations(
     current_user: UserProfile = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """获取今日个性化资料推荐（视频/文章/音频各2条）"""
+    """获取今日个性化资料推荐（视频4+文章4+音频2）"""
     materials = recommendation_service.recommend_materials(current_user, db)
     recommendation_service.save_recommendations(current_user.id, materials, db)
 
@@ -116,6 +116,7 @@ def get_recommendations(
     return RecommendationsResponse(
         videos=to_items("videos"),
         articles=to_items("articles"),
+        audios=to_items("audios"),
         generated_at=datetime.now().isoformat(),
     )
 
@@ -189,6 +190,7 @@ def refresh_recommendations(
     return RecommendationsResponse(
         videos=to_items("videos"),
         articles=to_items("articles"),
+        audios=to_items("audios"),
         generated_at=datetime.now().isoformat(),
     )
 

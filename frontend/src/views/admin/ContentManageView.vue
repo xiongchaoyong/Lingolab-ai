@@ -64,7 +64,7 @@ const formFields = {
   ],
   materials: [
     { key: 'title', label: '标题', type: 'input', required: true },
-    { key: 'type', label: '类型', type: 'select', options: ['video', 'article'], required: true },
+    { key: 'type', label: '类型', type: 'select', options: ['video', 'article', 'audio'], required: true },
     { key: 'level', label: '等级', type: 'select', options: ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'], required: true },
     { key: 'category', label: '分类', type: 'input' },
     { key: 'description', label: '描述', type: 'textarea' },
