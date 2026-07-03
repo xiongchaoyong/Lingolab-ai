@@ -39,6 +39,20 @@
 4. **导航栏 iOS 玻璃效果**：`TopNavLayout.vue` 重构为浮动胶囊布局 — 导航栏居中 65% 宽度 + 大圆角 + backdrop-filter 毛玻璃，头像独立定位到页面右端，下拉菜单亮色玻璃，通知铃铛移入导航栏
 5. **文档更新**：业务流程文档追加用户画像/EMA/推荐逻辑/知识图谱示例/观测层/智能客服/技术栈章节；新增答辩PPT三风格提示词
 
+## 2026-07-03: 首页重构 — 学习仪表盘替代项目介绍页
+
+### 变更内容
+1. **首页替换**：删除 `IntroductionView.vue`（营销落地页），`/` 路由改为 `HomeView`（学习仪表盘）
+2. **HomeView 接入真实数据**：`onMounted` 调用 `progressStore.fetchAll()`，统计卡片从硬编码 0 改为 API 动态渲染（累计学习时长/打卡天数/连续打卡/最长连续/跟读次数/对话次数），欢迎区显示 CEFR 等级（如 `B1 · 进阶`）
+3. **路由守卫调整**：首页添加 `meta: { auth: true }`，未登录用户重定向至 `/login`
+
+### 影响文件
+- `frontend/src/router/index.js` — 路由修改
+- `frontend/src/views/home/HomeView.vue` — 接入 progressStore
+- `frontend/src/views/introduction/IntroductionView.vue` — **删除**
+
+---
+
 ## 2026-07-02: RAG 知识库 + 智能客服增强
 
 ### 变更内容

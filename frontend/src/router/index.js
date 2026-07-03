@@ -41,13 +41,9 @@ const routes = [
     children: [
       {
         path: '',
-        name: 'Introduction',
-        component: () => import('@/views/introduction/IntroductionView.vue'),
-      },
-      {
-        path: 'home',
         name: 'Home',
-        redirect: '/',
+        component: () => import('@/views/home/HomeView.vue'),
+        meta: { auth: true },
       },
       // 模块二：学习服务
       {
@@ -230,9 +226,9 @@ router.beforeEach((to, from, next) => {
     return next('/')
   }
 
-  // 需认证路由：未登录 → 重定向到首页（功能介绍页）
+  // 需认证路由：未登录 → 重定向到登录页
   if (to.meta.auth && !authStore.isLoggedIn) {
-    return next('/')
+    return next('/login')
   }
 
   // 已完成测评的用户不允许再次测评
