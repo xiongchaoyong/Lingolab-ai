@@ -64,9 +64,8 @@ const typeMeta = {
 }
 
 function getMaterialIcon(type) {
-  if (type === 'video') return 'VideoCamera'
   if (type === 'article') return 'Document'
-  return 'Headset'
+  return 'VideoCamera'
 }
 
 function getLevelType(level) {
