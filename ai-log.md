@@ -11,10 +11,29 @@
 2. **LLM 服务合并**：`chat()`/`chat_stream()` 增加 mode 参数（scene→SCENE_PROMPTS, role→ROLE_PROMPTS），删除 chat_roleplay/chat_roleplay_stream 重复方法
 3. **后端统一 API 路由**：新建 `voice_chat.py`（~750 行），9 个端点 `/api/voice-chat/*`，会话 `_sessions` 存储 mode，评分按 mode 分叉；旧 conversation.py + roleplay.py 改为 thin wrapper（~30 行各）
 4. **前端统一 API 层**：新建 `voiceChat.js`（readSSEStream 共享，/api/voice-chat 统一前缀），旧文件 thin re-export 向后兼容
-5. **前端统一视图组件**：新建 `VoiceChatView.vue`（~620 行），模式切换分段控件 `[AI 自由对话] [角色扮演]`，选择页/通话页/报告页 85% 代码共用，mode 驱动 topicList/maxRounds/mascot/LLM 维度
-6. **路由 + 导航更新**：新增 `/voice-chat` 路由，旧路由重定向（/conversation→?mode=scene, /role-play→?mode=role），TopNavLayout 导航合并为一项「AI 语音对话」，首页快捷入口更新
-7. **删除旧文件**：VoiceCallView.vue + RolePlayView.vue（原 2974 行 → 620 行，减少 79%）
-8. **构建验证通过**：npm run build 无错误
+5. **前端统一视图组件**：新建 `VoiceChatView.vue`，模式切换分段控件，选择页/通话页/报告页 85% 代码共用
+6. **路由 + 导航更新**：新增 `/voice-chat` 路由，旧路由重定向，TopNavLayout 导航合并，首页快捷入口更新
+7. **删除旧文件**：VoiceCallView.vue + RolePlayView.vue（原 2974 行大幅精简）
+8. **UI 交互优化**：移除独立选择页，模式+话题选择直接集成在通话界面左侧面板；未选话题时右侧展示 4×2 话题卡片网格，选择后切换为对话区
+
+### 影响文件
+- `backend/app/schemas/voice_chat.py` — **新建**，统一 Schema
+- `backend/app/api/voice_chat.py` — **新建**，统一 API 路由
+- `backend/app/schemas/conversation.py` — thin re-export
+- `backend/app/schemas/roleplay.py` — thin re-export
+- `backend/app/api/conversation.py` — thin wrapper
+- `backend/app/api/roleplay.py` — thin wrapper
+- `backend/app/services/llm.py` — chat/chat_stream 合并
+- `backend/main.py` — 注册 voice_chat_router
+- `frontend/src/api/voiceChat.js` — **新建**，统一前端 API
+- `frontend/src/views/voice-chat/VoiceChatView.vue` — **新建**，统一视图（含内联选择交互）
+- `frontend/src/api/conversation.js` — thin re-export
+- `frontend/src/api/roleplay.py` — thin re-export
+- `frontend/src/router/index.js` — 新路由 + 旧路由重定向
+- `frontend/src/components/layout/TopNavLayout.vue` — 导航合并
+- `frontend/src/views/home/HomeView.vue` — 快捷入口更新
+- `frontend/src/views/conversation/VoiceCallView.vue` — **删除**
+- `frontend/src/views/roleplay/RolePlayView.vue` — **删除**
 
 ### 影响文件
 - `backend/app/schemas/voice_chat.py` — **新建**，统一 Schema

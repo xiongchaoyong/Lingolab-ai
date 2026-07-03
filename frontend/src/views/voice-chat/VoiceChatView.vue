@@ -1,8 +1,7 @@
 <script setup>
-import { ref, computed, onUnmounted, nextTick, watch } from 'vue'
+import { ref, computed, onUnmounted, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { ArrowLeft } from '@element-plus/icons-vue'
 import { streamStart, streamSpeak, ttsStreamUrl, ttsCachedUrl, endChat } from '@/api/voiceChat'
 import UtteranceDetailPanel from '@/components/pronunciation/UtteranceDetailPanel.vue'
 
@@ -38,14 +37,11 @@ const ROLES = [
 ]
 
 const topicList = computed(() => mode.value === 'scene' ? SCENARIOS : ROLES)
-const maxRounds = computed(() => mode.value === 'scene' ? 10 : 6)
-const pageTitle = computed(() => mode.value === 'scene' ? 'AI 智能对话' : '情景角色扮演')
 const mascotEmoji = computed(() => mode.value === 'scene' ? '🐱' : (selectedTopic.value?.emoji || '🎭'))
 const reportTitle = computed(() => mode.value === 'scene' ? '对话报告' : '角色扮演报告')
 const reportTopicLabel = computed(() => mode.value === 'scene' ? (selectedTopic.value?.title + ' 场景') : (selectedTopic.value?.title + ' 角色'))
 
 // ========== 状态 ==========
-const phase = ref('select')
 const selectedTopic = ref(null)
 const sessionId = ref('')
 const callState = ref('idle')
@@ -53,6 +49,7 @@ const isConnecting = ref(false)
 const isPaused = ref(false)
 const scoreReport = ref(null)
 const isScoring = ref(false)
+const phase = ref('calling') // calling | report
 
 const messages = ref([])
 const chatBoxRef = ref(null)
@@ -95,10 +92,7 @@ function typeHintText(targetEn, targetZh) {
     if (idx < targetEn.length) displayHintEn.value += targetEn[idx]
     if (targetZh && idx < targetZh.length) displayHintZh.value += targetZh[idx]
     idx++
-    if (idx >= maxLen) {
-      clearInterval(_hintTimer); _hintTimer = null
-      isHintTyping.value = false
-    }
+    if (idx >= maxLen) { clearInterval(_hintTimer); _hintTimer = null; isHintTyping.value = false }
   }, 40)
 }
 
@@ -178,7 +172,6 @@ function roundScoreColor(score) {
   return '#FF6B8A'
 }
 
-// ========== LLM 评分维度（模式不同） ==========
 const llmDimensions = computed(() => {
   if (!scoreReport.value) return []
   return mode.value === 'scene'
@@ -224,7 +217,6 @@ const SILENCE_DURATION = 2500
 // ========== 选择主题并开始对话 ==========
 async function selectTopic(topic) {
   selectedTopic.value = topic
-  phase.value = 'calling'
   callState.value = 'idle'
   isPaused.value = false
   messages.value = []
@@ -412,7 +404,9 @@ async function hangUp() {
       }
     }
     isScoring.value = false; phase.value = 'report'
-  } else { phase.value = 'select'; resetCall() }
+  } else {
+    resetCall()
+  }
 }
 
 function resetCall() {
@@ -420,8 +414,8 @@ function resetCall() {
   hintText.value = ''; stopHintTyping(); stopElapsedTimer()
   scoreReport.value = null; sessionId.value = ''
 }
-function backToSelect() { phase.value = 'select'; resetCall() }
-function goBack() { router.push('/home') }
+
+function backToSelect() { resetCall() }
 
 function dimScoreColor(score) {
   if (score >= 80) return '#5AD8A6'
@@ -439,62 +433,32 @@ onUnmounted(() => { hangUp() })
 
 <template>
   <div class="voice-call-page">
-    <!-- 场景/角色选择 -->
-    <template v-if="phase === 'select'">
-      <div class="call-select-header">
-        <!-- 模式切换分段控件 -->
-        <div class="mode-segmented">
-          <button
-            :class="['mode-seg-btn', { active: mode === 'scene' }]"
-            @click="switchMode('scene')"
-          >AI 自由对话</button>
-          <button
-            :class="['mode-seg-btn', { active: mode === 'role' }]"
-            @click="switchMode('role')"
-          >角色扮演</button>
-        </div>
-        <div class="header-mascot">{{ mascotEmoji }}</div>
-        <h2>{{ pageTitle }}</h2>
-        <p class="select-subtitle">
-          {{ mode === 'scene' ? '选一个场景，和我一起练习口语吧~' : '选一个角色，和 AI 进行真实语音对话吧~' }}
-        </p>
-      </div>
-      <div class="call-topic-grid">
-        <div
-          v-for="topic in topicList"
-          :key="topic.id"
-          class="call-topic-card"
-          :style="{ '--accent': topic.color }"
-          @click="selectTopic(topic)"
-        >
-          <div class="ctc-emoji">{{ topic.emoji }}</div>
-          <h4>{{ topic.title }}</h4>
-          <p>{{ topic.subtitle }}</p>
-        </div>
-      </div>
-      <div class="select-footer">
-        <el-button text @click="goBack" class="back-btn">
-          <el-icon><ArrowLeft /></el-icon> 返回首页
-        </el-button>
-      </div>
-    </template>
-
-    <!-- 通话界面 -->
-    <template v-else-if="phase === 'calling'">
+    <!-- 通话界面（含模式+主题选择） -->
+    <template v-if="phase === 'calling'">
       <div class="call-screen">
+        <!-- 左侧面板 -->
         <div class="call-left">
-          <div class="call-top">
-            <div class="call-topic-pill">
-              <span class="pill-emoji">{{ selectedTopic?.emoji }}</span>
-              {{ selectedTopic?.title }}
-            </div>
+          <!-- 模式切换 -->
+          <div class="mode-segmented">
+            <button :class="['mode-seg-btn', { active: mode === 'scene' }]" @click="switchMode('scene')">AI 自由对话</button>
+            <button :class="['mode-seg-btn', { active: mode === 'role' }]" @click="switchMode('role')">角色扮演</button>
           </div>
 
-          <div v-if="hintText" class="hint-card">
-            <span class="hint-label">💡 你可以说</span>
-            <span class="hint-text">{{ displayHintEn }}<span v-if="isHintTyping" class="typing-cursor">|</span></span>
-            <span v-if="hintText.zh" class="hint-zh">{{ displayHintZh }}<span v-if="isHintTyping" class="typing-cursor">|</span></span>
-          </div>
+          <!-- 对话进行中才显示 -->
+          <template v-if="selectedTopic">
+            <div class="call-top">
+              <div class="call-topic-pill">
+                <span class="pill-emoji">{{ selectedTopic?.emoji }}</span>
+                {{ selectedTopic?.title }}
+              </div>
+            </div>
+
+            <div v-if="hintText" class="hint-card">
+              <span class="hint-label">💡 你可以说</span>
+              <span class="hint-text">{{ displayHintEn }}<span v-if="isHintTyping" class="typing-cursor">|</span></span>
+              <span v-if="hintText.zh" class="hint-zh">{{ displayHintZh }}<span v-if="isHintTyping" class="typing-cursor">|</span></span>
+            </div>
+          </template>
 
           <div class="mascot-container" :class="callState">
             <div class="ripple-ring r1"></div><div class="ripple-ring r2"></div><div class="ripple-ring r3"></div>
@@ -502,7 +466,8 @@ onUnmounted(() => { hangUp() })
           </div>
 
           <div class="call-state-label" :class="callState">
-            <template v-if="isConnecting">正在连接...</template>
+            <template v-if="!selectedTopic">选择{{ mode === 'scene' ? '场景' : '角色' }}开始对话</template>
+            <template v-else-if="isConnecting">正在连接...</template>
             <template v-else-if="callState === 'ai_speaking'"><span class="state-dot speaking"></span> AI 正在说话</template>
             <template v-else-if="callState === 'listening'"><span class="state-dot listening"></span> 正在聆听...</template>
             <template v-else-if="callState === 'thinking'"><span class="state-dot thinking"></span> 思考中...</template>
@@ -510,23 +475,47 @@ onUnmounted(() => { hangUp() })
             <template v-else>准备就绪</template>
           </div>
 
-          <div class="session-info">
-            <div class="si-item">
-              <span class="si-icon">⏱️</span>
-              <span class="si-value">{{ formatTime(elapsedSeconds) }}</span>
+          <template v-if="selectedTopic">
+            <div class="session-info">
+              <div class="si-item">
+                <span class="si-icon">⏱️</span>
+                <span class="si-value">{{ formatTime(elapsedSeconds) }}</span>
+              </div>
+            </div>
+
+            <div class="call-actions">
+              <button class="pause-btn" @click="togglePause"><span class="pause-icon">{{ isPaused ? '▶️' : '⏸️' }}</span></button>
+              <p class="pause-label">{{ isPaused ? '继续' : '暂停' }}</p>
+              <button class="hangup-btn" @click="hangUp"><span class="hangup-icon">📞</span></button>
+              <p class="hangup-label">挂断</p>
+            </div>
+          </template>
+        </div>
+
+        <!-- 右侧面板：未选则展示主题卡片，已选则展示聊天 -->
+        <div class="call-right">
+          <!-- 主题选择网格 -->
+          <div v-if="!selectedTopic" class="topic-select-area">
+            <div class="topic-select-hint">
+              {{ mode === 'scene' ? '选一个场景，和我一起练习口语吧~' : '选一个角色，和 AI 进行真实语音对话吧~' }}
+            </div>
+            <div class="call-topic-grid">
+              <div
+                v-for="topic in topicList"
+                :key="topic.id"
+                class="call-topic-card"
+                :style="{ '--accent': topic.color }"
+                @click="selectTopic(topic)"
+              >
+                <div class="ctc-emoji">{{ topic.emoji }}</div>
+                <h4>{{ topic.title }}</h4>
+                <p>{{ topic.subtitle }}</p>
+              </div>
             </div>
           </div>
 
-          <div class="call-actions">
-            <button class="pause-btn" @click="togglePause"><span class="pause-icon">{{ isPaused ? '▶️' : '⏸️' }}</span></button>
-            <p class="pause-label">{{ isPaused ? '继续' : '暂停' }}</p>
-            <button class="hangup-btn" @click="hangUp"><span class="hangup-icon">📞</span></button>
-            <p class="hangup-label">挂断</p>
-          </div>
-        </div>
-
-        <div class="call-right">
-          <div class="call-chat-box" ref="chatBoxRef">
+          <!-- 聊天区域 -->
+          <div v-else class="call-chat-box" ref="chatBoxRef">
             <div v-for="(msg, idx) in messages" :key="idx" class="chat-bubble" :class="msg.role">
               <span class="bubble-avatar" v-if="msg.role === 'user'">
                 <el-avatar :size="32" :src="authStore.userInfo?.avatar" icon="UserFilled" />
@@ -681,7 +670,6 @@ onUnmounted(() => { hangUp() })
         </template>
       </div>
 
-      <!-- 轮次详情弹窗 -->
       <el-dialog
         v-model="showRoundDetail"
         :title="'第 ' + selectedRound?.round + ' 轮详情'"
@@ -754,7 +742,7 @@ onUnmounted(() => { hangUp() })
   background: #F0E8FF;
   border-radius: 14px;
   padding: 4px;
-  margin-bottom: 16px;
+  margin-top: 4px;
 }
 .mode-seg-btn {
   padding: 8px 22px;
@@ -773,55 +761,6 @@ onUnmounted(() => { hangUp() })
     box-shadow: 0 2px 8px rgba(124, 111, 247, 0.2);
   }
   &:hover:not(.active) { color: #9B8FF7; }
-}
-
-// ========== 选择页 ==========
-.call-select-header {
-  text-align: center;
-  padding: 48px 20px 0;
-  .header-mascot {
-    font-size: 56px;
-    animation: bounce 2s ease-in-out infinite;
-    display: inline-block;
-  }
-  h2 { font-size: 26px; font-weight: 700; margin: 12px 0 8px; color: #3D3D5C; }
-  .select-subtitle { color: #999; font-size: 15px; }
-}
-@keyframes bounce {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-8px); }
-}
-
-.call-topic-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 14px;
-  padding: 28px 20px;
-  max-width: 900px;
-  margin: 0 auto;
-}
-.call-topic-card {
-  background: #fff;
-  border: 2px solid #F0E8FF;
-  border-radius: 20px;
-  padding: 24px 16px;
-  text-align: center;
-  cursor: pointer;
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
-  &:hover {
-    border-color: var(--accent);
-    transform: translateY(-3px);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
-  }
-  .ctc-emoji { font-size: 40px; margin-bottom: 10px; }
-  h4 { font-size: 15px; font-weight: 600; margin-bottom: 4px; color: #3D3D5C; }
-  p { font-size: 12px; color: #aaa; }
-}
-.select-footer {
-  text-align: center;
-  padding-bottom: 40px;
-  .back-btn { color: #999; font-size: 14px; }
 }
 
 // ========== 通话界面 ==========
@@ -852,6 +791,49 @@ onUnmounted(() => { hangUp() })
   background: #F5F3FA;
 }
 
+// ========== 主题选择区域（右侧） ==========
+.topic-select-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 20px;
+  overflow-y: auto;
+}
+.topic-select-hint {
+  font-size: 15px;
+  color: #999;
+  margin-bottom: 24px;
+  text-align: center;
+}
+.call-topic-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  max-width: 900px;
+  width: 100%;
+}
+.call-topic-card {
+  background: #fff;
+  border: 2px solid #F0E8FF;
+  border-radius: 20px;
+  padding: 24px 16px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+  &:hover {
+    border-color: var(--accent);
+    transform: translateY(-3px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  }
+  .ctc-emoji { font-size: 40px; margin-bottom: 10px; }
+  h4 { font-size: 15px; font-weight: 600; margin-bottom: 4px; color: #3D3D5C; }
+  p { font-size: 12px; color: #aaa; }
+}
+
+// ========== 对话区域 ==========
 .session-info {
   display: flex;
   flex-direction: column;
@@ -894,7 +876,7 @@ onUnmounted(() => { hangUp() })
 @keyframes hintBorderPulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 0; } }
 @keyframes cursorBlink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
 
-.call-top { text-align: center; padding: 16px 20px 8px; flex-shrink: 0; }
+.call-top { text-align: center; padding: 4px 20px 0; flex-shrink: 0; }
 .call-topic-pill { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 500; color: #7C6FF7; background: rgba(124,111,247,0.08); padding: 8px 18px; border-radius: 24px; .pill-emoji { font-size: 16px; } }
 
 .mascot-container {
