@@ -5,7 +5,6 @@ import tempfile
 import logging
 
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException
-from fastapi.responses import JSONResponse
 
 from app.schemas.grammar import GrammarCorrectResponse, GrammarError
 from app.services.asr import get_asr_service
@@ -16,16 +15,54 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
+def _deduplicate_and_apply(raw_errors: list, text: str) -> tuple:
+    """
+    去重 + 从原文逐词替换构造修正版。
+
+    策略：
+    1. 按 original 在原句中首次出现的位置排序
+    2. 同一个 original 去重（只保留一条）
+    3. 从后往前替换（避免索引偏移），一次只替换 original 在原句中的第一次出现
+    4. 保证修正文本的空格和原句完全一致
+    """
+    if not raw_errors:
+        return [], text
+
+    # 去重：同一个 original 保留第一条
+    seen = set()
+    unique = []
+    for e in raw_errors:
+        orig = (e.get("original") or "").strip()
+        if orig and orig not in seen:
+            seen.add(orig)
+            unique.append(e)
+
+    # 按 original 在原句中的位置排序
+    def find_pos(e):
+        orig = (e.get("original") or "").strip()
+        idx = text.find(orig)
+        return idx if idx >= 0 else 999999
+
+    unique.sort(key=find_pos)
+
+    # 从后往前替换，保证索引稳定
+    corrected = text
+    for e in unique:
+        orig = (e.get("original") or "").strip()
+        corr = (e.get("correction") or "").strip()
+        if orig and orig in corrected:
+            corrected = corrected.replace(orig, corr, 1)
+
+    formatted = [GrammarError(**e) for e in unique]
+    return formatted, corrected
+
+
 @router.post("/correct", response_model=GrammarCorrectResponse)
 async def grammar_correct(
     text: str = Form(..., description="待纠错的英文文本"),
     cefr_level: str = Form(default="B1", description="CEFR 等级"),
 ):
-    """
-    语法纠错与润色 — 文本输入
-
-    对用户输入的英文文本进行语法错误检测、纠正，并提供更地道的表达建议。
-    """
+    """语法纠错与润色 — 文本输入"""
     text = text.strip()
     if not text:
         raise HTTPException(status_code=422, detail="文本不能为空")
@@ -35,14 +72,12 @@ async def grammar_correct(
     try:
         llm = get_llm_service()
         result = await llm.correct_grammar(text, cefr_level)
-
-        errors = result.get("errors", [])
-        if isinstance(errors, list):
-            errors = [GrammarError(**e) for e in errors]
+        raw_errors = result.get("errors", []) if isinstance(result.get("errors"), list) else []
+        errors, corrected = _deduplicate_and_apply(raw_errors, text)
 
         return GrammarCorrectResponse(
             original_text=text,
-            corrected_text=result.get("corrected_text", text),
+            corrected_text=corrected,
             errors=errors,
             polished_version=result.get("polished_version", ""),
             suggestions=result.get("suggestions", []),
@@ -57,11 +92,7 @@ async def grammar_correct_voice(
     audio: UploadFile = File(..., description="用户语音"),
     cefr_level: str = Form(default="B1", description="CEFR 等级"),
 ):
-    """
-    语法纠错与润色 — 语音输入
-
-    先通过 ASR 转写语音，再对转写文本进行语法纠错。
-    """
+    """语法纠错与润色 — 语音输入"""
     suffix = ".webm"
     if audio.filename and "." in audio.filename:
         suffix = os.path.splitext(audio.filename)[1] or ".webm"
@@ -94,14 +125,12 @@ async def grammar_correct_voice(
 
         llm = get_llm_service()
         result = await llm.correct_grammar(user_text, cefr_level)
-
-        errors = result.get("errors", [])
-        if isinstance(errors, list):
-            errors = [GrammarError(**e) for e in errors]
+        raw_errors = result.get("errors", []) if isinstance(result.get("errors"), list) else []
+        errors, corrected = _deduplicate_and_apply(raw_errors, user_text)
 
         return GrammarCorrectResponse(
             original_text=user_text,
-            corrected_text=result.get("corrected_text", user_text),
+            corrected_text=corrected,
             errors=errors,
             polished_version=result.get("polished_version", ""),
             suggestions=result.get("suggestions", []),

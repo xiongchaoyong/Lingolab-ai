@@ -9,8 +9,6 @@ import {
   toggleLikeApi,
   getCommentsApi,
   addCommentApi,
-  getGroupsApi,
-  toggleGroupApi,
 } from '@/api/community'
 
 export const useCommunityStore = defineStore('community', () => {
@@ -88,35 +86,10 @@ export const useCommunityStore = defineStore('community', () => {
     return comment
   }
 
-  // ===== 学习小组 =====
-  const groups = ref([])
-  const groupsLoading = ref(false)
-
-  async function fetchGroups() {
-    groupsLoading.value = true
-    try {
-      const result = await getGroupsApi()
-      groups.value = result.groups || []
-    } finally {
-      groupsLoading.value = false
-    }
-  }
-
-  async function toggleGroup(groupId) {
-    const result = await toggleGroupApi(groupId)
-    const group = groups.value.find(g => g.id === groupId)
-    if (group) {
-      group.is_joined = result.joined
-      group.member_count = result.member_count
-    }
-    return result
-  }
-
   return {
     challenges, leaderboard, currentChallenge, challengesLoading,
     fetchChallenges, submitChallenge, fetchLeaderboard,
     posts, postsLoading, fetchPosts, createPost, toggleLike,
     fetchComments, addComment,
-    groups, groupsLoading, fetchGroups, toggleGroup,
   }
 })

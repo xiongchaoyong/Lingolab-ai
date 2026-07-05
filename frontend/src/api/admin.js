@@ -72,8 +72,13 @@ export function getUserDetailApi(userId) {
 
 // ===== 仪表盘 =====
 
-export function getDashboardApi() {
-  return request.get('/api/admin/dashboard')
+export function getDashboardApi(params = {}) {
+  return request.get('/api/admin/dashboard', { params })
+}
+
+/** 教师工作台 Dashboard */
+export function getTeacherDashboardApi() {
+  return request.get('/api/admin/teacher-dashboard')
 }
 
 // ===== 学生报告 =====
@@ -86,10 +91,18 @@ export function getStudentDetailApi(studentId) {
   return request.get(`/api/admin/students/${studentId}`)
 }
 
+export function getStudentTrendApi(studentId) {
+  return request.get(`/api/admin/students/${studentId}/trend`)
+}
+
+export function getStudentCheckinStatsApi(studentId) {
+  return request.get(`/api/admin/students/${studentId}/checkin-stats`)
+}
+
 // ===== 内容管理 =====
 
-export function getContentListApi(contentType) {
-  return request.get(`/api/admin/content/${contentType}`)
+export function getContentListApi(contentType, params = {}) {
+  return request.get(`/api/admin/content/${contentType}`, { params })
 }
 
 export function createContentApi(data) {
@@ -116,6 +129,11 @@ export function replyFeedbackApi(feedbackId, reply) {
 
 export function resolveFeedbackApi(feedbackId) {
   return request.put(`/api/admin/feedbacks/${feedbackId}/resolve`)
+}
+
+/** 用户端提交反馈 */
+export function submitFeedbackApi(content, feedbackType) {
+  return request.post('/api/feedback', { content, feedback_type: feedbackType })
 }
 
 // ===== 知识库管理 =====

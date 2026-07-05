@@ -226,7 +226,9 @@ onMounted(() => {
     </div>
 
     <!-- 分数更新记录弹窗 -->
-    <el-dialog v-model="showLogDialog" title="维度分数更新记录" width="600px" destroy-on-close>
+    <el-dialog v-model="showLogDialog" title="维度分数更新记录" width="600px"
+      destroy-on-close align-center :close-on-click-modal="false"
+      append-to-body class="score-log-dialog">
       <div class="log-timeline">
         <div v-for="log in displayLogs" :key="log.id" class="log-item">
           <div class="log-dot" :class="'dot--' + log.source"></div>

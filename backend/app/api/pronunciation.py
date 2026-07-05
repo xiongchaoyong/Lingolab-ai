@@ -8,6 +8,7 @@ import logging
 
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Depends
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -18,6 +19,7 @@ from app.models.pronunciation import PronunciationContent, PronunciationRecord
 from app.services.pronunciation import score_audio
 from app.services.profile_updater import profile_updater
 from app.services.audio_utils import convert_to_wav
+from app.services.llm import get_llm_service
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -179,14 +181,21 @@ async def get_reference_audio(
 async def list_content(
     content_type: str = None,
     cefr_level: str = None,
+    keyword: str = None,
     db: Session = Depends(get_db),
 ):
-    """获取跟读内容库列表，支持按类型和难度筛选"""
+    """获取跟读内容库列表，支持按类型、难度和关键词筛选"""
     query = db.query(PronunciationContent).filter(PronunciationContent.is_active == 1)
     if content_type:
         query = query.filter(PronunciationContent.content_type == content_type)
     if cefr_level:
         query = query.filter(PronunciationContent.cefr_level == cefr_level)
+    if keyword and keyword.strip():
+        kw = f"%{keyword.strip()}%"
+        query = query.filter(
+            PronunciationContent.content_text.ilike(kw) |
+            PronunciationContent.title.ilike(kw)
+        )
     items = query.order_by(PronunciationContent.cefr_level, PronunciationContent.id).all()
     return items
 
@@ -222,3 +231,25 @@ async def list_records(
             content_text=content.content_text if content else None,
         ))
     return result
+
+
+# ============================================================
+# 英文文本验证
+# ============================================================
+
+class ValidateRequest(BaseModel):
+    text: str = Field(..., description="待验证的英文文本")
+    mode: str = Field(default="word", description="word 或 sentence")
+
+class ValidateResponse(BaseModel):
+    valid: bool = Field(..., description="是否为有效英文")
+    suggestion: str = Field(default="", description="验证建议")
+
+@router.post("/validate", response_model=ValidateResponse)
+async def validate_text(
+    body: ValidateRequest,
+):
+    """验证输入是否为有效英文单词/句子"""
+    llm = get_llm_service()
+    result = await llm.validate_english_text(body.text, body.mode)
+    return ValidateResponse(**result)

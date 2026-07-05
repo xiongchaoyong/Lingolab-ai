@@ -47,15 +47,3 @@ export function getCommentsApi(postId) {
 export function addCommentApi(postId, content) {
   return request.post(`/api/community/posts/${postId}/comments`, { content })
 }
-
-// ===== 学习小组 =====
-
-/** 获取小组列表 */
-export function getGroupsApi() {
-  return request.get('/api/community/groups')
-}
-
-/** 加入/退出小组 */
-export function toggleGroupApi(groupId) {
-  return request.post(`/api/community/groups/${groupId}/join`)
-}

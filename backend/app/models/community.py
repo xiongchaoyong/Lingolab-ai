@@ -1,4 +1,4 @@
-"""社区服务 ORM 模型 — voice_challenges / challenge_submissions / discussion_posts / post_comments / post_likes / study_groups / group_members"""
+"""社区服务 ORM 模型 — voice_challenges / challenge_submissions / discussion_posts / post_comments / post_likes"""
 
 from datetime import datetime
 
@@ -76,35 +76,3 @@ class PostLike(Base):
     post_id = Column(Integer, ForeignKey("discussion_posts.id"), nullable=False)
     user_id = Column(Integer, ForeignKey("user_profiles.id"), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-
-
-class StudyGroup(Base):
-    """学习小组表 — 映射已有 groups 表"""
-    __tablename__ = "groups"
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    name = Column(String(100), nullable=False, comment="小组名称")
-    description = Column(String(500), default="", comment="小组简介")
-    creator_id = Column(Integer, ForeignKey("user_profiles.id"), nullable=False)
-    level_range = Column(String(20), default="", comment="等级范围如 A1-C1")
-    schedule = Column(String(100), default="", comment="活动时间")
-    tags = Column(String(200), default="", comment="标签，逗号分隔")
-    max_members = Column(SmallInteger, default=20, comment="最大人数")
-    member_count = Column(SmallInteger, default=0, comment="成员数")
-    is_archived = Column(Boolean, default=False, comment="是否归档")
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
-
-
-class GroupMember(Base):
-    """小组成员表 — 映射已有 group_members 表"""
-    __tablename__ = "group_members"
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    group_id = Column(Integer, ForeignKey("groups.id"), nullable=False)
-    user_id = Column(Integer, ForeignKey("user_profiles.id"), nullable=False)
-    role = Column(String(10), default="member", comment="owner/member")
-    joined_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-
-    user = relationship("UserProfile", backref="group_memberships")
-    group = relationship("StudyGroup", backref="members")

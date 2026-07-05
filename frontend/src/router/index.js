@@ -128,6 +128,12 @@ const routes = [
     meta: { auth: true, role: 'teacher' },
     children: [
       {
+        path: 'dashboard',
+        name: 'TeacherDashboard',
+        component: () => import('@/views/teacher/TeacherDashboardView.vue'),
+        meta: { title: '工作台' },
+      },
+      {
         path: 'classes',
         name: 'TeacherClasses',
         component: () => import('@/views/teacher/ClassManageView.vue'),

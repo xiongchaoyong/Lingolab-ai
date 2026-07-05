@@ -22,12 +22,14 @@ export function scorePronunciation(audioBlob, text, mode = 'word') {
  * 获取跟读内容库
  * @param {string} contentType — 'word' 或 'sentence'
  * @param {string} cefrLevel — CEFR 难度：A1/A2/B1/B2
+ * @param {string} keyword — 关键词搜索（模糊匹配 content_text + title）
  * @returns {Promise<Array>} 内容列表
  */
-export function getContentList(contentType = null, cefrLevel = null) {
+export function getContentList(contentType = null, cefrLevel = null, keyword = '') {
   const params = {}
   if (contentType) params.content_type = contentType
   if (cefrLevel) params.cefr_level = cefrLevel
+  if (keyword) params.keyword = keyword
   return request.get('/api/pronunciation/content', { params })
 }
 
@@ -38,4 +40,14 @@ export function getContentList(contentType = null, cefrLevel = null) {
  */
 export function getRecordList(limit = 20) {
   return request.get('/api/pronunciation/records', { params: { limit } })
+}
+
+/**
+ * 验证英文文本合法性
+ * @param {string} text — 待验证文本
+ * @param {string} mode — 'word' 或 'sentence'
+ * @returns {Promise<{valid: boolean, suggestion: string}>}
+ */
+export function validateTextApi(text, mode = 'word') {
+  return request.post('/api/pronunciation/validate', { text, mode })
 }

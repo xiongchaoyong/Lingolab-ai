@@ -3,7 +3,7 @@ import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { ElMessage } from 'element-plus'
 import VoiceRecorder from '@/components/common/VoiceRecorder.vue'
 import DimensionBars from '@/components/common/DimensionBars.vue'
-import { scorePronunciation, getContentList, getRecordList } from '@/api/pronunciation'
+import { scorePronunciation, getContentList, getRecordList, validateTextApi } from '@/api/pronunciation'
 
 // 后端内容库
 const contentList = ref([])
@@ -17,6 +17,7 @@ const recorderRef = ref(null)
 const hasScored = ref(false)
 const scoreResult = ref(null)
 const isScoring = ref(false)
+const isValidating = ref(false)
 const scoreError = ref('')
 const showDetail = ref(false)
 const detailTab = ref('phoneme')
@@ -98,11 +99,16 @@ function waveStyle(side, i) {
 
 const difficultyOptions = ['A1', 'A2', 'B1', 'B2']
 
+// 搜索
+const searchKeyword = ref('')
+const isCustomMode = ref(false)
+let searchTimer = null
+
 // 加载跟读内容
 async function loadContent() {
   contentLoading.value = true
   try {
-    const list = await getContentList(mode.value, difficulty.value)
+    const list = await getContentList(mode.value, difficulty.value, searchKeyword.value)
     contentList.value = list || []
     contentIndex.value = 0
   } catch {
@@ -110,6 +116,77 @@ async function loadContent() {
   } finally {
     contentLoading.value = false
   }
+}
+
+function onSearchInput(val) {
+  if (searchTimer) clearTimeout(searchTimer)
+  searchTimer = setTimeout(() => {
+    searchKeyword.value = val
+    isCustomMode.value = false
+    loadContent()
+  }, 300)
+}
+
+function onSearchClear() {
+  searchKeyword.value = ''
+  loadContent()
+}
+
+async function handleSearchSubmit() {
+  const text = searchKeyword.value.trim()
+  if (!text) {
+    ElMessage.warning('请输入要练习的英文单词或句子')
+    return
+  }
+  if (text.length > 500) {
+    ElMessage.warning('文本长度不能超过 500 字符')
+    return
+  }
+
+  // 先搜 DB
+  try {
+    const list = await getContentList(mode.value, difficulty.value, text)
+    if (list && list.length > 0) {
+      // DB 命中 → 用库内内容
+      isCustomMode.value = false
+      contentList.value = list
+      contentIndex.value = 0
+      contentLoading.value = false
+      await nextTick()
+      fetchReferenceAudio()
+      return
+    }
+  } catch {
+    // 搜索失败，继续走验证流程
+  }
+
+  // DB 未命中 → LLM 验证
+  isValidating.value = true
+  try {
+    const result = await validateTextApi(text, mode.value)
+    if (result.valid) {
+      isCustomMode.value = true
+      searchKeyword.value = text
+      resetState()
+      await nextTick()
+      fetchReferenceAudio()
+    } else {
+      searchKeyword.value = ''
+      ElMessage.warning(result.suggestion || '输入可能不是有效英文，请检查拼写')
+    }
+  } catch {
+    searchKeyword.value = ''
+    ElMessage.warning('验证服务暂时不可用，请稍后重试')
+  } finally {
+    isValidating.value = false
+  }
+}
+
+function exitCustomMode() {
+  isCustomMode.value = false
+  searchKeyword.value = ''
+  resetState()
+  loadContent()
 }
 
 // 加载历史记录
@@ -130,6 +207,17 @@ function openHistory() {
 }
 
 const currentItem = computed(() => {
+  if (isCustomMode.value && searchKeyword.value.trim()) {
+    return {
+      id: -1,
+      title: searchKeyword.value.trim(),
+      content_text: searchKeyword.value.trim(),
+      content_type: mode.value,
+      cefr_level: null,
+      category: 'custom',
+      phonetic_ipa: null,
+    }
+  }
   if (contentList.value.length === 0) return null
   const item = contentList.value[contentIndex.value % contentList.value.length]
   return item
@@ -151,11 +239,15 @@ const scoreLevel = computed(() => {
 
 function switchMode(newMode) {
   mode.value = newMode
+  isCustomMode.value = false
+  searchKeyword.value = ''
   resetState()
   loadContent()
 }
 
 function handleDifficultyChange() {
+  isCustomMode.value = false
+  searchKeyword.value = ''
   resetState()
   loadContent()
 }
@@ -218,6 +310,17 @@ async function fetchReferenceAudio() {
 }
 
 function nextContent() {
+  if (isCustomMode.value) {
+    // 自定义模式：保持当前文本，仅重置评分状态以重新练习
+    hasScored.value = false
+    scoreResult.value = null
+    scoreError.value = ''
+    showDetail.value = false
+    if (recordingUrl.value) { URL.revokeObjectURL(recordingUrl.value); recordingUrl.value = '' }
+    if (referenceUrl.value) { URL.revokeObjectURL(referenceUrl.value); referenceUrl.value = '' }
+    recorderRef.value?.reset()
+    return
+  }
   contentIndex.value++
   hasScored.value = false
   scoreResult.value = null
@@ -383,6 +486,31 @@ const rhythmSummary = computed(() => {
       </div>
     </div>
 
+    <!-- 搜索栏 -->
+    <div class="search-bar-row">
+      <el-input
+        v-model="searchKeyword"
+        placeholder="输入单词或句子，按 Enter 开始练习..."
+        clearable
+        :prefix-icon="Search"
+        size="default"
+        style="width: 400px"
+        @clear="onSearchClear"
+        @keyup.enter="handleSearchSubmit"
+      />
+      <el-button type="primary" size="small" @click="handleSearchSubmit" :loading="isValidating">
+        <el-icon><Search /></el-icon> 练习
+      </el-button>
+    </div>
+
+    <!-- 自定义模式标签（DB 中不存在的文本） -->
+    <div v-if="isCustomMode" class="custom-mode-indicator">
+      <el-tag type="warning" closable @close="exitCustomMode" size="small">
+        自由练习: {{ searchKeyword.length > 30 ? searchKeyword.slice(0, 30) + '...' : searchKeyword }}
+      </el-tag>
+      <span class="custom-mode-hint">点击标签关闭可返回内容库浏览</span>
+    </div>
+
     <!-- 跟读内容卡片 -->
     <div class="content-display" v-if="currentItem">
       <div class="content-main">
@@ -400,11 +528,22 @@ const rhythmSummary = computed(() => {
       <p style="color: var(--color-text-secondary); margin-top: 8px;">加载跟读内容...</p>
     </div>
     <div v-else class="content-display">
-      <p style="color: var(--color-text-disabled);">暂无{{ difficulty }}级{{ mode === 'word' ? '单词' : '句子' }}内容</p>
+      <p style="color: var(--color-text-disabled);">
+        <template v-if="searchKeyword">未找到与「{{ searchKeyword }}」相关的{{ mode === 'word' ? '单词' : '句子' }}</template>
+        <template v-else>暂无{{ difficulty }}级{{ mode === 'word' ? '单词' : '句子' }}内容</template>
+      </p>
+    </div>
+
+    <!-- 验证/生成中 -->
+    <div class="record-section" v-if="isValidating">
+      <el-icon class="is-loading" :size="36"><Loading /></el-icon>
+      <p style="color: var(--color-text-secondary); margin-top: 8px;">
+        {{ mode === 'word' ? '正在检测单词并生成标准音...' : '正在检测句子并生成标准音...' }}
+      </p>
     </div>
 
     <!-- 录音区域 -->
-    <div class="record-section" v-if="!hasScored && !isScoring">
+    <div class="record-section" v-if="!hasScored && !isScoring && !isValidating">
       <VoiceRecorder
         ref="recorderRef"
         :prep-time="3"
@@ -1877,5 +2016,27 @@ const rhythmSummary = computed(() => {
       color: var(--color-text-primary);
     }
   }
+}
+
+// 搜索栏 & 自定义文本
+.search-bar-row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  margin-bottom: var(--spacing-lg);
+  flex-wrap: wrap;
+}
+
+.custom-mode-indicator {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-lg);
+  flex-wrap: wrap;
+}
+
+.custom-mode-hint {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-disabled);
 }
 </style>

@@ -15,6 +15,15 @@ const contentData = ref({
   dubbing: [],
 })
 
+// 分页状态（每种内容类型独立）
+const pagination = ref({
+  questions: { page: 1, total: 0 },
+  shadow: { page: 1, total: 0 },
+  materials: { page: 1, total: 0 },
+  dubbing: { page: 1, total: 0 },
+})
+const pageSize = 10
+
 const tabs = [
   { name: 'questions', label: '测评题库' },
   { name: 'shadow', label: '跟读内容' },
@@ -48,7 +57,6 @@ const columns = {
   ],
 }
 
-// 表单字段定义
 const formFields = {
   questions: [
     { key: 'content', label: '题目内容', type: 'textarea', required: true },
@@ -77,29 +85,33 @@ const formFields = {
 }
 
 const showDialog = ref(false)
-const dialogMode = ref('create') // 'create' | 'edit'
+const dialogMode = ref('create')
 const editingItem = ref(null)
 const formData = ref({})
 
 const dialogTitle = computed(() => dialogMode.value === 'create' ? '新增内容' : '编辑内容')
-
 const currentFields = computed(() => formFields[activeTab.value] || [])
 
 onMounted(() => { loadContent(activeTab.value) })
-
 watch(activeTab, (tab) => { loadContent(tab) })
 
 async function loadContent(type) {
-  if (contentData.value[type]?.length > 0) return
   loading.value = true
+  const pg = pagination.value[type]
   try {
-    const res = await getContentListApi(type)
+    const res = await getContentListApi(type, { page: pg.page, page_size: pageSize })
     contentData.value[type] = res.items || []
+    pg.total = res.total || 0
   } catch {
     ElMessage.error('加载内容失败')
   } finally {
     loading.value = false
   }
+}
+
+function handlePageChange(type, page) {
+  pagination.value[type].page = page
+  loadContent(type)
 }
 
 function openCreate() {
@@ -131,7 +143,8 @@ async function handleSave() {
       ElMessage.success('更新成功')
     }
     showDialog.value = false
-    contentData.value[type] = []
+    // 重置页码并重新加载
+    pagination.value[type].page = 1
     await loadContent(type)
   } catch (e) {
     ElMessage.error(e.response?.data?.detail || '操作失败')
@@ -150,7 +163,11 @@ async function handleDelete(row) {
   try {
     await deleteContentApi(activeTab.value, row.id)
     ElMessage.success('删除成功')
-    contentData.value[activeTab.value] = []
+    // 如果当前页只剩一条且不是第一页，回退一页
+    const pg = pagination.value[activeTab.value]
+    if (contentData.value[activeTab.value].length === 1 && pg.page > 1) {
+      pg.page -= 1
+    }
     await loadContent(activeTab.value)
   } catch (e) {
     ElMessage.error(e.response?.data?.detail || '删除失败')
@@ -191,6 +208,16 @@ async function handleDelete(row) {
             </template>
           </el-table-column>
         </el-table>
+
+        <div class="pagination-wrap" v-if="pagination[tab.name].total > pageSize">
+          <el-pagination
+            :current-page="pagination[tab.name].page"
+            :page-size="pageSize"
+            :total="pagination[tab.name].total"
+            layout="prev, pager, next"
+            @current-change="(p) => handlePageChange(tab.name, p)"
+          />
+        </div>
       </el-tab-pane>
     </el-tabs>
 
@@ -203,27 +230,10 @@ async function handleDelete(row) {
           :label="field.label"
           :required="field.required"
         >
-          <el-input
-            v-if="field.type === 'input'"
-            v-model="formData[field.key]"
-          />
-          <el-input
-            v-else-if="field.type === 'textarea'"
-            v-model="formData[field.key]"
-            type="textarea"
-            :rows="3"
-          />
-          <el-select
-            v-else-if="field.type === 'select'"
-            v-model="formData[field.key]"
-            style="width: 100%"
-          >
-            <el-option
-              v-for="opt in field.options"
-              :key="opt"
-              :label="opt"
-              :value="opt"
-            />
+          <el-input v-if="field.type === 'input'" v-model="formData[field.key]" />
+          <el-input v-else-if="field.type === 'textarea'" v-model="formData[field.key]" type="textarea" :rows="3" />
+          <el-select v-else-if="field.type === 'select'" v-model="formData[field.key]" style="width: 100%">
+            <el-option v-for="opt in field.options" :key="opt" :label="opt" :value="opt" />
           </el-select>
         </el-form-item>
       </el-form>
@@ -234,3 +244,11 @@ async function handleDelete(row) {
     </el-dialog>
   </div>
 </template>
+
+<style lang="scss" scoped>
+.pagination-wrap {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: var(--spacing-lg);
+}
+</style>

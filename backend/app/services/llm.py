@@ -622,19 +622,23 @@ class LLMService:
 
     async def correct_grammar(self, text: str, cefr_level: str = "B1") -> dict:
         """
-        语法纠错 — 极简 LLM 调用，只返回错误列表，追求低延迟
+        语法纠错 — 返回单词级错误列表（不返回完整句子，避免空格丢失）
         """
-        # 极简 prompt：只要求找错 + 一句话中文解释，不要润色/建议
         prompt = (
-            f'Find grammar errors in: "{text}"\n'
-            f'Return ONLY JSON: {{"errors":['
-            f'{{"original":"word","correction":"fixed","error_type":"tense|article|plural|preposition|word_choice|word_order|other",'
-            f'"explanation":"简短中文解释"}}]}}\n'
-            f'If no errors, return {{"errors":[]}}'
+            f'Find grammar errors in this English text: "{text}"\n'
+            f"CEFR level: {cefr_level}\n\n"
+            f"Rules:\n"
+            f'1. Each error.original must be a SINGLE WORD from the text, never a phrase.\n'
+            f'2. Each error.correction must be a SINGLE WORD or empty string (for deletions).\n'
+            f'3. Do NOT report the same error twice.\n'
+            f'4. Types: tense, subject_verb_agreement, article, preposition, plural, word_choice, word_order, other.\n\n'
+            f'Return ONLY JSON (no markdown, no code fences):\n'
+            f'{{"errors":[{{"original":"wrong_word","correction":"correct_word","error_type":"tense","explanation":"简短中文解释"}}]}}\n'
+            f'If no errors, return {{"errors":[]}}.'
         )
 
         try:
-            async with httpx.AsyncClient(timeout=8.0) as client:
+            async with httpx.AsyncClient(timeout=10.0) as client:
                 resp = await client.post(
                     BAILIAN_API_URL,
                     headers={
@@ -644,7 +648,7 @@ class LLMService:
                     json={
                         "model": self.model,
                         "messages": [{"role": "user", "content": prompt}],
-                        "max_tokens": 150,
+                        "max_tokens": 400,
                         "temperature": 0.1,
                         "enable_thinking": False,
                     },
@@ -654,7 +658,7 @@ class LLMService:
                 content = data["choices"][0]["message"]["content"].strip()
                 content = content.replace("```json", "").replace("```", "").strip()
                 result = json.loads(content)
-                logger.info(f"语法纠错完成: {len(result.get('errors', []))} 个错误")
+                logger.info(f"语法纠错: {text[:30]} → {len(result.get('errors', []))} 个错误")
                 return result
 
         except Exception as e:
@@ -706,6 +710,62 @@ class LLMService:
         except Exception as e:
             logger.error(f"翻译失败: {e}")
             return "翻译服务暂时不可用"
+
+    async def validate_english_text(self, text: str, mode: str = "word") -> dict:
+        """
+        验证输入是否为有效的英文单词/句子
+
+        Args:
+            text: 用户输入的文本
+            mode: word 或 sentence
+
+        Returns:
+            {valid: bool, suggestion: str}
+        """
+        if not text or not text.strip():
+            return {"valid": False, "suggestion": "输入不能为空"}
+
+        trimmed = text.strip()
+        mode_hint = "单词" if mode == "word" else "英文句子"
+        prompt = (
+            f"Check if the following input is a valid English {mode_hint}. "
+            f"If the text contains obvious spelling errors, gibberish, non-English characters, "
+            f"or doesn't look like real English, mark it as invalid and briefly explain why in Chinese.\n\n"
+            f'Input: "{trimmed}"\n\n'
+            f'Return ONLY a JSON object (no markdown, no code fences):\n'
+            f'{{"valid": true/false, "suggestion": "简短的中文提示"}}\n'
+            f'If valid set suggestion to empty string "".'
+        )
+
+        try:
+            async with httpx.AsyncClient(timeout=6.0) as client:
+                resp = await client.post(
+                    BAILIAN_API_URL,
+                    headers={
+                        "Authorization": f"Bearer {self.api_key}",
+                        "Content-Type": "application/json",
+                    },
+                    json={
+                        "model": self.model,
+                        "messages": [{"role": "user", "content": prompt}],
+                        "max_tokens": 150,
+                        "temperature": 0.1,
+                        "enable_thinking": False,
+                    },
+                )
+                resp.raise_for_status()
+                data = resp.json()
+                content = data["choices"][0]["message"]["content"].strip()
+                # 清洗可能的 markdown 代码块
+                if content.startswith("```"):
+                    content = content.split("\n", 1)[-1].rsplit("\n", 1)[0]
+                result = json.loads(content)
+                logger.info(f"英文验证: '{trimmed}' → valid={result.get('valid')}")
+                return result
+
+        except Exception as e:
+            logger.error(f"英文验证失败: {e}")
+            return {"valid": False, "suggestion": "验证服务暂时不可用，请稍后重试"}
 
 
     async def generate_hint(self, ai_text: str, cefr_level: str = "B1") -> str:

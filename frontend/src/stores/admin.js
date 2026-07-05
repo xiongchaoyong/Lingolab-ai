@@ -96,8 +96,8 @@ export const useAdminStore = defineStore('admin', () => {
   // ===== 仪表盘 =====
   const dashboard = ref(null)
 
-  async function fetchDashboard() {
-    const res = await getDashboardApi()
+  async function fetchDashboard(params = {}) {
+    const res = await getDashboardApi(params)
     dashboard.value = res
   }
 

@@ -26,10 +26,12 @@ class RadarResponse(BaseModel):
 # ============================================================
 
 class TrendPoint(BaseModel):
-    """趋势图数据点"""
+    """趋势图数据点（四维度）"""
     date: str = Field(..., description="日期")
     pronunciation: float = Field(default=0, description="发音分")
     fluency: float = Field(default=0, description="流利度分")
+    grammar: float = Field(default=0, description="语法分")
+    vocabulary: float = Field(default=0, description="词汇运用分")
 
 
 class TrendResponse(BaseModel):

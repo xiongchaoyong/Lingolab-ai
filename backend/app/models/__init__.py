@@ -32,6 +32,5 @@ from app.models.gamification import (  # noqa: E402, F401
 from app.models.community import (  # noqa: E402, F401
     VoiceChallenge, ChallengeSubmission,
     DiscussionPost, PostComment, PostLike,
-    StudyGroup, GroupMember,
 )
 from app.models.support import FAQEntry, SupportSession, SecurityLog  # noqa: E402, F401
