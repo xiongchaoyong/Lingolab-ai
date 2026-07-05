@@ -49,18 +49,22 @@ export const useProgressStore = defineStore('progress', () => {
   const lineOption = computed(() => {
     const points = trendData.value.points || []
     const labels = points.map(p => p.date)
-    const pronunciation = points.map(p => p.pronunciation)
-    const fluency = points.map(p => p.fluency)
+    const pronunciation = points.map(p => p.pronunciation || 0)
+    const fluency = points.map(p => p.fluency || 0)
+    const grammar = points.map(p => p.grammar || 0)
+    const vocabulary = points.map(p => p.vocabulary || 0)
 
     return {
       tooltip: { trigger: 'axis' },
-      legend: { data: ['发音准确率', '流利度'], bottom: 0 },
-      grid: { left: 8, right: 8, top: 8, bottom: 24 },
+      legend: { data: ['发音准确率', '流利度', '语法', '词汇运用'], bottom: 0 },
+      grid: { left: 8, right: 8, top: 20, bottom: 36 },
       xAxis: { type: 'category', data: labels },
       yAxis: { type: 'value', min: 0, max: 100 },
       series: [
         { name: '发音准确率', type: 'line', data: pronunciation, smooth: true, lineStyle: { color: '#A78BFA' }, itemStyle: { color: '#A78BFA' } },
-        { name: '流利度', type: 'line', data: fluency, smooth: true, lineStyle: { color: '#C4B5FD' }, itemStyle: { color: '#C4B5FD' } },
+        { name: '流利度', type: 'line', data: fluency, smooth: true, lineStyle: { color: '#34D399' }, itemStyle: { color: '#34D399' } },
+        { name: '语法', type: 'line', data: grammar, smooth: true, lineStyle: { color: '#F59E0B' }, itemStyle: { color: '#F59E0B' } },
+        { name: '词汇运用', type: 'line', data: vocabulary, smooth: true, lineStyle: { color: '#3B82F6' }, itemStyle: { color: '#3B82F6' } },
       ],
     }
   })

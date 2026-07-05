@@ -207,35 +207,49 @@ class TeacherService:
         return result
 
     def create_assignment(self, teacher_id: int, data: Dict, db: Session) -> Dict:
-        """布置作业"""
-        cls = db.query(Class).filter(Class.id == data["class_id"], Class.teacher_id == teacher_id).first()
-        if not cls:
-            raise ValueError("班级不存在")
+        """布置作业（支持单个班级或批量多个班级）"""
+        # 解析班级 ID 列表
+        class_ids = []
+        if data.get("class_ids"):
+            class_ids = [int(cid) for cid in data["class_ids"]]
+        elif data.get("class_id"):
+            class_ids = [int(data["class_id"])]
+
+        if not class_ids:
+            raise ValueError("请选择至少一个班级")
 
         due_date = None
         if data.get("due_date"):
             due_date = datetime.fromisoformat(data["due_date"])
 
-        assignment = Assignment(
-            class_id=data["class_id"],
-            title=data["title"],
-            description=data.get("description", ""),
-            content_type=data["content_type"],
-            content_ids=data.get("content_ids", []),
-            due_date=due_date,
-        )
-        db.add(assignment)
-        db.flush()
-        return {
-            "id": assignment.id, "class_id": assignment.class_id,
-            "class_name": cls.name,
-            "title": assignment.title, "description": assignment.description,
-            "content_type": assignment.content_type,
-            "content_ids": assignment.content_ids or [],
-            "due_date": assignment.due_date.isoformat() if assignment.due_date else None,
-            "completion_rate": 0.0,
-            "created_at": assignment.created_at.isoformat() if assignment.created_at else "",
-        }
+        created = []
+        for cid in class_ids:
+            cls = db.query(Class).filter(Class.id == cid, Class.teacher_id == teacher_id).first()
+            if not cls:
+                continue
+
+            assignment = Assignment(
+                class_id=cid,
+                title=data["title"],
+                description=data.get("description", ""),
+                content_type=data["content_type"],
+                content_ids=data.get("content_ids", []),
+                due_date=due_date,
+            )
+            db.add(assignment)
+            db.flush()
+            created.append({
+                "id": assignment.id, "class_id": assignment.class_id,
+                "class_name": cls.name,
+                "title": assignment.title, "description": assignment.description,
+                "content_type": assignment.content_type,
+                "content_ids": assignment.content_ids or [],
+                "due_date": assignment.due_date.isoformat() if assignment.due_date else None,
+                "completion_rate": 0.0,
+                "created_at": assignment.created_at.isoformat() if assignment.created_at else "",
+            })
+
+        return {"assignments": created, "count": len(created)}
 
     def get_submissions(self, assignment_id: int, teacher_id: int, db: Session) -> List[Dict]:
         """获取作业提交列表"""
@@ -415,6 +429,205 @@ class TeacherService:
         }
 
 
+    # ===== 教师工作台 Dashboard =====
+
+    def get_teacher_dashboard(self, teacher_id: int, db: Session) -> Dict:
+        """教师工作台聚合数据"""
+        # 班级列表
+        classes = db.query(Class).filter(Class.teacher_id == teacher_id, Class.is_active == 1).all()
+        class_ids = [c.id for c in classes]
+        total_classes = len(classes)
+
+        # 学生总数
+        total_students = 0
+        class_student_counts = []
+        if class_ids:
+            student_rows = (
+                db.query(ClassStudent.class_id, func.count(ClassStudent.id))
+                .filter(ClassStudent.class_id.in_(class_ids))
+                .group_by(ClassStudent.class_id)
+                .all()
+            )
+            class_map = dict(student_rows)
+            for c in classes:
+                count = class_map.get(c.id, 0)
+                class_student_counts.append({"name": c.name, "count": count})
+                total_students += count
+
+        # 待点评作业数
+        pending_reviews = 0
+        if class_ids:
+            pending_reviews = (
+                db.query(func.count(AssignmentSubmission.id))
+                .join(Assignment, AssignmentSubmission.assignment_id == Assignment.id)
+                .filter(Assignment.class_id.in_(class_ids), AssignmentSubmission.status == "submitted")
+                .scalar()
+            ) or 0
+
+        # 总作业数
+        total_assignments = 0
+        if class_ids:
+            total_assignments = (
+                db.query(func.count(Assignment.id))
+                .filter(Assignment.class_id.in_(class_ids))
+                .scalar()
+            ) or 0
+
+        # 今日活跃学生数
+        today = datetime.utcnow().date()
+        active_students_today = 0
+        if class_ids:
+            student_ids = [cs.user_id for cs in db.query(ClassStudent).filter(ClassStudent.class_id.in_(class_ids)).all()]
+            if student_ids:
+                active_students_today = (
+                    db.query(func.count(func.distinct(UserSkillScore.user_id)))
+                    .filter(
+                        UserSkillScore.user_id.in_(student_ids),
+                        func.date(UserSkillScore.created_at) == today,
+                    )
+                    .scalar()
+                ) or 0
+
+        # 最近布置的作业（最新 5 条）
+        recent_assignments = []
+        if class_ids:
+            recent = (
+                db.query(Assignment)
+                .filter(Assignment.class_id.in_(class_ids))
+                .order_by(Assignment.created_at.desc())
+                .limit(5)
+                .all()
+            )
+            for a in recent:
+                cls_name = ""
+                for c in classes:
+                    if c.id == a.class_id:
+                        cls_name = c.name
+                        break
+                recent_assignments.append({
+                    "id": a.id, "class_id": a.class_id,
+                    "class_name": cls_name,
+                    "title": a.title, "description": a.description,
+                    "content_type": a.content_type,
+                    "content_ids": a.content_ids or [],
+                    "due_date": a.due_date.isoformat() if a.due_date else None,
+                    "completion_rate": float(a.completion_rate) if a.completion_rate else 0.0,
+                    "created_at": a.created_at.isoformat() if a.created_at else "",
+                })
+
+        return {
+            "total_classes": total_classes,
+            "total_students": total_students,
+            "pending_reviews": pending_reviews,
+            "total_assignments": total_assignments,
+            "active_students_today": active_students_today,
+            "avg_class_size": round(total_students / total_classes, 1) if total_classes > 0 else 0,
+            "recent_assignments": recent_assignments,
+            "class_student_counts": class_student_counts,
+        }
+
+    # ===== 学生进度趋势 =====
+
+    def get_student_trend(self, student_id: int, teacher_id: int, db: Session) -> Dict:
+        """获取学生四维分数趋势（近30天，按天分组）"""
+        # 验证师生关系
+        class_ids = [c.id for c in db.query(Class).filter(Class.teacher_id == teacher_id).all()]
+        if class_ids:
+            is_student = (
+                db.query(ClassStudent)
+                .filter(ClassStudent.class_id.in_(class_ids), ClassStudent.user_id == student_id)
+                .first()
+            )
+            if not is_student:
+                raise ValueError("该学生不在你的班级中")
+
+        start = datetime.utcnow() - timedelta(days=30)
+        rows = (
+            db.query(
+                func.date(UserSkillScore.created_at).label("date"),
+                UserSkillScore.dimension,
+                func.avg(UserSkillScore.score),
+            )
+            .filter(
+                UserSkillScore.user_id == student_id,
+                UserSkillScore.created_at >= start,
+                UserSkillScore.dimension.in_(["pronunciation", "fluency", "grammar", "vocabulary"]),
+            )
+            .group_by(func.date(UserSkillScore.created_at), UserSkillScore.dimension)
+            .order_by("date")
+            .all()
+        )
+
+        # pivot by date
+        by_date = {}
+        for row in rows:
+            d = str(row[0])
+            if d not in by_date:
+                by_date[d] = {"pronunciation": 0, "fluency": 0, "grammar": 0, "vocabulary": 0}
+            by_date[d][str(row[1])] = round(float(row[2]), 1)
+
+        trend = [
+            {"date": d, **scores} for d, scores in sorted(by_date.items())
+        ]
+        return {"trend": trend}
+
+    # ===== 学习打卡统计 =====
+
+    def get_student_checkin_stats(self, student_id: int, teacher_id: int, db: Session) -> Dict:
+        """获取学生近30天每日打卡统计"""
+        # 验证师生关系
+        class_ids = [c.id for c in db.query(Class).filter(Class.teacher_id == teacher_id).all()]
+        if class_ids:
+            is_student = (
+                db.query(ClassStudent)
+                .filter(ClassStudent.class_id.in_(class_ids), ClassStudent.user_id == student_id)
+                .first()
+            )
+            if not is_student:
+                raise ValueError("该学生不在你的班级中")
+
+        start = datetime.utcnow() - timedelta(days=30)
+        rows = (
+            db.query(
+                func.date(UserSkillScore.created_at).label("date"),
+                func.count(UserSkillScore.id),
+            )
+            .filter(
+                UserSkillScore.user_id == student_id,
+                UserSkillScore.created_at >= start,
+            )
+            .group_by(func.date(UserSkillScore.created_at))
+            .order_by("date")
+            .all()
+        )
+
+        existing = {str(r[0]): r[1] for r in rows}
+
+        checkins = []
+        streak = 0
+        today = datetime.utcnow().date()
+        for i in range(30, -1, -1):
+            d = (today - timedelta(days=i)).isoformat()
+            count = existing.get(d, 0)
+            checkins.append({"date": d, "completed": count, "total": count})
+
+        # 计算连续打卡天数（从今天往前算）
+        for i in range(31):
+            d = (today - timedelta(days=i)).isoformat()
+            if existing.get(d, 0) > 0:
+                streak += 1
+            else:
+                break
+
+        total_days = sum(1 for c in checkins if c["completed"] > 0)
+        return {
+            "checkins": checkins,
+            "streak": streak,
+            "total_days": total_days,
+            "completion_rate": round(total_days / 31 * 100, 1) if total_days > 0 else 0,
+        }
+
+
 class AdminService:
     """运营端服务"""
 
@@ -570,9 +783,19 @@ class AdminService:
             "created_at": user.created_at.isoformat() if user.created_at else "",
         }
 
-    def get_dashboard(self, db: Session) -> Dict:
+    def get_dashboard(self, db: Session, start_date: Optional[str] = None, end_date: Optional[str] = None) -> Dict:
         """获取运营仪表盘数据"""
         today = date.today()
+
+        # 解析日期范围（默认最近30天）
+        if start_date:
+            range_start = datetime.strptime(start_date, "%Y-%m-%d").date()
+        else:
+            range_start = today - timedelta(days=30)
+        if end_date:
+            range_end = datetime.strptime(end_date, "%Y-%m-%d").date()
+        else:
+            range_end = today
 
         # 总用户数
         total_users = db.query(func.count(UserProfile.id)).scalar() or 0
@@ -706,15 +929,18 @@ class AdminService:
 
         if yesterday_active > 0:
             yesterday_users = (
-                db.query(func.distinct(UserSkillScore.user_id))
+                db.query(UserSkillScore.user_id.label('uid'))
                 .filter(func.date(UserSkillScore.created_at) == yesterday)
+                .distinct()
                 .subquery()
             )
             today_from_yesterday = (
                 db.query(func.count(func.distinct(UserSkillScore.user_id)))
                 .filter(
                     func.date(UserSkillScore.created_at) == today,
-                    UserSkillScore.user_id.in_(yesterday_users)
+                    UserSkillScore.user_id.in_(
+                        db.query(yesterday_users.c.uid).select_from(yesterday_users)
+                    )
                 )
                 .scalar()
             ) or 0
@@ -729,15 +955,18 @@ class AdminService:
 
         if seven_ago_active > 0:
             seven_ago_users = (
-                db.query(func.distinct(UserSkillScore.user_id))
+                db.query(UserSkillScore.user_id.label('uid'))
                 .filter(func.date(UserSkillScore.created_at) == seven_days_ago)
+                .distinct()
                 .subquery()
             )
             today_from_seven = (
                 db.query(func.count(func.distinct(UserSkillScore.user_id)))
                 .filter(
                     func.date(UserSkillScore.created_at) == today,
-                    UserSkillScore.user_id.in_(seven_ago_users)
+                    UserSkillScore.user_id.in_(
+                        db.query(seven_ago_users.c.uid).select_from(seven_ago_users)
+                    )
                 )
                 .scalar()
             ) or 0
@@ -752,6 +981,148 @@ class AdminService:
         # 人均时长
         active_user_count = db.query(func.count(func.distinct(UserSkillScore.user_id))).scalar() or 1
         avg_duration_minutes = round(total_duration_minutes / active_user_count, 1)
+
+        # ===== 内容使用排行 =====
+        content_ranking = []
+
+        # 热门发音内容 Top 8
+        pron_rows = (
+            db.query(PronunciationContent.content_text, func.count(PronunciationRecord.id))
+            .join(PronunciationRecord, PronunciationRecord.content_id == PronunciationContent.id)
+            .filter(
+                func.date(PronunciationRecord.created_at) >= range_start,
+                func.date(PronunciationRecord.created_at) <= range_end,
+            )
+            .group_by(PronunciationContent.content_text)
+            .order_by(func.count(PronunciationRecord.id).desc())
+            .limit(8)
+            .all()
+        )
+        for text, count in pron_rows:
+            content_ranking.append({"name": text, "type": "发音练习", "count": count})
+
+        # 热门对话场景 Top 6
+        scene_rows = (
+            db.query(ConversationSession.scene, func.count(ConversationSession.id))
+            .filter(
+                func.date(ConversationSession.created_at) >= range_start,
+                func.date(ConversationSession.created_at) <= range_end,
+            )
+            .group_by(ConversationSession.scene)
+            .order_by(func.count(ConversationSession.id).desc())
+            .limit(6)
+            .all()
+        )
+        scene_labels = {
+            "self_intro": "自我介绍", "directions": "问路指路", "shopping": "购物",
+            "restaurant": "餐厅点餐", "free": "自由对话", "hotel": "酒店入住",
+            "airport": "机场出行", "hospital": "医院就诊", "school": "校园生活",
+        }
+        for scene, count in scene_rows:
+            content_ranking.append({"name": scene_labels.get(scene, scene), "type": "场景对话", "count": count})
+
+        # 按 count 降序排列
+        content_ranking.sort(key=lambda x: x["count"], reverse=True)
+
+        # ===== 转化漏斗 =====
+        registered_in_range = (
+            db.query(func.count(UserProfile.id))
+            .filter(func.date(UserProfile.created_at) >= range_start,
+                     func.date(UserProfile.created_at) <= range_end)
+            .scalar()
+        ) or 0
+        assessed_in_range = (
+            db.query(func.count(UserProfile.id))
+            .filter(UserProfile.assessment_completed == 1,
+                     func.date(UserProfile.created_at) >= range_start,
+                     func.date(UserProfile.created_at) <= range_end)
+            .scalar()
+        ) or 0
+
+        # 有首次练习行为（发音/对话任一）
+        first_practice_sub = (
+            db.query(UserSkillScore.user_id.label('uid'))
+            .filter(func.date(UserSkillScore.created_at) >= range_start,
+                     func.date(UserSkillScore.created_at) <= range_end)
+            .distinct()
+            .subquery()
+        )
+        first_practice_count = (
+            db.query(func.count(first_practice_sub.c.uid)).scalar()
+        ) or 0
+
+        # 7日留存：窗口期用户中，有活动超出 range_end 的
+        retained_7d_count = 0
+        if first_practice_count > 0:
+            window_users = (
+                db.query(UserSkillScore.user_id.label('uid'))
+                .filter(func.date(UserSkillScore.created_at) >= range_start,
+                         func.date(UserSkillScore.created_at) <= range_end)
+                .distinct()
+                .subquery()
+            )
+            retained_7d_count = (
+                db.query(func.count(func.distinct(UserSkillScore.user_id)))
+                .filter(
+                    UserSkillScore.user_id.in_(
+                        db.query(window_users.c.uid).select_from(window_users)
+                    ),
+                    func.date(UserSkillScore.created_at) > range_end,
+                )
+                .scalar()
+            ) or 0
+
+        conversion_funnel = {
+            "registered": registered_in_range,
+            "assessed": assessed_in_range,
+            "first_practice": first_practice_count,
+            "retained_7d": retained_7d_count,
+        }
+
+        # ===== 每日活跃日报 =====
+        daily_report = []
+        total_days = (range_end - range_start).days
+        # 限制最多返回 60 天数据（防止超大范围）
+        if total_days > 60:
+            range_start = range_end - timedelta(days=59)
+            total_days = 59
+
+        current = range_start
+        while current <= range_end:
+            day_dau = (
+                db.query(func.count(func.distinct(UserSkillScore.user_id)))
+                .filter(func.date(UserSkillScore.created_at) == current)
+                .scalar()
+            ) or 0
+            day_new = (
+                db.query(func.count(UserProfile.id))
+                .filter(func.date(UserProfile.created_at) == current)
+                .scalar()
+            ) or 0
+            day_practice = (
+                db.query(func.count(PronunciationRecord.id))
+                .filter(func.date(PronunciationRecord.created_at) == current)
+                .scalar()
+            ) or 0
+            day_conv = (
+                db.query(func.count(ConversationSession.id))
+                .filter(func.date(ConversationSession.created_at) == current)
+                .scalar()
+            ) or 0
+            day_tasks = (
+                db.query(func.count(DailyTask.id))
+                .filter(DailyTask.task_date == current, DailyTask.status == "completed")
+                .scalar()
+            ) or 0
+            daily_report.append({
+                "date": current.isoformat(),
+                "dau": day_dau,
+                "new_users": day_new,
+                "practice_count": day_practice,
+                "conversation_count": day_conv,
+                "tasks_completed": day_tasks,
+            })
+            current += timedelta(days=1)
 
         return {
             "metrics": {
@@ -780,44 +1151,60 @@ class AdminService:
             "daily_activity": daily_activity,
             "content_type_distribution": type_dist,
             "level_distribution": level_dist,
+            "content_ranking": content_ranking,
+            "conversion_funnel": conversion_funnel,
+            "daily_report": daily_report,
         }
 
     # ===== 内容管理 =====
 
-    def get_content_list(self, content_type: str, db: Session) -> List[Dict]:
-        """获取内容列表（题库/跟读/资料/配音）"""
+    def get_content_list(self, content_type: str, db: Session, page: int = 1, page_size: int = 20) -> Dict:
+        """获取内容列表（题库/跟读/资料/配音），分页"""
+        offset = (page - 1) * page_size
+
         if content_type == "questions":
-            items = db.query(AssessmentQuestion).order_by(AssessmentQuestion.id).all()
-            return [{
+            query = db.query(AssessmentQuestion).order_by(AssessmentQuestion.id)
+            total = query.count()
+            items = query.offset(offset).limit(page_size).all()
+            rows = [{
                 "id": q.id, "content": q.question_text,
                 "type": q.dimension, "difficulty": q.difficulty,
                 "dimension": q.dimension,
             } for q in items]
 
         elif content_type == "shadow":
-            items = db.query(PronunciationContent).filter(PronunciationContent.is_active == 1).order_by(PronunciationContent.id).all()
-            return [{
+            query = db.query(PronunciationContent).filter(PronunciationContent.is_active == 1).order_by(PronunciationContent.id)
+            total = query.count()
+            items = query.offset(offset).limit(page_size).all()
+            rows = [{
                 "id": c.id, "word": c.content_text,
                 "ipa": c.phonetic_ipa or "",
                 "difficulty": c.cefr_level, "type": c.content_type,
             } for c in items]
 
         elif content_type == "materials":
-            items = db.query(LearningMaterial).filter(LearningMaterial.is_active == 1).order_by(LearningMaterial.id).all()
-            return [{
+            query = db.query(LearningMaterial).filter(LearningMaterial.is_active == 1).order_by(LearningMaterial.id)
+            total = query.count()
+            items = query.offset(offset).limit(page_size).all()
+            rows = [{
                 "id": m.id, "title": m.title,
                 "type": m.material_type, "category": m.category or "",
                 "level": m.cefr_level,
             } for m in items]
 
         elif content_type == "dubbing":
-            items = db.query(DubbingContent).filter(DubbingContent.is_active == 1).order_by(DubbingContent.id).all()
-            return [{
+            query = db.query(DubbingContent).filter(DubbingContent.is_active == 1).order_by(DubbingContent.id)
+            total = query.count()
+            items = query.offset(offset).limit(page_size).all()
+            rows = [{
                 "id": d.id, "title": d.title,
                 "line": d.subtitle or "", "difficulty": d.difficulty or "",
             } for d in items]
 
-        return []
+        else:
+            return {"items": [], "total": 0}
+
+        return {"items": rows, "total": total}
 
     # ===== 反馈管理 =====
 
@@ -880,6 +1267,22 @@ class AdminService:
             "status": fb.status, "admin_reply": fb.admin_reply,
             "replied_at": fb.replied_at.isoformat() if fb.replied_at else None,
             "created_at": fb.created_at.isoformat() if fb.created_at else "",
+        }
+
+    def submit_feedback(self, user_id: int, content: str, feedback_type: str, db: Session) -> Dict:
+        """用户提交反馈"""
+        fb = UserFeedback(
+            user_id=user_id,
+            content=content,
+            feedback_type=feedback_type,
+            status="pending",
+        )
+        db.add(fb)
+        db.flush()
+        return {
+            "id": fb.id, "user_id": fb.user_id,
+            "content": fb.content, "feedback_type": fb.feedback_type,
+            "status": fb.status, "created_at": fb.created_at.isoformat() if fb.created_at else "",
         }
 
     def resolve_feedback(self, feedback_id: int, admin_id: int, db: Session) -> Dict:

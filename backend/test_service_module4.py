@@ -178,14 +178,14 @@ class TestRadarSchemas:
 
     def test_radar_response(self):
         resp = RadarResponse(
-            dimensions=[RadarDimension(name=f"dim{i}", current=80, previous=70) for i in range(5)],
+            dimensions=[RadarDimension(name=f"dim{i}", current=80, previous=70) for i in range(4)],
             range="week",
         )
-        assert len(resp.dimensions) == 5
+        assert len(resp.dimensions) == 4
 
-    def test_five_radar_dimensions(self):
-        """五维雷达图维度"""
-        expected = ["发音", "流利度", "语法", "词汇运用", "互动参与"]
+    def test_four_radar_dimensions(self):
+        """四维雷达图维度"""
+        expected = ["发音", "流利度", "语法", "词汇运用"]
         assert RADAR_DIMENSIONS == expected
 
 

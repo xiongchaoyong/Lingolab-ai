@@ -20,9 +20,6 @@ from app.schemas.community import (
     CommentListResponse,
     CreateCommentRequest,
     LikeResponse,
-    GroupItem,
-    GroupListResponse,
-    JoinResult,
 )
 
 
@@ -136,33 +133,3 @@ class TestLikeSchema:
         resp = LikeResponse(liked=False, likes_count=4)
         assert resp.liked is False
 
-
-# ============================================================
-# 学习小组 Schema
-# ============================================================
-
-class TestGroupSchemas:
-    """小组 Schema 验证"""
-
-    def test_group_item(self):
-        group = GroupItem(
-            id=1, name="发音提升组", level="B1", schedule="每天 20:00",
-            tags=["发音", "口语"], member_count=15, is_joined=True,
-        )
-        assert group.member_count == 15
-        assert group.is_joined is True
-
-    def test_group_list(self):
-        resp = GroupListResponse(groups=[
-            GroupItem(id=i, name=f"小组{i}", level="B1", schedule="每天") for i in range(4)
-        ])
-        assert len(resp.groups) == 4
-
-    def test_join_result(self):
-        result = JoinResult(joined=True, member_count=16)
-        assert result.joined is True
-        assert result.member_count == 16
-
-    def test_leave_result(self):
-        result = JoinResult(joined=False, member_count=14)
-        assert result.joined is False

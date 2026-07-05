@@ -1,6 +1,6 @@
 <script setup>
 import { ref, onMounted } from 'vue'
-import { Microphone, Star, ChatLineRound, Picture, UserFilled, Clock, Loading, CircleCheckFilled, Medal } from '@element-plus/icons-vue'
+import { Microphone, Star, ChatLineRound, Picture, Loading, CircleCheckFilled, Medal } from '@element-plus/icons-vue'
 import VoiceRecorder from '@/components/common/VoiceRecorder.vue'
 import ScoreBar from '@/components/common/ScoreBar.vue'
 import { useCommunityStore } from '@/stores/community'
@@ -28,7 +28,6 @@ const showDubbingRecorder = ref(false)
 onMounted(() => {
   store.fetchChallenges()
   store.fetchPosts()
-  store.fetchGroups()
 })
 
 // ===== 语音挑战 =====
@@ -78,12 +77,6 @@ async function handleAddComment() {
   await store.addComment(commentDialogPost.value.id, commentContent.value.trim())
   commentContent.value = ''
   comments.value = await store.fetchComments(commentDialogPost.value.id)
-}
-
-// ===== 学习小组 =====
-
-async function handleToggleGroup(group) {
-  await store.toggleGroup(group.id)
 }
 
 // ===== 闯关挑战 =====
@@ -256,40 +249,6 @@ const rankColors = { 1: '#FFD700', 2: '#C0C0C0', 3: '#CD7F32' }
             </div>
           </div>
         </div>
-      </el-tab-pane>
-
-      <!-- ======================================== 学习小组 -->
-      <el-tab-pane label="学习小组" name="groups">
-        <div v-if="store.groups.length === 0 && !store.groupsLoading" class="empty-hint">
-          暂无学习小组
-        </div>
-        <el-row v-else :gutter="16">
-          <el-col :span="12" v-for="group in store.groups" :key="group.id">
-            <div class="group-card" :class="{ joined: group.is_joined }">
-              <div class="group-header">
-                <h4>{{ group.name }}</h4>
-                <el-tag size="small" :type="group.is_joined ? 'success' : 'info'">
-                  {{ group.is_joined ? '已加入' : '开放' }}
-                </el-tag>
-              </div>
-              <div class="group-body">
-                <div class="group-stat"><el-icon><UserFilled /></el-icon> {{ group.member_count }} 人</div>
-                <div class="group-stat"><el-icon><Clock /></el-icon> {{ group.schedule }}</div>
-                <div class="group-stat">
-                  <el-tag size="small" type="warning">{{ group.level }}</el-tag>
-                  <el-tag v-for="t in group.tags" :key="t" size="small" effect="plain" style="margin-left:4px">{{ t }}</el-tag>
-                </div>
-              </div>
-              <el-button
-                :type="group.is_joined ? 'default' : 'primary'"
-                size="small"
-                @click="handleToggleGroup(group)"
-              >
-                {{ group.is_joined ? '退出小组' : '加入小组' }}
-              </el-button>
-            </div>
-          </el-col>
-        </el-row>
       </el-tab-pane>
 
       <!-- ======================================== 闯关挑战 -->
@@ -539,18 +498,6 @@ const rankColors = { 1: '#FFD700', 2: '#C0C0C0', 3: '#CD7F32' }
 .disc-topic { margin: 0 0 var(--spacing-sm); font-weight: 600; }
 .disc-content { color: var(--color-text-secondary); line-height: 1.6; margin-bottom: var(--spacing-md); }
 .disc-actions { display: flex; gap: var(--spacing-sm); border-top: 1px solid var(--color-border); padding-top: var(--spacing-md); }
-
-.group-card {
-  background: var(--color-bg-secondary); border: 1px solid var(--color-border);
-  border-radius: var(--radius-md); padding: var(--spacing-xl);
-  margin-bottom: var(--spacing-lg);
-  &.joined { border-color: rgba(var(--color-success-rgb), 0.3); }
-  .group-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--spacing-md);
-    h4 { margin: 0; }
-  }
-  .group-body { display: flex; flex-direction: column; gap: var(--spacing-sm); margin-bottom: var(--spacing-md); }
-  .group-stat { font-size: var(--font-size-sm); color: var(--color-text-secondary); display: flex; align-items: center; gap: var(--spacing-xs); }
-}
 
 .comment-list { max-height: 300px; overflow-y: auto; margin-bottom: var(--spacing-lg); }
 .comment-item {

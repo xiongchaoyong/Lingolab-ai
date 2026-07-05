@@ -1,4 +1,4 @@
-"""社区服务 — 语音挑战 / 话题讨论 / 学习小组"""
+"""社区服务 — 语音挑战 / 话题讨论"""
 
 import logging
 from typing import Dict, List
@@ -12,8 +12,6 @@ from app.models.community import (
     DiscussionPost,
     PostComment,
     PostLike,
-    StudyGroup,
-    GroupMember,
 )
 from app.models.user import UserProfile
 
@@ -275,66 +273,6 @@ class CommunityService:
             "created_at": comment.created_at.isoformat() if comment.created_at else "",
         }
 
-    # ============================================================
-    # 学习小组
-    # ============================================================
-
-    def get_groups(self, user_id: int, db: Session) -> List[Dict]:
-        """获取小组列表"""
-        groups = (
-            db.query(StudyGroup)
-            .filter(StudyGroup.is_archived == False)
-            .order_by(StudyGroup.member_count.desc())
-            .all()
-        )
-        # 查询用户已加入的小组
-        joined_ids = set()
-        if user_id:
-            memberships = (
-                db.query(GroupMember.group_id)
-                .filter(GroupMember.user_id == user_id)
-                .all()
-            )
-            joined_ids = {m[0] for m in memberships}
-
-        result = []
-        for g in groups:
-            tags = [t.strip() for t in g.tags.split(",") if t.strip()] if g.tags else []
-            result.append({
-                "id": g.id,
-                "name": g.name,
-                "description": g.description,
-                "level": g.level_range or "",
-                "schedule": g.schedule or "",
-                "tags": tags,
-                "member_count": g.member_count,
-                "is_joined": g.id in joined_ids,
-                "created_at": g.created_at.isoformat() if g.created_at else "",
-            })
-        return result
-
-    def toggle_group(self, user_id: int, group_id: int, db: Session) -> Dict:
-        """加入/退出小组"""
-        group = db.query(StudyGroup).filter(StudyGroup.id == group_id).first()
-        if not group:
-            raise ValueError("小组不存在")
-
-        existing = (
-            db.query(GroupMember)
-            .filter(GroupMember.group_id == group_id, GroupMember.user_id == user_id)
-            .first()
-        )
-
-        if existing:
-            db.delete(existing)
-            group.member_count = max(0, group.member_count - 1)
-            joined = False
-        else:
-            db.add(GroupMember(group_id=group_id, user_id=user_id))
-            group.member_count += 1
-            joined = True
-        db.flush()
-        return {"joined": joined, "member_count": group.member_count}
 
 
 # 单例

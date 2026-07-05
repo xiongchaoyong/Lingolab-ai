@@ -3,6 +3,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { usePredictionStore } from '@/stores/prediction'
+import FeedbackButton from '@/components/common/FeedbackButton.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -91,6 +92,7 @@ const teacherNavs = [
   {
     title: '后台管理',
     children: [
+      { path: '/teacher/dashboard', title: '工作台' },
       { path: '/teacher/classes', title: '班级管理' },
       { path: '/teacher/reports', title: '学生报告' },
       { path: '/teacher/homework', title: '作业管理' },
@@ -127,6 +129,7 @@ const adminNavs = [
   {
     title: '教师管理',
     children: [
+      { path: '/teacher/dashboard', title: '工作台' },
       { path: '/teacher/classes', title: '班级管理' },
       { path: '/teacher/reports', title: '学生报告' },
       { path: '/teacher/homework', title: '作业管理' },
@@ -302,6 +305,9 @@ function handleCommand(command) {
         </template>
       </nav>
     </transition>
+
+    <!-- 反馈按钮（登录后可见） -->
+    <FeedbackButton v-if="authStore.isLoggedIn" />
 
     <!-- 内容区域 -->
     <main :class="['tn-content', { 'tn-content--fullscreen': isFullscreenRoute }]">

@@ -16,7 +16,7 @@ from app.models.knowledge_graph import DailyTask, MaterialRecommendation
 from app.models.learning import LearningMaterial, MaterialRecord
 from app.models.community import (
     VoiceChallenge, ChallengeSubmission,
-    DiscussionPost, PostComment, PostLike, StudyGroup, GroupMember,
+    DiscussionPost, PostComment, PostLike,
 )
 
 USER_ID = 4  # xxxcy

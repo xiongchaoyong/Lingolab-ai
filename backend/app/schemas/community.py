@@ -115,30 +115,3 @@ class LikeResponse(BaseModel):
     liked: bool
     likes_count: int
 
-
-# ============================================================
-# 学习小组
-# ============================================================
-
-class GroupItem(BaseModel):
-    """小组信息"""
-    id: int
-    name: str
-    description: str = ""
-    level: str
-    schedule: str
-    tags: List[str] = Field(default_factory=list)
-    member_count: int = 0
-    is_joined: bool = False
-    created_at: str = ""
-
-
-class GroupListResponse(BaseModel):
-    """小组列表"""
-    groups: List[GroupItem] = Field(default_factory=list)
-
-
-class JoinResult(BaseModel):
-    """加入/退出结果"""
-    joined: bool
-    member_count: int

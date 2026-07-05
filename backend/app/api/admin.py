@@ -22,6 +22,9 @@ from app.schemas.admin import (
     UserRoleRequest,
     UpdateClassRequest,
     DashboardResponse,
+    TeacherDashboardResponse,
+    StudentTrendResponse,
+    CheckinStatsResponse,
     FeedbackListResponse,
     FeedbackReplyRequest,
     FeedbackStatusRequest,
@@ -317,11 +320,13 @@ def get_user_detail(
 
 @router.get("/dashboard", response_model=DashboardResponse)
 def get_dashboard(
+    start_date: str = Query(None, description="开始日期 YYYY-MM-DD"),
+    end_date: str = Query(None, description="结束日期 YYYY-MM-DD"),
     admin: UserProfile = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
-    """获取运营仪表盘数据"""
-    result = admin_service.get_dashboard(db)
+    """获取运营仪表盘数据（支持日期范围筛选）"""
+    result = admin_service.get_dashboard(db, start_date, end_date)
     return DashboardResponse(**result)
 
 
@@ -354,20 +359,67 @@ def get_student_detail(
 
 
 # ============================================================
+# 教师工作台 Dashboard
+# ============================================================
+
+@router.get("/teacher-dashboard", response_model=TeacherDashboardResponse)
+def get_teacher_dashboard(
+    teacher: UserProfile = Depends(require_teacher),
+    db: Session = Depends(get_db),
+):
+    """教师工作台聚合数据"""
+    result = teacher_service.get_teacher_dashboard(teacher.id, db)
+    return TeacherDashboardResponse(**result)
+
+
+# ============================================================
+# 学生进度趋势 + 打卡统计
+# ============================================================
+
+@router.get("/students/{student_id}/trend", response_model=StudentTrendResponse)
+def get_student_trend(
+    student_id: int,
+    teacher: UserProfile = Depends(require_teacher),
+    db: Session = Depends(get_db),
+):
+    """获取学生四维分数趋势"""
+    try:
+        result = teacher_service.get_student_trend(student_id, teacher.id, db)
+        return StudentTrendResponse(**result)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.get("/students/{student_id}/checkin-stats", response_model=CheckinStatsResponse)
+def get_student_checkin_stats(
+    student_id: int,
+    teacher: UserProfile = Depends(require_teacher),
+    db: Session = Depends(get_db),
+):
+    """获取学生打卡统计"""
+    try:
+        result = teacher_service.get_student_checkin_stats(student_id, teacher.id, db)
+        return CheckinStatsResponse(**result)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+# ============================================================
 # 运营端 — 内容管理
 # ============================================================
 
 @router.get("/content/{content_type}")
 def get_content_list(
     content_type: str,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
     admin: UserProfile = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
-    """获取内容列表（questions/shadow/materials/dubbing）"""
+    """获取内容列表（questions/shadow/materials/dubbing），分页"""
     if content_type not in ("questions", "shadow", "materials", "dubbing"):
         raise HTTPException(status_code=400, detail="无效的内容类型")
-    items = admin_service.get_content_list(content_type, db)
-    return {"items": items}
+    return admin_service.get_content_list(content_type, db, page, page_size)
 
 
 @router.post("/content", response_model=dict)

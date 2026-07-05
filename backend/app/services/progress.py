@@ -14,7 +14,7 @@ from app.models.gamification import UserScore, DubbingRecord
 logger = logging.getLogger(__name__)
 
 # 五维雷达图维度（从画像四维度衍生）
-RADAR_DIMENSIONS = ["发音", "流利度", "语法", "词汇运用", "互动参与"]
+RADAR_DIMENSIONS = ["发音", "流利度", "语法", "词汇运用"]
 
 
 class ProgressService:
@@ -173,87 +173,85 @@ class ProgressService:
 
         dim_map = {row[0]: float(row[1]) for row in rows if row[1]}
 
-        # 映射到五维显示
+        # 映射到四维显示
         return {
             "发音": dim_map.get("pronunciation", 0),
             "流利度": dim_map.get("fluency", 0),
             "语法": dim_map.get("grammar", 0),
             "词汇运用": dim_map.get("vocabulary", 0),
-            "互动参与": dim_map.get("fluency", 0) * 0.9,
         }
+
+    # 四种数据库存储维度
+    _TREND_DIMENSIONS = ["pronunciation", "fluency", "grammar", "vocabulary"]
 
     def _get_daily_trend(
         self, user_id: int, start: datetime, end: datetime, db: Session
     ) -> List[Dict]:
-        """按天聚合趋势数据"""
-        rows = (
-            db.query(
-                func.date(UserSkillScore.created_at).label("d"),
-                func.avg(UserSkillScore.score).label("avg"),
-            )
-            .filter(
-                UserSkillScore.user_id == user_id,
-                UserSkillScore.created_at >= start,
-                UserSkillScore.created_at <= end,
-                UserSkillScore.dimension == "pronunciation",
-            )
-            .group_by(text("d"))
-            .order_by(text("d"))
-            .all()
-        )
-
-        points = []
-        for row in rows:
-            points.append({
-                "date": str(row[0]),
-                "pronunciation": round(float(row[1]), 1),
-                "fluency": round(float(row[1]) * 0.85, 1),
-            })
-        return points
+        """按天聚合五维趋势数据"""
+        label_col = func.date(UserSkillScore.created_at).label("label")
+        return self._get_trend_points(user_id, start, end, label_col, str, db)
 
     def _get_hourly_trend(self, user_id, start, end, db):
-        """按小时聚合（日视图）"""
-        rows = (
-            db.query(
-                func.hour(UserSkillScore.created_at).label("h"),
-                func.avg(UserSkillScore.score).label("avg"),
-            )
-            .filter(
-                UserSkillScore.user_id == user_id,
-                UserSkillScore.created_at >= start,
-                UserSkillScore.created_at <= end,
-                UserSkillScore.dimension == "pronunciation",
-            )
-            .group_by(text("h"))
-            .order_by(text("h"))
-            .all()
-        )
-        return [
-            {"date": f"{int(row[0]):02d}:00", "pronunciation": round(float(row[1]), 1), "fluency": round(float(row[1]) * 0.85, 1)}
-            for row in rows
-        ]
+        """按小时聚合五维趋势数据（日视图）"""
+        label_col = func.hour(UserSkillScore.created_at).label("label")
+        points = self._get_trend_points(user_id, start, end, label_col, None, db)
+        for p in points:
+            p["date"] = f"{int(p['date']):02d}:00"
+        return points
 
     def _get_weekly_trend(self, user_id, start, end, db):
-        """按周聚合（全部视图）"""
+        """按周聚合五维趋势数据（全部视图）"""
+        label_col = func.date_format(
+            UserSkillScore.created_at, "%Y-W%U"
+        ).label("label")
+        return self._get_trend_points(user_id, start, end, label_col, str, db)
+
+    def _get_trend_points(
+        self, user_id: int, start: datetime, end: datetime,
+        label_col, label_format, db: Session
+    ) -> List[Dict]:
+        """通用多维趋势聚合：按 period 分组，查询四个维度并 pivot 为数据点"""
         rows = (
             db.query(
-                func.date_format(UserSkillScore.created_at, "%Y-W%U").label("w"),
-                func.avg(UserSkillScore.score).label("avg"),
+                label_col,
+                UserSkillScore.dimension,
+                func.avg(UserSkillScore.score).label("avg_score"),
             )
             .filter(
                 UserSkillScore.user_id == user_id,
                 UserSkillScore.created_at >= start,
                 UserSkillScore.created_at <= end,
-                UserSkillScore.dimension == "pronunciation",
+                UserSkillScore.dimension.in_(self._TREND_DIMENSIONS),
             )
-            .group_by(text("w"))
-            .order_by(text("w"))
+            .group_by(text("label"), UserSkillScore.dimension)
+            .order_by(text("label"))
             .all()
         )
-        return [
-            {"date": str(row[0]), "pronunciation": round(float(row[1]), 1), "fluency": round(float(row[1]) * 0.85, 1)}
-            for row in rows
-        ]
+
+        # pivot: {label: {dimension: avg_score}}
+        date_map: Dict[str, Dict[str, float]] = {}
+        for row in rows:
+            label = str(row[0]) if label_format else str(row[0])
+            dim = row[1]
+            score = float(row[2])
+            date_map.setdefault(label, {})[dim] = score
+
+        points = []
+        for label, dims in date_map.items():
+            pronunciation = round(dims.get("pronunciation", 0), 1)
+            fluency = round(dims.get("fluency", 0), 1)
+            grammar = round(dims.get("grammar", 0), 1)
+            vocabulary = round(dims.get("vocabulary", 0), 1)
+
+            points.append({
+                "date": label,
+                "pronunciation": pronunciation,
+                "fluency": fluency,
+                "grammar": grammar,
+                "vocabulary": vocabulary,
+            })
+
+        return points
 
     def _get_activity_counts(self, user_id: int, year: int, db: Session) -> List:
         """获取全年每日活动次数"""

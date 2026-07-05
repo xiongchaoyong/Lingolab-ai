@@ -1,18 +1,48 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useAdminStore } from '@/stores/admin'
+import { ElMessage } from 'element-plus'
+import { Download } from '@element-plus/icons-vue'
 
 const store = useAdminStore()
 const loading = ref(false)
+const dateRange = ref([])
 
-onMounted(async () => {
+onMounted(() => { loadDashboard() })
+
+async function loadDashboard() {
   loading.value = true
   try {
-    await store.fetchDashboard()
+    const params = {}
+    if (dateRange.value?.length === 2) {
+      params.start_date = dateRange.value[0]
+      params.end_date = dateRange.value[1]
+    }
+    await store.fetchDashboard(params)
   } finally {
     loading.value = false
   }
-})
+}
+
+function handleDateChange() {
+  // 清空时直接加载（走默认30天）
+  if (!dateRange.value || dateRange.value.length !== 2) {
+    dateRange.value = []
+  }
+  loadDashboard()
+}
+
+// 快捷日期
+function setDateRange(days) {
+  const end = new Date()
+  const start = new Date()
+  start.setDate(start.getDate() - days)
+  dateRange.value = [
+    start.toISOString().slice(0, 10),
+    end.toISOString().slice(0, 10),
+  ]
+  loadDashboard()
+}
 
 const d = computed(() => store.dashboard?.metrics || {})
 
@@ -54,6 +84,8 @@ function formatNumber(n) {
   if (n >= 1000) return (n / 1000).toFixed(1) + 'k'
   return String(n)
 }
+
+// ===== 图表配置 =====
 
 const dailyActivityOption = computed(() => {
   const data = store.dashboard?.daily_activity || []
@@ -125,12 +157,123 @@ const typeBarOption = computed(() => {
     }],
   }
 })
+
+// 内容使用排行柱状图
+const rankingOption = computed(() => {
+  const ranking = store.dashboard?.content_ranking || []
+  const names = ranking.map(r => r.name.length > 10 ? r.name.slice(0, 10) + '...' : r.name)
+  const counts = ranking.map(r => r.count)
+  const types = ranking.map(r => r.type)
+  return {
+    tooltip: {
+      trigger: 'axis',
+      axisPointer: { type: 'shadow' },
+      formatter: (p) => {
+        const items = Array.isArray(p) ? p : [p]
+        const idx = items[0]?.dataIndex
+        const name = ranking[idx]?.name || ''
+        return `${name}<br/>${items.map(i => `${i.marker} ${i.seriesName}: ${i.value}`).join('<br/>')}`
+      },
+    },
+    legend: { data: ['发音练习', '场景对话'], bottom: 0 },
+    grid: { left: 8, right: 8, top: 8, bottom: 36 },
+    xAxis: { type: 'category', data: names, axisLabel: { rotate: 30, fontSize: 10 } },
+    yAxis: { type: 'value', name: '次数' },
+    series: ['发音练习', '场景对话'].map(t => ({
+      name: t, type: 'bar',
+      data: ranking.map((r, i) => r.type === t ? r.count : null),
+      itemStyle: {
+        borderRadius: [6, 6, 0, 0],
+        color: t === '发音练习' ? '#A78BFA' : '#34D399',
+      },
+      barGap: '20%',
+    })),
+  }
+})
+
+// 转化漏斗图
+const funnelOption = computed(() => {
+  const funnel = store.dashboard?.conversion_funnel || {}
+  const stages = [
+    { name: '注册', value: funnel.registered || 0 },
+    { name: '完成测评', value: funnel.assessed || 0 },
+    { name: '首次练习', value: funnel.first_practice || 0 },
+    { name: '7日留存', value: funnel.retained_7d || 0 },
+  ]
+  const maxVal = Math.max(...stages.map(s => s.value), 1)
+  return {
+    tooltip: {
+      trigger: 'item',
+      formatter: (p) => {
+        const rate = stages[0].value > 0 ? (p.value / stages[0].value * 100).toFixed(1) : 0
+        return `${p.name}: ${p.value}<br/>相对注册: ${rate}%`
+      },
+    },
+    grid: { left: 8, right: 8, top: 8, bottom: 8 },
+    xAxis: { type: 'value', show: false, max: maxVal },
+    yAxis: { type: 'category', data: stages.map(s => s.name), axisLine: { show: false }, axisTick: { show: false } },
+    series: [{
+      type: 'bar',
+      data: stages.map((s, i) => ({
+        value: s.value,
+        itemStyle: {
+          color: ['#A78BFA', '#60A5FA', '#34D399', '#FBBF24'][i],
+          borderRadius: [0, 8, 8, 0],
+        },
+      })),
+      barWidth: 32,
+      label: { show: true, position: 'right', formatter: '{c}' },
+    }],
+  }
+})
+
+// ===== 导出 Excel (CSV) =====
+function exportCSV() {
+  const report = store.dashboard?.daily_report || []
+  if (!report.length) {
+    ElMessage.warning('暂无数据可导出')
+    return
+  }
+  const headers = ['日期', 'DAU', '新增用户', '发音练习', '对话', '任务完成']
+  const rows = report.map(r => [
+    r.date, r.dau, r.new_users, r.practice_count, r.conversation_count, r.tasks_completed,
+  ])
+  const BOM = '\uFEFF'
+  const csv = BOM + [headers, ...rows].map(row => row.join(',')).join('\n')
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `运营日报_${new Date().toISOString().slice(0, 10)}.csv`
+  a.click()
+  URL.revokeObjectURL(url)
+  ElMessage.success('导出成功')
+}
 </script>
 
 <template>
-  <div class="content-card">
-    <div class="flex-between" style="margin-bottom: var(--spacing-xl);">
+  <div class="content-card dashboard-page">
+    <!-- 头部：标题 + 日期筛选 + 快捷按钮 + 导出 -->
+    <div class="dash-header">
       <h2 class="page-title" style="margin-bottom:0;">运营数据看板</h2>
+      <div class="dash-controls">
+        <el-button-group class="date-presets">
+          <el-button size="small" @click="setDateRange(7)">近7天</el-button>
+          <el-button size="small" @click="setDateRange(30)">近30天</el-button>
+          <el-button size="small" @click="setDateRange(90)">近90天</el-button>
+        </el-button-group>
+        <el-date-picker
+          v-model="dateRange"
+          type="daterange"
+          range-separator="至"
+          start-placeholder="开始"
+          end-placeholder="结束"
+          size="small"
+          style="width: 240px;"
+          @change="handleDateChange"
+        />
+        <el-button size="small" :icon="Download" type="primary" @click="exportCSV">导出日报</el-button>
+      </div>
     </div>
 
     <!-- 加载状态 -->
@@ -152,7 +295,25 @@ const typeBarOption = computed(() => {
         </el-row>
       </div>
 
-      <!-- 图表行1：7日DAU + CEFR分布 -->
+      <!-- 图表行1：内容排行 + 转化漏斗 -->
+      <el-row :gutter="16" style="margin-top: var(--spacing-lg);">
+        <el-col :span="14">
+          <div class="chart-box">
+            <h4 class="chart-title">内容使用排行（所选时段）</h4>
+            <v-chart v-if="(store.dashboard.content_ranking || []).length" :option="rankingOption" autoresize style="height: 300px" />
+            <el-empty v-else description="暂无排行数据" :image-size="60" />
+          </div>
+        </el-col>
+        <el-col :span="10">
+          <div class="chart-box">
+            <h4 class="chart-title">转化漏斗（所选时段）</h4>
+            <v-chart v-if="(store.dashboard.conversion_funnel || {}).registered" :option="funnelOption" autoresize style="height: 300px" />
+            <el-empty v-else description="暂无漏斗数据" :image-size="60" />
+          </div>
+        </el-col>
+      </el-row>
+
+      <!-- 图表行2：7日DAU + CEFR分布 -->
       <el-row :gutter="16" style="margin-top: var(--spacing-lg);">
         <el-col :span="14">
           <div class="chart-box">
@@ -168,7 +329,7 @@ const typeBarOption = computed(() => {
         </el-col>
       </el-row>
 
-      <!-- 图表行2：用户增长 + 练习类型 -->
+      <!-- 图表行3：用户增长 + 练习类型 -->
       <el-row :gutter="16" style="margin-top: var(--spacing-lg);">
         <el-col :span="14">
           <div class="chart-box">
@@ -183,6 +344,7 @@ const typeBarOption = computed(() => {
           </div>
         </el-col>
       </el-row>
+
     </template>
 
     <el-empty v-else description="暂无数据" />
@@ -190,6 +352,30 @@ const typeBarOption = computed(() => {
 </template>
 
 <style lang="scss" scoped>
+.dashboard-page {
+  padding-bottom: var(--spacing-xl);
+}
+
+.dash-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--spacing-md);
+  margin-bottom: var(--spacing-xl);
+}
+
+.dash-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+}
+
+.date-presets {
+  margin-right: var(--spacing-xs);
+}
+
 .metrics-section {
   margin-bottom: var(--spacing-sm);
 
@@ -240,5 +426,15 @@ const typeBarOption = computed(() => {
   font-weight: 600;
   margin-bottom: var(--spacing-md);
   color: var(--color-text-primary);
+}
+
+@media (max-width: 768px) {
+  .dash-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .dash-controls {
+    flex-wrap: wrap;
+  }
 }
 </style>

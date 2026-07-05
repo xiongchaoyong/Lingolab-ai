@@ -77,7 +77,8 @@ class AssignmentListResponse(BaseModel):
 
 class CreateAssignmentRequest(BaseModel):
     """布置作业"""
-    class_id: int
+    class_id: Optional[int] = None
+    class_ids: Optional[List[int]] = None
     title: str = Field(..., max_length=200)
     description: str = ""
     content_type: str = Field(..., description="pronunciation/conversation/dubbing")
@@ -165,35 +166,111 @@ class DashboardMetrics(BaseModel):
     total_duration_minutes: int = 0
     avg_duration_minutes: float = 0.0
     conversation_completion_rate: float = 0.0
-    # 角色分布
     teacher_count: int = 0
     learner_count: int = 0
-    # 班级概况
     total_classes: int = 0
     avg_students_per_class: float = 0.0
-    # 今日活动
     today_tasks_completed: int = 0
     today_pronunciation: int = 0
     today_conversations: int = 0
-    # 任务
     task_completion_rate: float = 0.0
-    # 积分
     total_points: int = 0
 
 
-class TrendPoint(BaseModel):
-    """趋势数据点"""
-    label: str
-    value: int
+class ContentRankItem(BaseModel):
+    """内容使用排行条目"""
+    name: str
+    type: str = ""
+    count: int = 0
+
+
+class ConversionFunnel(BaseModel):
+    """转化漏斗数据"""
+    registered: int = 0
+    assessed: int = 0
+    first_practice: int = 0
+    retained_7d: int = 0
+
+
+class DailyReportItem(BaseModel):
+    """每日活跃日报条目"""
+    date: str
+    dau: int = 0
+    new_users: int = 0
+    practice_count: int = 0
+    conversation_count: int = 0
+    tasks_completed: int = 0
+
+
+class TrendLabel(BaseModel):
+    """仪表盘趋势标签（label/value 结构）"""
+    label: str = ""
+    value: int = 0
 
 
 class DashboardResponse(BaseModel):
     """仪表盘完整数据"""
     metrics: DashboardMetrics
-    user_trend: List[TrendPoint] = Field(default_factory=list)
-    daily_activity: List[TrendPoint] = Field(default_factory=list)
+    user_trend: List[TrendLabel] = Field(default_factory=list)
+    daily_activity: List[TrendLabel] = Field(default_factory=list)
     content_type_distribution: dict = Field(default_factory=dict)
     level_distribution: dict = Field(default_factory=dict)
+    content_ranking: List[ContentRankItem] = Field(default_factory=list)
+    conversion_funnel: ConversionFunnel = Field(default_factory=ConversionFunnel)
+    daily_report: List[DailyReportItem] = Field(default_factory=list)
+
+
+# ============================================================
+# 教师工作台 Dashboard
+# ============================================================
+
+class TeacherDashboardResponse(BaseModel):
+    """教师端仪表盘"""
+    total_classes: int = 0
+    total_students: int = 0
+    pending_reviews: int = 0
+    total_assignments: int = 0
+    active_students_today: int = 0
+    avg_class_size: float = 0.0
+    recent_assignments: List[AssignmentItem] = Field(default_factory=list)
+    class_student_counts: List[dict] = Field(default_factory=list)
+
+
+# ============================================================
+# 学生进度趋势
+# ============================================================
+
+class TrendDataPoint(BaseModel):
+    """趋势数据点（四维度）"""
+    date: str
+    pronunciation: float = 0
+    fluency: float = 0
+    grammar: float = 0
+    vocabulary: float = 0
+
+
+class StudentTrendResponse(BaseModel):
+    """学生趋势数据"""
+    trend: List[TrendDataPoint] = Field(default_factory=list)
+
+
+# ============================================================
+# 学习打卡统计
+# ============================================================
+
+class CheckinDay(BaseModel):
+    """单日打卡"""
+    date: str
+    completed: int = 0
+    total: int = 0
+
+
+class CheckinStatsResponse(BaseModel):
+    """打卡统计"""
+    checkins: List[CheckinDay] = Field(default_factory=list)
+    streak: int = 0
+    total_days: int = 0
+    completion_rate: float = 0.0
 
 
 # ============================================================
@@ -217,6 +294,12 @@ class FeedbackListResponse(BaseModel):
     """反馈列表"""
     feedbacks: List[FeedbackItem] = Field(default_factory=list)
     total: int = 0
+
+
+class CreateFeedbackRequest(BaseModel):
+    """用户提交反馈"""
+    content: str = Field(..., min_length=1, max_length=2000, description="反馈内容")
+    feedback_type: str = Field(default="other", pattern="^(bug|feature|scene|other)$", description="反馈类型")
 
 
 class FeedbackReplyRequest(BaseModel):

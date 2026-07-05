@@ -1,4 +1,4 @@
-"""社区服务 API 路由 — 语音挑战 / 话题讨论 / 学习小组"""
+"""社区服务 API 路由 — 语音挑战 / 话题讨论"""
 
 import logging
 
@@ -22,9 +22,6 @@ from app.schemas.community import (
     CreatePostRequest,
     CreateCommentRequest,
     LikeResponse,
-    GroupListResponse,
-    GroupItem,
-    JoinResult,
 )
 from app.services.community import community_service
 
@@ -180,28 +177,3 @@ async def add_comment(
     return CommentItem(**result)
 
 
-# ============================================================
-# 学习小组
-# ============================================================
-
-@router.get("/groups", response_model=GroupListResponse)
-async def list_groups(
-    current_user: UserProfile = Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
-    """获取小组列表"""
-    items = community_service.get_groups(current_user.id, db)
-    db.commit()
-    return GroupListResponse(groups=[GroupItem(**i) for i in items])
-
-
-@router.post("/groups/{group_id}/join", response_model=JoinResult)
-async def toggle_group(
-    group_id: int,
-    current_user: UserProfile = Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
-    """加入/退出小组"""
-    result = community_service.toggle_group(current_user.id, group_id, db)
-    db.commit()
-    return JoinResult(**result)

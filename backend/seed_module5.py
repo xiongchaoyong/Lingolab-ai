@@ -1,4 +1,4 @@
-"""模块5 种子数据 — 语音挑战/讨论帖/学习小组"""
+"""模块5 种子数据 — 语音挑战/讨论帖"""
 
 from datetime import date, datetime, timedelta
 
@@ -9,41 +9,33 @@ from app.models.community import (
     ChallengeSubmission,
     DiscussionPost,
     PostComment,
-    StudyGroup,
-    GroupMember,
 )
 
 db = SessionLocal()
 
 # ============================================================
-# 1. 语音挑战
+# 1. 语音挑战（幂等：按标题去重，已存在的跳过）
 # ============================================================
-challenges = [
-    VoiceChallenge(
-        title="Tongue Twister Challenge",
-        description="挑战绕口令，看看谁的发音最标准！",
-        sample_text="She sells seashells by the seashore. The shells she sells are surely seashells.",
-        deadline=datetime.utcnow() + timedelta(days=7),
-        is_active=True,
-    ),
-    VoiceChallenge(
-        title="BBC News Shadow Reading",
-        description="跟读 BBC 新闻片段，练习英式发音和语调",
-        sample_text="The government has announced new measures to tackle climate change, including a ban on petrol cars by 2030.",
-        deadline=datetime.utcnow() + timedelta(days=5),
-        is_active=True,
-    ),
-    VoiceChallenge(
-        title="Poem Recitation",
-        description="朗诵经典英文诗歌，展现你的语音韵律感",
-        sample_text="Shall I compare thee to a summer's day? Thou art more lovely and more temperate.",
-        deadline=datetime.utcnow() + timedelta(days=3),
-        is_active=True,
-    ),
+challenge_data = [
+    {"title": "Tongue Twister Challenge", "description": "挑战绕口令，看看谁的发音最标准！", "sample_text": "She sells seashells by the seashore. The shells she sells are surely seashells.", "deadline": datetime.utcnow() + timedelta(days=7)},
+    {"title": "BBC News Shadow Reading", "description": "跟读 BBC 新闻片段，练习英式发音和语调", "sample_text": "The government has announced new measures to tackle climate change, including a ban on petrol cars by 2030.", "deadline": datetime.utcnow() + timedelta(days=5)},
+    {"title": "Poem Recitation", "description": "朗诵经典英文诗歌，展现你的语音韵律感", "sample_text": "Shall I compare thee to a summer's day? Thou art more lovely and more temperate.", "deadline": datetime.utcnow() + timedelta(days=3)},
 ]
-db.add_all(challenges)
-db.flush()
-print(f"Inserted {len(challenges)} voice challenges")
+
+existing_titles = {t[0] for t in db.query(VoiceChallenge.title).all()}
+challenges = []
+for d in challenge_data:
+    if d["title"] in existing_titles:
+        print(f"  ⏭ 跳过已存在: {d['title']}")
+        continue
+    challenges.append(VoiceChallenge(**d, is_active=True))
+
+if challenges:
+    db.add_all(challenges)
+    db.flush()
+    print(f"Inserted {len(challenges)} voice challenges")
+else:
+    print("语音挑战已全部存在，跳过")
 
 # ============================================================
 # 2. 讨论帖
@@ -95,60 +87,6 @@ comments = [
 db.add_all(comments)
 db.flush()
 print(f"Inserted {len(comments)} comments")
-
-# ============================================================
-# 4. 学习小组
-# ============================================================
-groups = [
-    StudyGroup(
-        name="Daily Speaking Club",
-        description="每天练习口语，互相纠正发音和语法",
-        creator_id=4,
-        level_range="B1",
-        schedule="每天晚上 20:00",
-        tags="口语,日常",
-        member_count=1,
-        is_archived=False,
-    ),
-    StudyGroup(
-        name="IELTS Prep Squad",
-        description="雅思备考小组，分享考试技巧和模拟练习",
-        creator_id=4,
-        level_range="B2",
-        schedule="周二/周四 19:30",
-        tags="雅思,备考",
-        member_count=0,
-        is_archived=False,
-    ),
-    StudyGroup(
-        name="Pronunciation Lab",
-        description="专注发音训练，使用音标和最小对立体练习",
-        creator_id=4,
-        level_range="A2",
-        schedule="周一/三/五 18:00",
-        tags="发音,纠音",
-        member_count=0,
-        is_archived=False,
-    ),
-    StudyGroup(
-        name="Business English",
-        description="职场英语，涵盖会议/邮件/演讲等场景",
-        creator_id=4,
-        level_range="B2",
-        schedule="周六 10:00",
-        tags="商务,职场",
-        member_count=0,
-        is_archived=False,
-    ),
-]
-db.add_all(groups)
-db.flush()
-print(f"Inserted {len(groups)} study groups")
-
-# 用户4加入第一个小组
-db.add(GroupMember(group_id=groups[0].id, user_id=4))
-db.flush()
-print("User 4 joined Daily Speaking Club")
 
 db.commit()
 db.close()

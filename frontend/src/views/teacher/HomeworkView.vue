@@ -14,7 +14,7 @@ const currentSubmission = ref(null)
 const reviewForm = ref({ teacher_feedback: '', teacher_score: null })
 
 const newHomework = ref({
-  class_id: null,
+  class_ids: [],
   title: '',
   description: '',
   content_type: 'pronunciation',
@@ -43,7 +43,7 @@ function getContentTypeLabel(type) {
 }
 
 async function assignHomework() {
-  if (!newHomework.value.title || !newHomework.value.class_id) return
+  if (!newHomework.value.title || !newHomework.value.class_ids?.length) return
   loading.value = true
   try {
     const data = {
@@ -53,9 +53,10 @@ async function assignHomework() {
         : null,
     }
     await store.createAssignment(data)
-    ElMessage.success('作业布置成功')
+    const count = newHomework.value.class_ids.length
+    ElMessage.success(`作业已布置到 ${count} 个班级`)
     showAssignDialog.value = false
-    newHomework.value = { class_id: null, title: '', description: '', content_type: 'pronunciation', content_ids: [], due_date: null }
+    newHomework.value = { class_ids: [], title: '', description: '', content_type: 'pronunciation', content_ids: [], due_date: null }
   } catch (e) {
     ElMessage.error('布置失败')
   } finally {
@@ -156,8 +157,8 @@ function playAudio(url) {
         <el-form-item label="作业标题">
           <el-input v-model="newHomework.title" placeholder="如：Unit 3 跟读练习" maxlength="200" />
         </el-form-item>
-        <el-form-item label="班级">
-          <el-select v-model="newHomework.class_id" style="width:100%" placeholder="选择班级">
+        <el-form-item label="班级（可多选）">
+          <el-select v-model="newHomework.class_ids" multiple style="width:100%" placeholder="选择一个或多个班级">
             <el-option v-for="c in classOptions" :key="c.value" :label="c.label" :value="c.value" />
           </el-select>
         </el-form-item>
@@ -175,7 +176,7 @@ function playAudio(url) {
       </el-form>
       <template #footer>
         <el-button @click="showAssignDialog = false">取消</el-button>
-        <el-button type="primary" @click="assignHomework" :disabled="!newHomework.title || !newHomework.class_id" :loading="loading">布置</el-button>
+        <el-button type="primary" @click="assignHomework" :disabled="!newHomework.title || !newHomework.class_ids?.length" :loading="loading">布置</el-button>
       </template>
     </el-dialog>
 

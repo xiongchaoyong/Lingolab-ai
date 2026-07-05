@@ -309,9 +309,6 @@ test("12.1 语音挑战列表", "GET", "/api/community/challenges", 200,
 test("12.2 讨论区帖子", "GET", "/api/community/posts", 200,
     check_fn=lambda b,r: isinstance(b.get("posts", []), list))
 
-test("12.3 学习小组", "GET", "/api/community/groups", 200,
-    check_fn=lambda b,r: isinstance(b.get("groups", []), list))
-
 # ==================== 模块13: 资料推荐 (Recommendations) ====================
 print("\n📋 模块13: 资料推荐")
 
