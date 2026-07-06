@@ -224,8 +224,11 @@ const router = createRouter({
 router.beforeEach((to, from, next) => {
   const authStore = useAuthStore()
 
-  // 游客路由：已登录用户访问 /login /register → 重定向到首页
+  // 游客路由：已登录用户访问 /login /register → 按角色重定向
   if (to.meta.guest && authStore.isLoggedIn) {
+    const role = authStore.userInfo?.role
+    if (role === 'admin') return next('/admin/dashboard')
+    if (role === 'teacher') return next('/teacher/dashboard')
     return next('/')
   }
 
@@ -248,13 +251,22 @@ router.beforeEach((to, from, next) => {
     return next('/assessment')
   }
 
-  // 角色检查：教师/管理员路由（admin 可访问教师路由）
+  // 角色检查：严格端隔离（admin 可访问 teacher 路由）
   if (to.meta.role && authStore.userInfo?.role !== to.meta.role) {
     // admin 可访问 teacher 路由
     if (to.meta.role === 'teacher' && authStore.userInfo?.role === 'admin') {
       return next()
     }
     return next('/')
+  }
+
+  // 严格端隔离：非学生角色不能访问学生端页面
+  const studentOnlyPaths = ['/', '/pronunciation', '/voice-chat', '/grammar',
+    '/learning-path', '/recommend', '/profile-summary', '/community', '/my-classes', '/help']
+  if (studentOnlyPaths.includes(to.path) && authStore.isLoggedIn) {
+    const role = authStore.userInfo?.role
+    if (role === 'teacher') return next('/teacher/dashboard')
+    if (role === 'admin') return next('/admin/dashboard')
   }
 
   next()

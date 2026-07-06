@@ -61,7 +61,7 @@ const rules = {
   ],
   password: [
     { required: true, message: '请输入密码', trigger: 'blur' },
-    { min: 8, max: 32, message: '8-32 个字符，需包含字母和数字', trigger: 'blur' },
+    { min: 1, message: '请输入密码', trigger: 'blur' },
     { pattern: /^(?=.*[a-zA-Z])(?=.*\d)/, message: '密码必须包含字母和数字', trigger: 'blur' },
   ],
   confirmPassword: [
@@ -159,7 +159,7 @@ async function handleRegister() {
               <el-input
                 v-model="form.password"
                 type="password"
-                placeholder="8-32个字符，含字母和数字"
+                placeholder="请输入密码"
                 show-password
               />
             </el-form-item>

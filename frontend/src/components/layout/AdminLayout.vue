@@ -73,8 +73,6 @@ function toggleCollapse() {
 function handleCommand(command) {
   if (command === 'profile') {
     router.push('/profile')
-  } else if (command === 'student') {
-    router.push('/')
   } else if (command === 'logout') {
     authStore.logout()
     router.push('/login')
@@ -111,7 +109,6 @@ function handleCommand(command) {
           <template #dropdown>
             <el-dropdown-menu>
               <el-dropdown-item command="profile">个人设置</el-dropdown-item>
-              <el-dropdown-item command="student">切换到学生端</el-dropdown-item>
               <el-dropdown-item command="logout" divided>退出登录</el-dropdown-item>
             </el-dropdown-menu>
           </template>

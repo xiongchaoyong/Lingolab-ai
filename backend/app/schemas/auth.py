@@ -9,7 +9,7 @@ class RegisterRequest(BaseModel):
     """用户注册请求"""
     username: str = Field(..., description="用户名，4-20 字符，字母数字下划线")
     email: str = Field(..., description="邮箱地址")
-    password: str = Field(..., description="密码，8-32 字符，需包含字母和数字")
+    password: str = Field(..., description="密码，1-128 字符")
     age: int = Field(..., ge=1, le=150, description="年龄，1-150")
     learning_goal: str = Field(..., description="学习目标：daily/exam/business/abroad/hobby")
     interests: List[str] = Field(default_factory=list, description="兴趣标签数组")
@@ -33,10 +33,8 @@ class RegisterRequest(BaseModel):
     @field_validator("password")
     @classmethod
     def validate_password(cls, v: str) -> str:
-        if len(v) < 8 or len(v) > 32:
-            raise ValueError("密码需 8-32 个字符")
-        if not re.search(r"[a-zA-Z]", v) or not re.search(r"\d", v):
-            raise ValueError("密码必须包含字母和数字")
+        if len(v) < 1 or len(v) > 128:
+            raise ValueError("密码需 1-128 个字符")
         return v
 
     @field_validator("learning_goal")
