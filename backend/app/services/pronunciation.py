@@ -255,11 +255,13 @@ class PronunciationService:
             else:
                 level = "需练习"
 
+            tip = PHONEME_TIPS.get(ch, "")
             scores.append({
                 "char": ch,
                 "score": round(gop_score, 1),
                 "duration_ms": round((end_f - start_f) * 20, 1),
                 "level": level,
+                "tip": tip,
             })
             total_score += gop_score
 

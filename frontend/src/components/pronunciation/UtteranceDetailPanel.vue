@@ -177,15 +177,23 @@ const levelTable = [
       <!-- 逐音素评分 -->
       <el-tab-pane label="逐音素评分" name="phoneme">
         <div class="phoneme-strip">
-          <div
+          <el-tooltip
             v-for="(cs, i) in data.char_scores"
             :key="i"
-            class="phoneme-chip"
-            :style="{ background: getCharScoreBg(cs.score), borderColor: getCharScoreBorder(cs.score) }"
+            :content="cs.tip || ''"
+            placement="top"
+            effect="dark"
+            :disabled="!cs.tip"
           >
-            <span class="chip-char">{{ cs.char }}</span>
-            <span class="chip-score">{{ cs.score }}</span>
-          </div>
+            <div
+              class="phoneme-chip"
+              :class="{ 'phoneme-chip--has-tip': cs.tip }"
+              :style="{ background: getCharScoreBg(cs.score), borderColor: getCharScoreBorder(cs.score) }"
+            >
+              <span class="chip-char">{{ cs.char }}</span>
+              <span class="chip-score">{{ cs.score }}</span>
+            </div>
+          </el-tooltip>
           <p v-if="!data.char_scores?.length" class="text-muted">暂无逐音素数据</p>
         </div>
 
@@ -627,6 +635,15 @@ const levelTable = [
 
   .chip-char { font-size: 14px; font-weight: 700; color: #3D3D5C; }
   .chip-score { font-size: 10px; color: #999; }
+}
+
+.phoneme-chip--has-tip {
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s;
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  }
 }
 
 .viz-section {

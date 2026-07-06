@@ -780,18 +780,26 @@ const rhythmSummary = computed(() => {
         <el-tab-pane label="逐音素评分" name="phoneme">
           <!-- 文本高亮条 -->
           <div class="phoneme-strip">
-            <div
+            <el-tooltip
               v-for="(cs, i) in scoreResult.char_scores"
               :key="i"
-              class="phoneme-chip"
-              :style="{
-                background: getCharScoreBg(cs.score),
-                borderColor: getCharScoreBorder(cs.score),
-              }"
+              :content="cs.tip || ''"
+              placement="top"
+              effect="dark"
+              :disabled="!cs.tip"
             >
-              <span class="chip-char">{{ cs.char }}</span>
-              <span class="chip-score">{{ cs.score }}</span>
-            </div>
+              <div
+                class="phoneme-chip"
+                :class="{ 'phoneme-chip--has-tip': cs.tip }"
+                :style="{
+                  background: getCharScoreBg(cs.score),
+                  borderColor: getCharScoreBorder(cs.score),
+                }"
+              >
+                <span class="chip-char">{{ cs.char }}</span>
+                <span class="chip-score">{{ cs.score }}</span>
+              </div>
+            </el-tooltip>
             <p v-if="!scoreResult.char_scores?.length" class="text-muted">暂无逐音素数据</p>
           </div>
 
@@ -804,7 +812,18 @@ const rhythmSummary = computed(() => {
             max-height="300"
             style="margin-top: 16px;"
           >
-            <el-table-column prop="char" label="音素" width="80" align="center" />
+            <el-table-column prop="char" label="音素" width="80" align="center">
+                  <template #default="{ row }">
+                    <el-tooltip
+                      :content="row.tip || ''"
+                      placement="top"
+                      effect="dark"
+                      :disabled="!row.tip"
+                    >
+                      <span :class="{ 'has-tip': row.tip }">{{ row.char }}</span>
+                    </el-tooltip>
+                  </template>
+                </el-table-column>
             <el-table-column prop="score" label="GOP 得分" width="120" align="center">
               <template #default="{ row }">
                 <span :style="{ color: getScoreColor(row.score), fontWeight: 600 }">
@@ -1691,6 +1710,20 @@ const rhythmSummary = computed(() => {
   border-radius: var(--radius-sm);
   border: 1.5px solid;
   min-width: 44px;
+}
+
+.phoneme-chip--has-tip {
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+.phoneme-chip--has-tip:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.has-tip {
+  cursor: pointer;
+  border-bottom: 1px dashed var(--color-text-secondary);
 }
 
 .chip-char {

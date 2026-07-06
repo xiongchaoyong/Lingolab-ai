@@ -21,6 +21,7 @@ class CharScore(BaseModel):
     score: float = Field(..., description="GOP 得分 (0-100)")
     duration_ms: float = Field(..., description="持续时间(ms)")
     level: str = Field(..., description="评级: 优秀/良好/一般/需练习")
+    tip: str = Field(default="", description="发音指导（舌位/口型）")
 
 
 class F0Point(BaseModel):
