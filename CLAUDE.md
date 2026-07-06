@@ -5,6 +5,18 @@
 
 ---
 
+## 🚀 首次启动检测
+
+当 Claude Code 打开此项目时，**首先检查是否为首次在新环境中运行**：
+
+1. 检查 `backend/.env` 是否存在且包含真实配置（非模板占位符）
+2. 检查数据库 `english_training_dev` 是否存在
+3. 检查 `frontend/node_modules` 和 `backend/venv`（或任意 Python 环境）是否存在
+
+**如果以上任一条件不满足，立即读取并执行 `docs/setup-guide.md` 中的配置流程**，引导用户完成环境搭建。不要直接开始编码。
+
+---
+
 ## ⚠️ 编码前必读
 
 **在进行任何代码编写前，必须先读取 `docs/ai-collaboration-standards.md`**，严格遵循其中的项目结构、前端/后端模式、命名规范和协作流程。所有 AI 生成的代码必须符合该规范。
