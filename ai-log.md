@@ -1,3 +1,11 @@
+## 2026-07-06: 音素评分舌位口型指导提示
+
+- 后端 CharScore schema 新增 `tip` 字段，`_compute_gop_scores()` 为每个音素查找 PHONEME_TIPS 字典附加发音指导
+- 前端 PronunciationView + UtteranceDetailPanel 音素块添加 el-tooltip，hover 展示舌位/口型指导
+- 有 tip 的音素块增加悬浮上浮动画效果，视觉暗示可交互
+
+Commit: 待提交 | Branch: feat/grammar-check-fixes | 4 files
+
 ## 2026-07-05: 运营看板增强 + 教师端工作台 + 反馈入口 + 多项优化
 
 ### 运营看板（5项增强）
