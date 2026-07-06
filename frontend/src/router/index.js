@@ -124,9 +124,10 @@ const routes = [
   // ========== 教师端 ==========
   {
     path: '/teacher',
-    component: () => import('@/components/layout/TopNavLayout.vue'),
+    component: () => import('@/components/layout/AdminLayout.vue'),
     meta: { auth: true, role: 'teacher' },
     children: [
+      { path: '', redirect: { name: 'TeacherDashboard' } },
       {
         path: 'dashboard',
         name: 'TeacherDashboard',
@@ -151,15 +152,22 @@ const routes = [
         component: () => import('@/views/teacher/HomeworkView.vue'),
         meta: { title: '作业管理' },
       },
+      {
+        path: 'courses',
+        name: 'TeacherCourses',
+        component: () => import('@/views/teacher/CourseManageView.vue'),
+        meta: { title: '课程管理' },
+      },
     ],
   },
 
   // ========== 运营后台 ==========
   {
     path: '/admin',
-    component: () => import('@/components/layout/TopNavLayout.vue'),
+    component: () => import('@/components/layout/AdminLayout.vue'),
     meta: { auth: true, role: 'admin' },
     children: [
+      { path: '', redirect: { name: 'AdminDashboard' } },
       {
         path: 'dashboard',
         name: 'AdminDashboard',
@@ -189,6 +197,12 @@ const routes = [
         name: 'AdminKnowledge',
         component: () => import('@/views/admin/KnowledgeBaseView.vue'),
         meta: { title: '知识库管理' },
+      },
+      {
+        path: 'settings',
+        name: 'AdminSettings',
+        component: () => import('@/views/admin/SettingsView.vue'),
+        meta: { title: '系统设置' },
       },
     ],
   },
@@ -225,10 +239,11 @@ router.beforeEach((to, from, next) => {
     return next('/')
   }
 
-  // 未完成测评 → 强制跳转测评页（豁免路径除外）
+  // 未完成测评 → 强制跳转测评页（仅学习者，豁免路径除外）
   const assessmentExempt = ['/assessment', '/assessment/result', '/profile', '/login', '/register']
   if (to.meta.auth && authStore.isLoggedIn &&
-      authStore.userInfo && !authStore.userInfo.assessment_completed &&
+      authStore.userInfo && authStore.userInfo.role === 'learner' &&
+      !authStore.userInfo.assessment_completed &&
       !assessmentExempt.includes(to.path)) {
     return next('/assessment')
   }

@@ -1,3 +1,12 @@
+## 2026-07-06: 三端分离门户
+
+- 后端登录重定向按角色分流（教师→/teacher/dashboard，运营→/admin/dashboard，学生→评估）
+- 新建 `AdminLayout.vue` 经典后台布局（侧边栏+顶栏+内容区），教师端和运营端共用
+- 路由调整：/teacher/* 和 /admin/* 从 TopNavLayout 切换为 AdminLayout，添加默认重定向
+- 修复评估守卫：仅学习者（role=learner）强制跳转评估，教师和管理员跳过
+- 新增教师端「课程管理」页面 /teacher/courses
+- 新增运营端「系统设置」页面 /admin/settings
+
 ## 2026-07-06: 音素评分舌位口型指导提示
 
 - 后端 CharScore schema 新增 `tip` 字段，`_compute_gop_scores()` 为每个音素查找 PHONEME_TIPS 字典附加发音指导
